@@ -1,0 +1,32 @@
+# Development Caddyfile
+# Replace mentory.local with your domain in production
+
+mentory.local {
+    # Web app
+    handle {
+        reverse_proxy web:3000
+    }
+
+    # API routes
+    handle /api/* {
+        reverse_proxy api:4000
+    }
+}
+
+# Production example (uncomment and configure)
+# mentory.io {
+#     # Web app
+#     handle {
+#         reverse_proxy web:3000
+#     }
+# 
+#     # API routes
+#     handle /api/* {
+#         reverse_proxy api:4000
+#     }
+# 
+#     # Enable automatic HTTPS
+#     tls {
+#         email admin@mentory.io
+#     }
+# }

@@ -1,0 +1,26 @@
+{
+  "name": "mentory",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "dev:web": "pnpm --filter @mentory/web dev",
+    "dev:api": "pnpm --filter @mentory/api dev",
+    "build": "pnpm -r build",
+    "build:web": "pnpm --filter @mentory/web build",
+    "build:api": "pnpm --filter @mentory/api build",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\"",
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "docker:dev": "docker compose -f infra/docker-compose.dev.yml up --build",
+    "docker:prod": "docker compose -f infra/docker-compose.prod.yml up --build -d",
+    "docker:down": "docker compose -f infra/docker-compose.dev.yml down"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "prettier": "^3.4.0",
+    "typescript": "^5.7.0"
+  }
+}

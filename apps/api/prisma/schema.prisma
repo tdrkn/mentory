@@ -1,0 +1,431 @@
+// ============================================
+// Mentory Prisma Schema
+// ============================================
+// Based on ER diagram: /product/er.puml
+// Run migrations: pnpm prisma migrate dev
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Enums
+// ============================================
+
+enum UserRole {
+  mentee
+  mentor
+  both
+  admin
+}
+
+enum SlotStatus {
+  free
+  held
+  booked
+}
+
+enum SessionStatus {
+  requested
+  booked
+  paid
+  canceled
+  completed
+  no_show
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+}
+
+enum PayoutStatus {
+  pending
+  paid
+  failed
+}
+
+enum NotificationType {
+  session_requested
+  session_confirmed
+  session_canceled
+  session_reminder
+  payment_received
+  payout_sent
+  new_message
+  new_review
+}
+
+// ============================================
+// Users & Profiles
+// ============================================
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  timezone     String   @default("UTC")
+  role         UserRole @default(mentee)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  mentorProfile   MentorProfile?
+  menteeProfile   MenteeProfile?
+  mentorServices  MentorService[]
+  availabilityRules AvailabilityRule[]
+  availabilityExceptions AvailabilityException[]
+  slots           Slot[]
+  sessionsAsMentor Session[] @relation("MentorSessions")
+  sessionsAsMentee Session[] @relation("MenteeSessions")
+  payouts         Payout[]
+  sessionNotes    SessionNote[]
+  reviewsGiven    Review[] @relation("ReviewsByMentee")
+  reviewsReceived Review[] @relation("ReviewsForMentor")
+  messages        Message[]
+  notifications   Notification[]
+
+  @@map("users")
+}
+
+model MentorProfile {
+  userId      String   @id @map("user_id") @db.Uuid
+  headline    String?
+  bio         String?
+  languages   String[] @default([])
+  timezone    String   @default("UTC")
+  isActive    Boolean  @default(false) @map("is_active")
+  ratingAvg   Decimal  @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount Int      @default(0) @map("rating_count")
+
+  // Relations
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topics MentorTopic[]
+
+  @@map("mentor_profiles")
+}
+
+model MenteeProfile {
+  userId     String   @id @map("user_id") @db.Uuid
+  background String?
+  goals      String?
+  interests  String[] @default([])
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("mentee_profiles")
+}
+
+// ============================================
+// Topics & Mentor Topics
+// ============================================
+
+model Topic {
+  id   String @id @default(uuid()) @db.Uuid
+  name String @unique
+
+  // Relations
+  mentors MentorTopic[]
+
+  @@map("topics")
+}
+
+model MentorTopic {
+  mentorId String @map("mentor_id") @db.Uuid
+  topicId  String @map("topic_id") @db.Uuid
+
+  // Relations
+  mentor MentorProfile @relation(fields: [mentorId], references: [userId], onDelete: Cascade)
+  topic  Topic         @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@id([mentorId, topicId])
+  @@index([topicId])
+  @@map("mentor_topics")
+}
+
+// ============================================
+// Services & Availability
+// ============================================
+
+model MentorService {
+  id          String  @id @default(uuid()) @db.Uuid
+  mentorId    String  @map("mentor_id") @db.Uuid
+  title       String
+  durationMin Int     @map("duration_min")
+  priceAmount Decimal @map("price_amount") @db.Decimal(10, 2)
+  currency    String  @default("USD") @db.VarChar(3)
+  isActive    Boolean @default(true) @map("is_active")
+
+  // Relations
+  mentor   User      @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  sessions Session[]
+
+  @@index([mentorId])
+  @@index([isActive])
+  @@map("mentor_services")
+}
+
+model AvailabilityRule {
+  id        String @id @default(uuid()) @db.Uuid
+  mentorId  String @map("mentor_id") @db.Uuid
+  weekday   Int    @db.SmallInt // 1 = Monday, 7 = Sunday
+  startTime String @map("start_time") @db.VarChar(5) // HH:MM format
+  endTime   String @map("end_time") @db.VarChar(5)
+  timezone  String @default("UTC")
+
+  // Relations
+  mentor User @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+
+  @@index([mentorId])
+  @@map("availability_rules")
+}
+
+model AvailabilityException {
+  id          String  @id @default(uuid()) @db.Uuid
+  mentorId    String  @map("mentor_id") @db.Uuid
+  date        DateTime @db.Date
+  isAvailable Boolean @default(false) @map("is_available")
+  note        String?
+
+  // Relations
+  mentor User @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+
+  @@unique([mentorId, date])
+  @@index([mentorId])
+  @@index([date])
+  @@map("availability_exceptions")
+}
+
+// ============================================
+// Slots & Sessions
+// ============================================
+
+model Slot {
+  id        String     @id @default(uuid()) @db.Uuid
+  mentorId  String     @map("mentor_id") @db.Uuid
+  startAt   DateTime   @map("start_at") @db.Timestamptz
+  endAt     DateTime   @map("end_at") @db.Timestamptz
+  status    SlotStatus @default(free)
+  heldUntil DateTime?  @map("held_until") @db.Timestamptz
+
+  // Relations
+  mentor  User     @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  session Session?
+
+  @@index([mentorId])
+  @@index([startAt])
+  @@index([status])
+  @@index([mentorId, startAt, status])
+  @@map("slots")
+}
+
+model Session {
+  id           String        @id @default(uuid()) @db.Uuid
+  mentorId     String        @map("mentor_id") @db.Uuid
+  menteeId     String        @map("mentee_id") @db.Uuid
+  serviceId    String        @map("service_id") @db.Uuid
+  slotId       String        @unique @map("slot_id") @db.Uuid
+  status       SessionStatus @default(requested)
+  startAt      DateTime      @map("start_at") @db.Timestamptz
+  endAt        DateTime      @map("end_at") @db.Timestamptz
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  canceledAt   DateTime?     @map("canceled_at") @db.Timestamptz
+  cancelReason String?       @map("cancel_reason")
+
+  // Relations
+  mentor       User          @relation("MentorSessions", fields: [mentorId], references: [id], onDelete: Restrict)
+  mentee       User          @relation("MenteeSessions", fields: [menteeId], references: [id], onDelete: Restrict)
+  service      MentorService @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  slot         Slot          @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  payments     Payment[]
+  videoRoom    VideoRoom?
+  notes        SessionNote[]
+  review       Review?
+  conversation Conversation?
+
+  @@index([mentorId])
+  @@index([menteeId])
+  @@index([status])
+  @@index([startAt])
+  @@index([mentorId, status])
+  @@index([menteeId, status])
+  @@map("sessions")
+}
+
+// ============================================
+// Payments & Payouts
+// ============================================
+
+model Payment {
+  id                String        @id @default(uuid()) @db.Uuid
+  sessionId         String        @map("session_id") @db.Uuid
+  provider          String        @default("stripe")
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @db.VarChar(3)
+  status            PaymentStatus @default(pending)
+  providerPaymentId String?       @map("provider_payment_id")
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+
+  @@index([sessionId])
+  @@index([status])
+  @@map("payments")
+}
+
+model Payout {
+  id        String       @id @default(uuid()) @db.Uuid
+  mentorId  String       @map("mentor_id") @db.Uuid
+  amount    Decimal      @db.Decimal(10, 2)
+  currency  String       @db.VarChar(3)
+  status    PayoutStatus @default(pending)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  mentor User @relation(fields: [mentorId], references: [id], onDelete: Restrict)
+
+  @@index([mentorId])
+  @@index([status])
+  @@map("payouts")
+}
+
+// ============================================
+// Video & Notes
+// ============================================
+
+model VideoRoom {
+  id            String   @id @default(uuid()) @db.Uuid
+  sessionId     String   @unique @map("session_id") @db.Uuid
+  provider      String   @default("daily")
+  roomId        String   @map("room_id")
+  joinUrlMentee String?  @map("join_url_mentee")
+  joinUrlMentor String?  @map("join_url_mentor")
+  recordingUrl  String?  @map("recording_url")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("video_rooms")
+}
+
+model SessionNote {
+  id            String   @id @default(uuid()) @db.Uuid
+  sessionId     String   @map("session_id") @db.Uuid
+  mentorId      String   @map("mentor_id") @db.Uuid
+  privateNotes  String?  @map("private_notes")
+  sharedSummary String?  @map("shared_summary")
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  mentor  User    @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, mentorId])
+  @@index([sessionId])
+  @@map("session_notes")
+}
+
+// ============================================
+// Chat
+// ============================================
+
+model Conversation {
+  id        String   @id @default(uuid()) @db.Uuid
+  mentorId  String   @map("mentor_id") @db.Uuid
+  menteeId  String   @map("mentee_id") @db.Uuid
+  sessionId String?  @unique @map("session_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  session  Session?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  messages Message[]
+
+  @@unique([mentorId, menteeId])
+  @@index([mentorId])
+  @@index([menteeId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String    @id @default(uuid()) @db.Uuid
+  conversationId String    @map("conversation_id") @db.Uuid
+  senderId       String    @map("sender_id") @db.Uuid
+  body           String
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  readAt         DateTime? @map("read_at") @db.Timestamptz
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  attachments  Attachment[]
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+model Attachment {
+  id        String @id @default(uuid()) @db.Uuid
+  messageId String @map("message_id") @db.Uuid
+  url       String
+  mimeType  String @map("mime_type")
+  sizeBytes BigInt @map("size_bytes")
+
+  // Relations
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("attachments")
+}
+
+// ============================================
+// Reviews & Notifications
+// ============================================
+
+model Review {
+  id        String   @id @default(uuid()) @db.Uuid
+  sessionId String   @unique @map("session_id") @db.Uuid
+  menteeId  String   @map("mentee_id") @db.Uuid
+  mentorId  String   @map("mentor_id") @db.Uuid
+  rating    Int      @db.SmallInt // 1-5
+  text      String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  mentee  User    @relation("ReviewsByMentee", fields: [menteeId], references: [id], onDelete: Cascade)
+  mentor  User    @relation("ReviewsForMentor", fields: [mentorId], references: [id], onDelete: Cascade)
+
+  @@index([mentorId])
+  @@index([menteeId])
+  @@index([rating])
+  @@map("reviews")
+}
+
+model Notification {
+  id          String           @id @default(uuid()) @db.Uuid
+  userId      String           @map("user_id") @db.Uuid
+  type        NotificationType
+  payloadJson Json?            @map("payload_json")
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  readAt      DateTime?        @map("read_at") @db.Timestamptz
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, readAt])
+  @@index([createdAt])
+  @@map("notifications")
+}
