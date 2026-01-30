@@ -2,11 +2,18 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "module": "CommonJS",
+    "moduleResolution": "node",
     "outDir": "./dist",
     "rootDir": "./src",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "target": "ES2022"
+    "target": "ES2022",
+    "skipLibCheck": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "strictPropertyInitialization": false,
+    "typeRoots": ["./node_modules/@types", "../../node_modules/@types"],
+    "types": ["node", "jest", "express"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

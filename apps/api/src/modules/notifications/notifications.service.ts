@@ -1,10 +1,7 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
 import { PrismaService } from '../../prisma';
 import { UpdateNotificationSettingsDto } from './dto/update-notification-settings.dto';
 import { NotificationType } from '@prisma/client';
-import { EMAIL_QUEUE } from './notifications.module';
 
 // Notification types for type safety
 export type NotificationData = {
@@ -20,7 +17,6 @@ export class NotificationsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @InjectQueue(EMAIL_QUEUE) private readonly emailQueue: Queue,
   ) {}
 
   async getNotifications(
@@ -124,7 +120,7 @@ export class NotificationsService {
         type: data.type,
         title: data.title,
         body: data.body,
-        data: data.data,
+        payloadJson: data.data,
       },
     });
   }
@@ -261,6 +257,7 @@ export class NotificationsService {
 
   /**
    * Queue an email job for async processing
+   * TODO: Re-enable BullMQ when ready
    */
   private async queueEmail(
     jobType: string,
@@ -270,44 +267,23 @@ export class NotificationsService {
       context: Record<string, any>;
     },
   ) {
-    try {
-      const job = await this.emailQueue.add(jobType, data, {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 2000, // Start with 2s, then 4s, 8s
-        },
-        removeOnComplete: 100, // Keep last 100 completed jobs
-        removeOnFail: 50, // Keep last 50 failed jobs for debugging
-      });
-
-      this.logger.log(`Queued ${jobType} email job ${job.id} for user ${data.userId}`);
-      return job;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to queue ${jobType} email: ${errorMessage}`);
-      // Don't throw - email failure shouldn't break the main flow
-      return null;
-    }
+    // STUB: Just log for now, email queue disabled
+    this.logger.log(`[STUB] Would queue ${jobType} email for user ${data.userId}`);
+    return null;
   }
 
   /**
    * Get queue statistics
+   * TODO: Re-enable when BullMQ is configured
    */
   async getQueueStats() {
-    const [waiting, active, completed, failed] = await Promise.all([
-      this.emailQueue.getWaitingCount(),
-      this.emailQueue.getActiveCount(),
-      this.emailQueue.getCompletedCount(),
-      this.emailQueue.getFailedCount(),
-    ]);
-
+    // STUB: Return zeros for now
     return {
-      queue: EMAIL_QUEUE,
-      waiting,
-      active,
-      completed,
-      failed,
+      queue: 'email',
+      waiting: 0,
+      active: 0,
+      completed: 0,
+      failed: 0,
     };
   }
 }

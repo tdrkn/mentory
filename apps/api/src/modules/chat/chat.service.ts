@@ -191,7 +191,7 @@ export class ChatService {
             filename: a.filename,
             mimeType: a.mimeType,
             url: a.url,
-            size: a.size,
+            sizeBytes: a.size,
           })),
         });
       }

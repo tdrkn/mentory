@@ -33,8 +33,8 @@ COPY apps/api/package.json ./apps/api/
 COPY packages/shared/package.json ./packages/shared/
 
 # Install ALL dependencies (including devDependencies)
-RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
+# Note: no cache mount to ensure native modules are built for correct arch
+RUN pnpm install --frozen-lockfile
 
 # ============================================
 # Stage 3: Development
@@ -48,6 +48,10 @@ COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_module
 
 # Copy source code
 COPY . .
+
+# Rebuild native modules for Linux and generate Prisma client
+RUN npm rebuild bcrypt --update-binary && \
+    cd apps/api && npx prisma generate
 
 # Set environment
 ENV NODE_ENV=development

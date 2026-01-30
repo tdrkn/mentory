@@ -44,9 +44,9 @@ export default function MentorsPage() {
         if (filters.sort) params.set('sort', filters.sort);
         
         const query = params.toString() ? `?${params.toString()}` : '';
-        const response = await api.get<{ mentors: MentorProfile[]; total: number }>(`/mentors${query}`);
-        setMentors(response.mentors);
-        setTotal(response.total);
+        const response = await api.get<{ data: MentorProfile[]; meta: { total: number } }>(`/mentors${query}`);
+        setMentors(response.data || []);
+        setTotal(response.meta?.total || 0);
       } catch (err) {
         if (err instanceof ApiError) {
           setError('Не удалось загрузить менторов');

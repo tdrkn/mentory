@@ -1,0 +1,57 @@
+# ============================================
+# Mentory Docker Ignore
+# ============================================
+
+# Dependencies - use container's own node_modules
+node_modules
+**/node_modules
+.pnp
+.pnp.js
+
+# Build outputs
+dist
+.next
+out
+build
+coverage
+.turbo
+
+# IDE and editor
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Git
+.git
+.gitignore
+
+# Environment files (handled separately)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files (avoid recursive include)
+infra/
+!infra/Caddyfile
+!infra/init-db
+
+# Test and temporary files
+*.test.ts
+*.spec.ts
+__tests__
+__mocks__
+.jest
+.nyc_output

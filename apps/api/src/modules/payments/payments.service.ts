@@ -27,7 +27,7 @@ export class PaymentsService {
       throw new BadRequestException('Payment already exists');
     }
 
-    const amount = session.service.priceCents;
+    const amount = Math.round(Number(session.service.priceAmount) * 100); // Convert to cents
     const platformFee = Math.round(amount * 0.15); // 15% platform fee
     const mentorAmount = amount - platformFee;
 
@@ -150,7 +150,7 @@ export class PaymentsService {
       throw new NotFoundException('Payment not found');
     }
 
-    if (payment.mentorId !== userId && payment.menteeId !== userId) {
+    if (payment.mentorId !== userId && payment.session.menteeId !== userId) {
       throw new ForbiddenException('Access denied');
     }
 
@@ -179,7 +179,7 @@ export class PaymentsService {
           id: {
             in: await this.prisma.payout
               .findMany({
-                where: { mentorId, status: { in: ['pending', 'processing', 'completed'] } },
+                where: { mentorId, status: { in: ['pending', 'processing', 'completed'] as const } },
                 select: { id: true },
               })
               .then((p) => p.map((x) => x.id)),
@@ -197,8 +197,8 @@ export class PaymentsService {
     });
 
     return {
-      available: result._sum.mentorAmount || 0,
-      pending: pendingPayouts._sum.amount || 0,
+      available: result._sum?.mentorAmount ?? 0,
+      pending: pendingPayouts._sum?.amount ?? 0,
       currency: 'USD', // TODO: Support multiple currencies
     };
   }
@@ -228,7 +228,7 @@ export class PaymentsService {
 
     const balance = await this.getMentorBalance(mentorId);
 
-    if (balance.available <= 0) {
+    if (Number(balance.available) <= 0) {
       throw new BadRequestException('No available balance');
     }
 

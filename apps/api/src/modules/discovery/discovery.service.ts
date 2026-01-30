@@ -65,8 +65,8 @@ export class DiscoveryService {
       where.mentorServices = {
         some: {
           isActive: true,
-          ...(minPrice !== undefined && { priceCents: { gte: minPrice } }),
-          ...(maxPrice !== undefined && { priceCents: { lte: maxPrice } }),
+          ...(minPrice !== undefined && { priceAmount: { gte: minPrice } }),
+          ...(maxPrice !== undefined && { priceAmount: { lte: maxPrice } }),
         },
       };
     }
@@ -87,21 +87,12 @@ export class DiscoveryService {
     const [mentors, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
-        select: {
-          id: true,
-          fullName: true,
-          avatarUrl: true,
-          createdAt: true,
+        include: {
           mentorProfile: {
-            select: {
-              headline: true,
-              bio: true,
-              languages: true,
-              ratingAvg: true,
-              ratingCount: true,
+            include: {
               topics: {
-                select: {
-                  topic: { select: { id: true, name: true, slug: true } },
+                include: {
+                  topic: true,
                 },
                 take: 5, // Limit topics in list view
               },
@@ -109,14 +100,7 @@ export class DiscoveryService {
           },
           mentorServices: {
             where: { isActive: true },
-            select: {
-              id: true,
-              title: true,
-              durationMin: true,
-              priceCents: true,
-              currency: true,
-            },
-            orderBy: { priceCents: 'asc' },
+            orderBy: { priceAmount: 'asc' },
             take: 1, // Show cheapest service
           },
           _count: {
@@ -133,10 +117,10 @@ export class DiscoveryService {
     ]);
 
     // Transform response
-    const data = mentors.map((mentor) => ({
+    const data = mentors.map((mentor: any) => ({
       id: mentor.id,
       fullName: mentor.fullName,
-      avatarUrl: mentor.avatarUrl,
+      avatarUrl: null, // TODO: Add avatarUrl to User model
       headline: mentor.mentorProfile?.headline,
       bio: mentor.mentorProfile?.bio?.substring(0, 200), // Truncate for list
       languages: mentor.mentorProfile?.languages || [],
@@ -144,9 +128,9 @@ export class DiscoveryService {
         average: mentor.mentorProfile?.ratingAvg || 0,
         count: mentor.mentorProfile?.ratingCount || 0,
       },
-      topics: mentor.mentorProfile?.topics.map((t) => t.topic) || [],
-      startingPrice: mentor.mentorServices[0] || null,
-      completedSessions: mentor._count.sessionsAsMentor,
+      topics: mentor.mentorProfile?.topics?.map((t: any) => t.topic) || [],
+      startingPrice: mentor.mentorServices?.[0] || null,
+      completedSessions: mentor._count?.sessionsAsMentor || 0,
       joinedAt: mentor.createdAt,
     }));
 

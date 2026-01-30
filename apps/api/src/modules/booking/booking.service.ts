@@ -138,7 +138,7 @@ export class BookingService {
           },
           include: {
             mentor: { select: { id: true, fullName: true, email: true } },
-            service: { select: { id: true, title: true, priceCents: true, currency: true } },
+            service: { select: { id: true, title: true, priceAmount: true, currency: true } },
             slot: { select: { id: true, startAt: true, endAt: true } },
           },
         });
@@ -296,24 +296,29 @@ export class BookingService {
     let releasedCount = 0;
 
     for (const slot of expiredSlots) {
-      await this.prisma.$transaction([
+      const updates: any[] = [
         // Release slot
         this.prisma.slot.update({
           where: { id: slot.id },
           data: { status: 'free', heldUntil: null },
         }),
-        // Cancel any pending sessions
-        ...slot.session.map((s) =>
+      ];
+
+      // Cancel session if exists and is in requested status
+      if (slot.session && slot.session.status === 'requested') {
+        updates.push(
           this.prisma.session.update({
-            where: { id: s.id },
+            where: { id: slot.session.id },
             data: {
               status: 'canceled',
               canceledAt: now,
               cancelReason: 'Hold expired',
             },
           }),
-        ),
-      ]);
+        );
+      }
+
+      await this.prisma.$transaction(updates);
       releasedCount++;
     }
 
@@ -331,7 +336,7 @@ export class BookingService {
         mentee: { select: { id: true, fullName: true, email: true, avatarUrl: true } },
         service: true,
         slot: true,
-        payment: true,
+        payments: true,
       },
     });
 

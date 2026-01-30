@@ -41,6 +41,7 @@ enum SessionStatus {
 
 enum PaymentStatus {
   pending
+  succeeded
   paid
   failed
   refunded
@@ -48,6 +49,8 @@ enum PaymentStatus {
 
 enum PayoutStatus {
   pending
+  processing
+  completed
   paid
   failed
 }
@@ -57,6 +60,7 @@ enum NotificationType {
   session_confirmed
   session_canceled
   session_reminder
+  session_booked
   payment_received
   payout_sent
   new_message
@@ -72,6 +76,7 @@ model User {
   email        String   @unique
   passwordHash String   @map("password_hash")
   fullName     String   @map("full_name")
+  avatarUrl    String?  @map("avatar_url")
   timezone     String   @default("UTC")
   role         UserRole @default(mentee)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
@@ -85,10 +90,14 @@ model User {
   slots           Slot[]
   sessionsAsMentor Session[] @relation("MentorSessions")
   sessionsAsMentee Session[] @relation("MenteeSessions")
-  payouts         Payout[]
+  payouts         Payout[]   @relation("MentorPayouts")
+  paymentsAsMentor Payment[] @relation("MentorPayments")
+  paymentsAsMentee Payment[] @relation("MenteePayments")
   sessionNotes    SessionNote[]
   reviewsGiven    Review[] @relation("ReviewsByMentee")
   reviewsReceived Review[] @relation("ReviewsForMentor")
+  conversationsAsMentor Conversation[] @relation("MentorConversations")
+  conversationsAsMentee Conversation[] @relation("MenteeConversations")
   messages        Message[]
   notifications   Notification[]
 
@@ -96,14 +105,15 @@ model User {
 }
 
 model MentorProfile {
-  userId      String   @id @map("user_id") @db.Uuid
-  headline    String?
-  bio         String?
-  languages   String[] @default([])
-  timezone    String   @default("UTC")
-  isActive    Boolean  @default(false) @map("is_active")
-  ratingAvg   Decimal  @default(0) @map("rating_avg") @db.Decimal(3, 2)
-  ratingCount Int      @default(0) @map("rating_count")
+  userId          String   @id @map("user_id") @db.Uuid
+  headline        String?
+  bio             String?
+  languages       String[] @default([])
+  timezone        String   @default("UTC")
+  isActive        Boolean  @default(false) @map("is_active")
+  ratingAvg       Decimal  @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount     Int      @default(0) @map("rating_count")
+  stripeAccountId String?  @map("stripe_account_id")
 
   // Relations
   user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -266,18 +276,27 @@ model Session {
 
 model Payment {
   id                String        @id @default(uuid()) @db.Uuid
-  sessionId         String        @map("session_id") @db.Uuid
+  sessionId         String        @unique @map("session_id") @db.Uuid
+  menteeId          String?       @map("mentee_id") @db.Uuid
+  mentorId          String?       @map("mentor_id") @db.Uuid
   provider          String        @default("stripe")
-  amount            Decimal       @db.Decimal(10, 2)
+  amount            Int           // Amount in cents
+  platformFee       Int?          @map("platform_fee")
+  mentorAmount      Int?          @map("mentor_amount")
   currency          String        @db.VarChar(3)
   status            PaymentStatus @default(pending)
   providerPaymentId String?       @map("provider_payment_id")
+  paidAt            DateTime?     @map("paid_at") @db.Timestamptz
   createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
   session Session @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  mentor  User?   @relation("MentorPayments", fields: [mentorId], references: [id], onDelete: SetNull)
+  mentee  User?   @relation("MenteePayments", fields: [menteeId], references: [id], onDelete: SetNull)
 
   @@index([sessionId])
+  @@index([mentorId])
+  @@index([menteeId])
   @@index([status])
   @@map("payments")
 }
@@ -288,10 +307,11 @@ model Payout {
   amount    Decimal      @db.Decimal(10, 2)
   currency  String       @db.VarChar(3)
   status    PayoutStatus @default(pending)
+  provider  String       @default("stripe")
   createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
-  mentor User @relation(fields: [mentorId], references: [id], onDelete: Restrict)
+  mentor User @relation("MentorPayouts", fields: [mentorId], references: [id], onDelete: Restrict)
 
   @@index([mentorId])
   @@index([status])
@@ -340,13 +360,18 @@ model SessionNote {
 // ============================================
 
 model Conversation {
-  id        String   @id @default(uuid()) @db.Uuid
-  mentorId  String   @map("mentor_id") @db.Uuid
-  menteeId  String   @map("mentee_id") @db.Uuid
-  sessionId String?  @unique @map("session_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id              String    @id @default(uuid()) @db.Uuid
+  mentorId        String    @map("mentor_id") @db.Uuid
+  menteeId        String    @map("mentee_id") @db.Uuid
+  sessionId       String?   @unique @map("session_id") @db.Uuid
+  lastReadMentor  DateTime? @map("last_read_mentor") @db.Timestamptz
+  lastReadMentee  DateTime? @map("last_read_mentee") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
+  mentor   User      @relation("MentorConversations", fields: [mentorId], references: [id], onDelete: Cascade)
+  mentee   User      @relation("MenteeConversations", fields: [menteeId], references: [id], onDelete: Cascade)
   session  Session?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   messages Message[]
 
@@ -360,7 +385,9 @@ model Message {
   id             String    @id @default(uuid()) @db.Uuid
   conversationId String    @map("conversation_id") @db.Uuid
   senderId       String    @map("sender_id") @db.Uuid
-  body           String
+  content        String
+  contentType    String    @default("text") @map("content_type")
+  isRead         Boolean   @default(false) @map("is_read")
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
   readAt         DateTime? @map("read_at") @db.Timestamptz
 
@@ -378,6 +405,7 @@ model Message {
 model Attachment {
   id        String @id @default(uuid()) @db.Uuid
   messageId String @map("message_id") @db.Uuid
+  filename  String
   url       String
   mimeType  String @map("mime_type")
   sizeBytes BigInt @map("size_bytes")
@@ -417,6 +445,9 @@ model Notification {
   id          String           @id @default(uuid()) @db.Uuid
   userId      String           @map("user_id") @db.Uuid
   type        NotificationType
+  title       String?
+  body        String?
+  isRead      Boolean          @default(false) @map("is_read")
   payloadJson Json?            @map("payload_json")
   createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz
   readAt      DateTime?        @map("read_at") @db.Timestamptz
