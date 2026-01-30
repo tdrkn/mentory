@@ -164,34 +164,33 @@ export default function MentorsPage() {
               >
                 <div className="flex items-start gap-4">
                   <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center text-2xl">
-                    {mentor.user.avatarUrl ? (
-                      <img src={mentor.user.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" />
+                    {mentor.avatarUrl ? (
+                      <img src={mentor.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" />
                     ) : (
-                      mentor.user.fullName.charAt(0)
+                      mentor.fullName?.charAt(0) || 'M'
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">{mentor.user.fullName}</h3>
-                    <p className="text-sm text-gray-600 truncate">{mentor.title}</p>
+                    <h3 className="font-semibold text-gray-900 truncate">{mentor.fullName}</h3>
+                    <p className="text-sm text-gray-600 truncate">{mentor.headline}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-yellow-500">⭐ {mentor.rating.toFixed(1)}</span>
+                      <span className="text-yellow-500">⭐ {mentor.rating?.average || '0'}</span>
                       <span className="text-gray-400">•</span>
-                      <span className="text-gray-600">{mentor.sessionCount} сессий</span>
+                      <span className="text-gray-600">{mentor.completedSessions || 0} сессий</span>
                     </div>
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {mentor.topics.slice(0, 3).map(topic => (
+                  {(mentor.topics || []).slice(0, 3).map(topic => (
                     <span key={topic.id} className="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs rounded">
                       {topic.name}
                     </span>
                   ))}
                 </div>
                 <div className="mt-4 flex justify-between items-center">
-                  <span className="text-lg font-bold text-indigo-600">${mentor.hourlyRate}/час</span>
-                  {mentor.isVerified && (
-                    <span className="text-green-600 text-sm">✓ Проверен</span>
-                  )}
+                  <span className="text-lg font-bold text-indigo-600">
+                    {mentor.startingPrice ? `$${mentor.startingPrice.priceAmount}` : 'Цена по запросу'}
+                  </span>
                 </div>
               </Link>
             ))}

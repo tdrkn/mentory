@@ -16,8 +16,13 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await login(email, password);
-      router.push('/mentors');
+      const user = await login(email, password);
+      // Redirect based on role
+      if (user?.role === 'mentor') {
+        router.push('/dashboard');
+      } else {
+        router.push('/mentors');
+      }
     } catch {
       // Error handled in context
     } finally {

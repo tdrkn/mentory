@@ -7,8 +7,9 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName: string, role: 'mentor' | 'mentee') => Promise<void>;
+  isMentor: boolean;
+  login: (email: string, password: string) => Promise<User>;
+  register: (email: string, password: string, fullName: string, role: 'mentor' | 'mentee') => Promise<User>;
   logout: () => void;
   error: string | null;
 }
@@ -43,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser();
   }, [loadUser]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<User> => {
     setError(null);
     try {
       const response = await api.post<{ accessToken: string; user: User }>('/auth/login', {
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       localStorage.setItem('accessToken', response.accessToken);
       setUser(response.user);
+      return response.user;
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.data?.message || 'Неверный email или пароль');
@@ -62,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (email: string, password: string, fullName: string, role: 'mentor' | 'mentee') => {
+  const register = async (email: string, password: string, fullName: string, role: 'mentor' | 'mentee'): Promise<User> => {
     setError(null);
     try {
       const response = await api.post<{ accessToken: string; user: User }>('/auth/register', {
@@ -73,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       localStorage.setItem('accessToken', response.accessToken);
       setUser(response.user);
+      return response.user;
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.data?.message || 'Ошибка регистрации');
@@ -95,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isLoading,
         isAuthenticated: !!user,
+        isMentor: user?.role === 'mentor',
         login,
         register,
         logout,

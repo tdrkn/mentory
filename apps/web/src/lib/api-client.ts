@@ -111,16 +111,24 @@ export interface User {
 
 export interface MentorProfile {
   id: string;
-  userId: string;
-  user: User;
-  title: string;
+  fullName: string;
+  avatarUrl: string | null;
+  headline: string;
   bio: string;
-  hourlyRate: number;
-  rating: number;
-  reviewCount: number;
-  sessionCount: number;
+  languages: string[];
+  rating: { average: string; count: number };
   topics: { id: string; name: string }[];
-  isVerified: boolean;
+  startingPrice: {
+    id: string;
+    mentorId: string;
+    title: string;
+    durationMin: number;
+    priceAmount: string;
+    currency: string;
+    isActive: boolean;
+  } | null;
+  completedSessions: number;
+  joinedAt: string;
 }
 
 export interface Slot {
