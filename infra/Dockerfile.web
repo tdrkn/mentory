@@ -1,134 +1,64 @@
 # ============================================
-# Mentory Web Dockerfile (Next.js)
+# Mentory Web Dockerfile (SvelteKit)
 # ============================================
-# Multi-stage build with dev and prod targets
-#
-# Build:
-#   docker build -f infra/Dockerfile.web --target development -t mentory-web:dev .
-#   docker build -f infra/Dockerfile.web --target production -t mentory-web:prod .
 
-# ============================================
-# Stage 1: Base
-# ============================================
 FROM node:22-alpine AS base
 
-# Install pnpm
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
-
-# Set working directory
 WORKDIR /app
 
-# Add labels
 LABEL org.opencontainers.image.source="https://github.com/mentory/mentory"
-LABEL org.opencontainers.image.description="Mentory Web"
+LABEL org.opencontainers.image.description="Mentory Web (SvelteKit)"
 
-# ============================================
-# Stage 2: Dependencies
-# ============================================
 FROM base AS deps
-
-# Install libc6-compat for alpine
 RUN apk add --no-cache libc6-compat
-
-# Copy package files
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
-
-# Install ALL dependencies
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 
-# ============================================
-# Stage 3: Development
-# ============================================
 FROM base AS development
-
-# Install libc6-compat
 RUN apk add --no-cache libc6-compat
-
-# Copy dependencies
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
-
-# Copy source code
 COPY . .
-
-# Set environment
 ENV NODE_ENV=development
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV WATCHPACK_POLLING=true
-
-# Expose port
 EXPOSE 3000
-
-# Default command
 CMD ["pnpm", "dev:web"]
 
-# ============================================
-# Stage 4: Builder
-# ============================================
 FROM base AS builder
-
 RUN apk add --no-cache libc6-compat
-
-# Copy dependencies
+ARG PUBLIC_API_URL
+ARG PUBLIC_APP_URL
+ARG PUBLIC_MINIO_URL
+ENV PUBLIC_API_URL=${PUBLIC_API_URL}
+ENV PUBLIC_APP_URL=${PUBLIC_APP_URL}
+ENV PUBLIC_MINIO_URL=${PUBLIC_MINIO_URL}
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
-
-# Copy source code
 COPY . .
-
-# Build shared package
 RUN pnpm --filter @mentory/shared build
-
-# Build Next.js app
-# Set env vars needed at build time
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_ENV=production
-
-# Build with standalone output
 RUN pnpm --filter @mentory/web build
 
-# ============================================
-# Stage 5: Production
-# ============================================
 FROM node:22-alpine AS production
-
-# Security: Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
-
+    adduser --system --uid 1001 svelte
 WORKDIR /app
-
-# Set environment
 ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+ENV HOST=0.0.0.0
 
-# Copy public assets
-COPY --from=builder /app/apps/web/public ./public
+COPY --from=builder --chown=svelte:nodejs /app/apps/web/build ./build
+COPY --from=builder --chown=svelte:nodejs /app/apps/web/package.json ./
+COPY --from=builder --chown=svelte:nodejs /app/node_modules ./node_modules
 
-# Create .next directory with correct permissions
-RUN mkdir .next && chown nextjs:nodejs .next
-
-# Copy standalone build
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./.next/static
-
-# Switch to non-root user
-USER nextjs
-
-# Expose port
+USER svelte
 EXPOSE 3000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
 
-# Start application
-CMD ["node", "server.js"]
-
+CMD ["node", "build"]

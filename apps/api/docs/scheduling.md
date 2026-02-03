@@ -30,15 +30,16 @@
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | /api/scheduling/generate-slots | Сгенерировать слоты |
-| GET | /api/scheduling/slots | Слоты ментора (public) |
-| GET | /api/scheduling/calendar/:mentorId | Календарь (public) |
+| POST | /api/scheduling/slots/generate | Сгенерировать слоты |
+| GET | /api/scheduling/slots | Слоты ментора (mentor only) |
+| GET | /api/scheduling/mentors/:mentorId/slots | Публичные доступные слоты |
+| GET | /api/scheduling/calendar | Календарь (mentor only) |
 
 ### Services
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | /api/services/my | Мои услуги |
+| GET | /api/services | Мои услуги |
 | POST | /api/services | Создать услугу |
 | PATCH | /api/services/:id | Обновить услугу |
 | DELETE | /api/services/:id | Удалить услугу |
@@ -47,22 +48,22 @@
 
 ```bash
 # Create availability rule (Mon-Fri 10:00-18:00)
-curl -X POST http://localhost:3001/api/scheduling/rules \
+curl -X POST http://localhost:4000/api/scheduling/rules \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"dayOfWeek":1,"startTime":"10:00","endTime":"18:00"}'
+  -d '{"weekday":1,"startTime":"10:00","endTime":"18:00"}'
 
 # Generate slots for next week
-curl -X POST http://localhost:3001/api/scheduling/generate-slots \
+curl -X POST http://localhost:4000/api/scheduling/slots/generate \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"startDate":"2026-02-01","endDate":"2026-02-07","slotDurationMin":60}'
+  -d '{"from":"2026-02-01","to":"2026-02-07","slotDurationMin":60}'
 
 # Get mentor slots
-curl "http://localhost:3001/api/scheduling/slots?mentorId=MENTOR_ID&from=2026-02-01"
+curl "http://localhost:4000/api/scheduling/slots?from=2026-02-01"
 
 # Create service
-curl -X POST http://localhost:3001/api/services \
+curl -X POST http://localhost:4000/api/services \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"title":"1-on-1 Mentoring","description":"Personal session","durationMin":60,"priceCents":5000}'

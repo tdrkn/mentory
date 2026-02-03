@@ -46,5 +46,5 @@ make migrate
 make seed
 
 # API available at
-http://localhost:3001/api
+http://localhost:4000/api
 ```

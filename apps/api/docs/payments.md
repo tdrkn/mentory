@@ -57,16 +57,16 @@ Example: $50 session
 
 ```bash
 # Create payment intent
-curl -X POST http://localhost:3001/api/payments/intent \
+curl -X POST http://localhost:4000/api/payments/intent \
   -H "Authorization: Bearer MENTEE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"sessionId":"SESSION_ID"}'
 
 # Get balance
-curl http://localhost:3001/api/payouts/balance \
+curl http://localhost:4000/api/payouts/balance \
   -H "Authorization: Bearer MENTOR_TOKEN"
 
 # Request payout
-curl -X POST http://localhost:3001/api/payouts/request \
+curl -X POST http://localhost:4000/api/payouts/request \
   -H "Authorization: Bearer MENTOR_TOKEN"
 ```

@@ -22,5 +22,11 @@
     "@types/node": "^22.10.0",
     "prettier": "^3.4.0",
     "typescript": "^5.7.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@tiptap/core": "2.27.2",
+      "@tiptap/pm": "2.27.2"
+    }
   }
 }

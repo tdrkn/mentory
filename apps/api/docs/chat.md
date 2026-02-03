@@ -30,24 +30,24 @@
 
 ```bash
 # Get conversations
-curl http://localhost:3001/api/conversations \
+curl http://localhost:4000/api/conversations \
   -H "Authorization: Bearer TOKEN"
 
 # Get or create conversation
-curl -X POST http://localhost:3001/api/conversations/SESSION_ID \
+curl -X POST http://localhost:4000/api/conversations/SESSION_ID \
   -H "Authorization: Bearer TOKEN"
 
 # Send message
-curl -X POST http://localhost:3001/api/chat/CONV_ID/messages \
+curl -X POST http://localhost:4000/api/chat/CONV_ID/messages \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"content":"Hello!"}'
 
 # Get messages
-curl http://localhost:3001/api/conversations/CONV_ID/messages \
+curl http://localhost:4000/api/conversations/CONV_ID/messages \
   -H "Authorization: Bearer TOKEN"
 
 # Mark as read
-curl -X PATCH http://localhost:3001/api/chat/CONV_ID/read \
+curl -X PATCH http://localhost:4000/api/chat/CONV_ID/read \
   -H "Authorization: Bearer TOKEN"
 ```

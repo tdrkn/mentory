@@ -20,7 +20,7 @@ export class DiscoveryService {
   async searchMentors(query: SearchMentorsDto) {
     const {
       topic,
-      topicSlug,
+      topicId,
       language,
       minPrice,
       maxPrice,
@@ -44,13 +44,15 @@ export class DiscoveryService {
       },
     };
 
-    // Topic filter - by name or slug
-    if (topic || topicSlug) {
+    // Topic filter - by id or name
+    if (topicId) {
+      (where.mentorProfile as any).topics = {
+        some: { topicId },
+      };
+    } else if (topic) {
       (where.mentorProfile as any).topics = {
         some: {
-          topic: topicSlug
-            ? { slug: topicSlug }
-            : { name: { contains: topic, mode: 'insensitive' } },
+          topic: { name: { contains: topic, mode: 'insensitive' } },
         },
       };
     }

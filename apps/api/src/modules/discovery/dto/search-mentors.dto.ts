@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsEnum, IsInt, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsEnum, IsInt, Min, Max, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum MentorSortBy {
@@ -19,8 +19,8 @@ export class SearchMentorsDto {
   topic?: string;
 
   @IsOptional()
-  @IsString()
-  topicSlug?: string;
+  @IsUUID()
+  topicId?: string;
 
   @IsOptional()
   @IsString()
@@ -70,4 +70,3 @@ export class SearchMentorsDto {
   @Min(1)
   page?: number;
 }
-

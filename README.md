@@ -3,7 +3,7 @@
 > Платформа для поиска менторов и проведения онлайн-консультаций
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-15-black.svg)](https://nextjs.org/)
+[![SvelteKit](https://img.shields.io/badge/SvelteKit-2-orange.svg)](https://kit.svelte.dev/)
 [![NestJS](https://img.shields.io/badge/NestJS-10-red.svg)](https://nestjs.com/)
 [![pnpm](https://img.shields.io/badge/pnpm-9.15-orange.svg)](https://pnpm.io/)
 [![Docker](https://img.shields.io/badge/Docker-ready-blue.svg)](https://docker.com/)
@@ -40,7 +40,7 @@
 ```
 mentory/
 ├── apps/
-│   ├── web/                 # Next.js 15 (React 19, App Router)
+│   ├── web/                 # SvelteKit 2 (SSR)
 │   └── api/                 # NestJS 10 (REST API)
 ├── packages/
 │   └── shared/              # Общие типы, DTO, константы
@@ -63,7 +63,7 @@ mentory/
 
 | Слой | Технологии |
 |------|------------|
-| **Frontend** | Next.js 15, React 19, TypeScript |
+| **Frontend** | SvelteKit 2, TypeScript |
 | **Backend** | NestJS 10, TypeScript, class-validator |
 | **Database** | PostgreSQL 16 |
 | **Cache** | Redis 7 |
@@ -108,9 +108,22 @@ pnpm docker:dev
 pnpm docker:down
 ```
 
+### Быстрый запуск одной командой
+
+```bash
+./scripts/start.sh
+```
+
+Остановить:
+
+```bash
+./scripts/stop.sh
+```
+
 **Сервисы:**
 - Web: http://localhost:3000
 - API: http://localhost:4000
+- Admin: http://localhost:4000/admin
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
 
@@ -124,7 +137,7 @@ docker compose -f infra/docker-compose.dev.yml up db redis -d
 pnpm dev
 
 # Или по отдельности
-pnpm dev:web   # Next.js на :3000
+pnpm dev:web   # SvelteKit на :3000
 pnpm dev:api   # NestJS на :4000
 ```
 
@@ -166,29 +179,39 @@ JWT_SECRET=change-me-in-production-min-32-chars
 JWT_EXPIRES_IN=7d
 
 # Web
-NEXT_PUBLIC_API_URL=http://localhost:4000
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+PUBLIC_API_URL=http://localhost:4000
+PUBLIC_APP_URL=http://localhost:3000
 
 # Redis
 REDIS_URL=redis://redis:6379
+
+# Admin
+ADMIN_EMAIL=admin@mentory.local
+ADMIN_PASSWORD=change-me-admin
+ADMIN_COOKIE_SECRET=change-me-cookie-secret-min-32-chars
 ```
 
 Полный список переменных — в [.env.example](.env.example).
+
+### Админ-панель
+
+Админка доступна по адресу `http://localhost:4000/admin`. Логин/пароль берутся из `.env` (`ADMIN_EMAIL`, `ADMIN_PASSWORD`).
 
 ---
 
 ## 📁 Структура пакетов
 
-### apps/web (Next.js)
+### apps/web (SvelteKit)
 
 ```
 apps/web/
 ├── src/
-│   └── app/
-│       ├── layout.tsx       # Root layout
-│       ├── page.tsx         # Главная страница
-│       └── globals.css      # Глобальные стили
-├── next.config.js
+│   ├── routes/              # Страницы
+│   ├── lib/                 # API client, stores, components
+│   ├── app.css              # Глобальные стили
+│   └── app.html             # HTML шаблон
+├── svelte.config.js
+├── vite.config.ts
 ├── tsconfig.json
 └── package.json
 ```

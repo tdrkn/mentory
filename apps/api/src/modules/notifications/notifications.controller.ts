@@ -1,6 +1,6 @@
 import { Controller, Get, Patch, Param, Query, Body, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guards';
-import { CurrentUser } from '../auth/decorators';
+import { JwtAuthGuard, RolesGuard } from '../auth/guards';
+import { CurrentUser, Roles } from '../auth/decorators';
 import { NotificationsService } from './notifications.service';
 import { UpdateNotificationSettingsDto } from './dto/update-notification-settings.dto';
 
@@ -91,8 +91,9 @@ export class NotificationsController {
    * Access: Admin
    */
   @Get('queue-stats')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   async getQueueStats() {
-    // TODO: Add admin guard
     return this.notificationsService.getQueueStats();
   }
 }

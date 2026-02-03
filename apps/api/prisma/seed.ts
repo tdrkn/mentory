@@ -6,6 +6,8 @@
 
 import { PrismaClient, UserRole, SlotStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { addDays, addMinutes, startOfDay, isAfter } from 'date-fns';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
 const prisma = new PrismaClient();
 
@@ -15,18 +17,6 @@ const prisma = new PrismaClient();
 
 async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
-}
-
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-}
-
-function setTime(date: Date, hours: number, minutes: number): Date {
-  const result = new Date(date);
-  result.setHours(hours, minutes, 0, 0);
-  return result;
 }
 
 function getWeekday(date: Date): number {
@@ -291,38 +281,48 @@ async function main() {
   // ============================================
   console.log('🕐 Generating slots for next 7 days...');
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = startOfDay(new Date());
   const slotDuration = 60; // minutes
   const slotsData: { mentorId: string; startAt: Date; endAt: Date; status: SlotStatus }[] = [];
 
   // Get availability rules
   const rules = await prisma.availabilityRule.findMany();
 
-  for (let dayOffset = 1; dayOffset <= 7; dayOffset++) {
-    const currentDate = addDays(today, dayOffset);
-    const weekday = getWeekday(currentDate);
+  const fromDate = addDays(today, 1);
+  const toDate = addDays(today, 7);
 
-    for (const rule of rules) {
+  for (const rule of rules) {
+    const ruleTz = rule.timezone || 'UTC';
+    const fromZoned = startOfDay(toZonedTime(fromDate, ruleTz));
+    const toZoned = startOfDay(toZonedTime(toDate, ruleTz));
+
+    for (let d = fromZoned; !isAfter(d, toZoned); d = addDays(d, 1)) {
+      const weekday = getWeekday(d);
       if (rule.weekday !== weekday) continue;
 
       const [startHour, startMin] = rule.startTime.split(':').map(Number);
       const [endHour, endMin] = rule.endTime.split(':').map(Number);
 
-      let slotStart = setTime(currentDate, startHour, startMin);
-      const windowEnd = setTime(currentDate, endHour, endMin);
+      const localStart = new Date(d);
+      localStart.setHours(startHour, startMin, 0, 0);
 
-      while (slotStart.getTime() + slotDuration * 60 * 1000 <= windowEnd.getTime()) {
-        const slotEnd = new Date(slotStart.getTime() + slotDuration * 60 * 1000);
-        
+      const localEnd = new Date(d);
+      localEnd.setHours(endHour, endMin, 0, 0);
+
+      let slotStartUtc = fromZonedTime(localStart, ruleTz);
+      const windowEndUtc = fromZonedTime(localEnd, ruleTz);
+
+      while (slotStartUtc.getTime() + slotDuration * 60 * 1000 <= windowEndUtc.getTime()) {
+        const slotEndUtc = addMinutes(slotStartUtc, slotDuration);
+
         slotsData.push({
           mentorId: rule.mentorId,
-          startAt: new Date(slotStart),
-          endAt: slotEnd,
+          startAt: new Date(slotStartUtc),
+          endAt: new Date(slotEndUtc),
           status: SlotStatus.free,
         });
 
-        slotStart = slotEnd;
+        slotStartUtc = slotEndUtc;
       }
     }
   }

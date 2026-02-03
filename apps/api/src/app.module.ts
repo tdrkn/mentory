@@ -14,6 +14,7 @@ import { BookingModule } from './modules/booking';
 import { PaymentsModule } from './modules/payments';
 import { ChatModule } from './modules/chat';
 import { NotificationsModule } from './modules/notifications';
+import { AdminBootstrapService } from './admin/admin-bootstrap.service';
 
 @Module({
   imports: [
@@ -36,7 +37,7 @@ import { NotificationsModule } from './modules/notifications';
     NotificationsModule,
   ],
   controllers: [HealthController],
-  providers: [],
+  providers: [AdminBootstrapService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

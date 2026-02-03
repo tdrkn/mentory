@@ -145,21 +145,21 @@ Authorization: Bearer <accessToken>
 
 ```bash
 # Register
-curl -X POST http://localhost:3001/api/auth/register \
+curl -X POST http://localhost:4000/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"password123","fullName":"Test User","role":"mentee"}'
 
 # Login
-curl -X POST http://localhost:3001/api/auth/login \
+curl -X POST http://localhost:4000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"password123"}'
 
 # Get current user
-curl http://localhost:3001/api/auth/me \
+curl http://localhost:4000/api/auth/me \
   -H "Authorization: Bearer YOUR_TOKEN"
 
 # Change password
-curl -X PATCH http://localhost:3001/api/auth/password \
+curl -X PATCH http://localhost:4000/api/auth/password \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"currentPassword":"password123","newPassword":"newpassword456"}'

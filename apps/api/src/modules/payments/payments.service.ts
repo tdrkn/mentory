@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, GoneException } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
 import { CreatePayoutAccountDto } from './dto/create-payout-account.dto';
@@ -10,12 +10,31 @@ export class PaymentsService {
 
   async createPaymentIntent(menteeId: string, dto: CreatePaymentIntentDto) {
     const session = await this.prisma.session.findFirst({
-      where: { id: dto.sessionId, menteeId, status: 'booked' },
-      include: { service: true },
+      where: { id: dto.sessionId, menteeId, status: { in: ['requested', 'booked'] } },
+      include: { service: true, slot: true },
     });
 
     if (!session) {
       throw new NotFoundException('Session not found');
+    }
+
+    // If session is still in requested status, ensure hold is valid
+    if (session.status === 'requested') {
+      const now = new Date();
+      if (!session.slot || session.slot.status !== 'held' || !session.slot.heldUntil || session.slot.heldUntil < now) {
+        // Release slot and cancel session if hold expired
+        await this.prisma.$transaction([
+          this.prisma.slot.update({
+            where: { id: session.slotId },
+            data: { status: 'free', heldUntil: null },
+          }),
+          this.prisma.session.update({
+            where: { id: session.id },
+            data: { status: 'canceled', canceledAt: now, cancelReason: 'Hold expired' },
+          }),
+        ]);
+        throw new GoneException('Hold expired');
+      }
     }
 
     // Check if payment already exists

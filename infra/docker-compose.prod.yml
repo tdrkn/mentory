@@ -49,6 +49,10 @@ services:
       context: ..
       dockerfile: infra/Dockerfile.web
       target: production
+      args:
+        PUBLIC_API_URL: ${PUBLIC_API_URL}
+        PUBLIC_APP_URL: ${PUBLIC_APP_URL}
+        PUBLIC_MINIO_URL: ${PUBLIC_MINIO_URL}
     container_name: mentory-web-prod
     env_file:
       - ../.env

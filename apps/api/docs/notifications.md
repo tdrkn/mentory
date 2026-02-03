@@ -35,15 +35,15 @@
 
 ```bash
 # Get notifications
-curl http://localhost:3001/api/notifications \
+curl http://localhost:4000/api/notifications \
   -H "Authorization: Bearer TOKEN"
 
 # Get unread count
-curl http://localhost:3001/api/notifications/unread-count \
+curl http://localhost:4000/api/notifications/unread-count \
   -H "Authorization: Bearer TOKEN"
 
 # Mark all as read
-curl -X PATCH http://localhost:3001/api/notifications/read-all \
+curl -X PATCH http://localhost:4000/api/notifications/read-all \
   -H "Authorization: Bearer TOKEN"
 ```
 

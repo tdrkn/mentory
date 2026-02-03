@@ -13,9 +13,9 @@
 ```
 src/modules/profiles/
 ├── profiles.module.ts
-├── profiles.controller.ts        # /profiles/*
-├── mentor-profile.controller.ts  # /profiles/mentor
-├── mentee-profile.controller.ts  # /profiles/mentee
+├── profiles.controller.ts        # /profile/*
+├── mentor-profile.controller.ts  # /profile/mentor
+├── mentee-profile.controller.ts  # /profile/mentee
 ├── profiles.service.ts
 └── dto/
     ├── update-profile.dto.ts
@@ -27,7 +27,7 @@ src/modules/profiles/
 
 ## Endpoints
 
-### GET /api/profiles/me
+### GET /api/profile
 
 Получение профиля текущего пользователя.
 
@@ -50,7 +50,7 @@ src/modules/profiles/
 }
 ```
 
-### PATCH /api/profiles/me
+### PATCH /api/profile
 
 Обновление базового профиля.
 
@@ -62,7 +62,7 @@ src/modules/profiles/
 }
 ```
 
-### GET /api/profiles/mentor
+### GET /api/profile/mentor
 
 Получение профиля ментора (для ментора).
 
@@ -84,7 +84,7 @@ src/modules/profiles/
 }
 ```
 
-### PATCH /api/profiles/mentor
+### PATCH /api/profile/mentor
 
 Обновление профиля ментора.
 
@@ -99,7 +99,7 @@ src/modules/profiles/
 }
 ```
 
-### PUT /api/profiles/mentor/topics
+### PUT /api/profile/mentor/topics
 
 Обновление топиков ментора (полная замена).
 
@@ -110,11 +110,11 @@ src/modules/profiles/
 }
 ```
 
-### GET /api/profiles/mentee
+### GET /api/profile/mentee
 
 Получение профиля менти.
 
-### PATCH /api/profiles/mentee
+### PATCH /api/profile/mentee
 
 Обновление профиля менти.
 
@@ -126,47 +126,45 @@ src/modules/profiles/
 }
 ```
 
-### POST /api/profiles/avatar
+### Загрузка аватара
 
-Загрузка аватара.
-
-**Request:** multipart/form-data with `file` field
+Пока не реализовано (TODO).
 
 ## curl Examples
 
 ```bash
 # Get my profile
-curl http://localhost:3001/api/profiles/me \
+curl http://localhost:4000/api/profile \
   -H "Authorization: Bearer YOUR_TOKEN"
 
 # Update profile
-curl -X PATCH http://localhost:3001/api/profiles/me \
+curl -X PATCH http://localhost:4000/api/profile \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"fullName":"New Name","timezone":"Europe/London"}'
 
 # Get mentor profile
-curl http://localhost:3001/api/profiles/mentor \
+curl http://localhost:4000/api/profile/mentor \
   -H "Authorization: Bearer YOUR_TOKEN"
 
 # Update mentor profile
-curl -X PATCH http://localhost:3001/api/profiles/mentor \
+curl -X PATCH http://localhost:4000/api/profile/mentor \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"headline":"Expert Mentor","hourlyRateCents":10000}'
 
 # Update mentor topics
-curl -X PUT http://localhost:3001/api/profiles/mentor/topics \
+curl -X PUT http://localhost:4000/api/profile/mentor/topics \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"topicIds":["topic-id-1","topic-id-2"]}'
 
 # Get mentee profile
-curl http://localhost:3001/api/profiles/mentee \
+curl http://localhost:4000/api/profile/mentee \
   -H "Authorization: Bearer YOUR_TOKEN"
 
 # Update mentee profile
-curl -X PATCH http://localhost:3001/api/profiles/mentee \
+curl -X PATCH http://localhost:4000/api/profile/mentee \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"goals":"Master TypeScript"}'
@@ -190,10 +188,10 @@ curl -X PATCH http://localhost:3001/api/profiles/mentee \
 
 | Endpoint | Access |
 |----------|--------|
-| GET /profiles/me | Any authenticated |
-| PATCH /profiles/me | Any authenticated |
-| GET /profiles/mentor | Mentor only |
-| PATCH /profiles/mentor | Mentor only |
-| PUT /profiles/mentor/topics | Mentor only |
-| GET /profiles/mentee | Mentee only |
-| PATCH /profiles/mentee | Mentee only |
+| GET /profile | Any authenticated |
+| PATCH /profile | Any authenticated |
+| GET /profile/mentor | Mentor only |
+| PATCH /profile/mentor | Mentor only |
+| PUT /profile/mentor/topics | Mentor only |
+| GET /profile/mentee | Mentee only |
+| PATCH /profile/mentee | Mentee only |

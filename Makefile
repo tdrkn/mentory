@@ -232,6 +232,7 @@ start: ## 🚀 START EVERYTHING - one command deployment
 	@echo "  $(GREEN)🌐 Web App:$(NC)      http://localhost:3000"
 	@echo "  $(GREEN)🔌 API:$(NC)          http://localhost:4000"
 	@echo "  $(GREEN)❤️  Health:$(NC)       http://localhost:4000/api/health/ready"
+	@echo "  $(GREEN)🛠️  Admin:$(NC)        http://localhost:4000/admin"
 	@echo "  $(GREEN)📧 MailHog:$(NC)      http://localhost:8025"
 	@echo "  $(GREEN)📦 MinIO:$(NC)        http://localhost:9001"
 	@echo "  $(GREEN)🗄️  Prisma:$(NC)       make prisma-studio"

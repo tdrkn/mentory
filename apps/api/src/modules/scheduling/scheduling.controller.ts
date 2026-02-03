@@ -126,7 +126,7 @@ export class SchedulingController {
   // ============================================
 
   /**
-   * GET /api/mentors/:mentorId/slots
+   * GET /api/scheduling/mentors/:mentorId/slots
    * Get available slots for mentor (PUBLIC)
    * Returns only free slots, releases expired holds
    * All times in UTC
@@ -169,6 +169,8 @@ export class SchedulingController {
    * Access: Mentor
    */
   @Post('slots/generate')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('mentor', 'both')
   async generateSlots(
     @CurrentUser('id') mentorId: string,
     @Body() dto: GenerateSlotsDto,
@@ -182,6 +184,8 @@ export class SchedulingController {
    * Access: Mentor
    */
   @Delete('slots/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('mentor', 'both')
   async deleteSlot(
     @CurrentUser('id') mentorId: string,
     @Param('id') slotId: string,
@@ -199,6 +203,8 @@ export class SchedulingController {
    * Access: Mentor
    */
   @Get('calendar')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('mentor', 'both')
   async getCalendar(
     @CurrentUser('id') mentorId: string,
     @Query('from') from: string,

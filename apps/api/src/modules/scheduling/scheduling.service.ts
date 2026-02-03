@@ -6,6 +6,8 @@ import { GenerateSlotsDto } from './dto/generate-slots.dto';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
 import { SlotStatus, Prisma } from '@prisma/client';
+import { addDays, addMinutes, startOfDay, isAfter } from 'date-fns';
+import { formatInTimeZone, toZonedTime, fromZonedTime } from 'date-fns-tz';
 
 /**
  * TIMEZONE STRATEGY:
@@ -245,6 +247,12 @@ export class SchedulingService {
       throw new BadRequestException('No availability rules defined');
     }
 
+    const mentor = await this.prisma.user.findUnique({
+      where: { id: mentorId },
+      select: { timezone: true },
+    });
+    const mentorTimezone = mentor?.timezone || 'UTC';
+
     const fromDate = new Date(dto.from);
     const toDate = new Date(dto.to);
     const slotDuration = dto.slotDurationMin || 60;
@@ -258,43 +266,53 @@ export class SchedulingService {
       },
     });
     const exceptionDates = new Set(
-      exceptions.filter((e) => !e.isAvailable).map((e) => e.date.toISOString().split('T')[0]),
+      exceptions
+        .filter((e) => !e.isAvailable)
+        .map((e) => formatInTimeZone(e.date, mentorTimezone, 'yyyy-MM-dd')),
     );
 
-    // Generate slots for each day
-    for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
+    const fromZoned = startOfDay(toZonedTime(fromDate, mentorTimezone));
+    const toZoned = startOfDay(toZonedTime(toDate, mentorTimezone));
+    const now = new Date();
+
+    // Generate slots for each day in mentor timezone
+    for (let d = fromZoned; !isAfter(d, toZoned); d = addDays(d, 1)) {
+      const dateKey = formatInTimeZone(d, mentorTimezone, 'yyyy-MM-dd');
       const weekday = d.getDay() === 0 ? 7 : d.getDay();
-      const dateStr = d.toISOString().split('T')[0];
 
       // Skip if exception (day off)
-      if (exceptionDates.has(dateStr)) continue;
+      if (exceptionDates.has(dateKey)) continue;
 
       const dayRules = rules.filter((r) => r.weekday === weekday);
 
       for (const rule of dayRules) {
+        const ruleTz = rule.timezone || mentorTimezone;
         const [startHour, startMin] = rule.startTime.split(':').map(Number);
         const [endHour, endMin] = rule.endTime.split(':').map(Number);
 
-        let slotStart = new Date(d);
-        slotStart.setUTCHours(startHour, startMin, 0, 0);
+        const localStart = new Date(d);
+        localStart.setHours(startHour, startMin, 0, 0);
 
-        const windowEnd = new Date(d);
-        windowEnd.setUTCHours(endHour, endMin, 0, 0);
+        const localEnd = new Date(d);
+        localEnd.setHours(endHour, endMin, 0, 0);
 
-        while (slotStart.getTime() + slotDuration * 60 * 1000 <= windowEnd.getTime()) {
-          const slotEnd = new Date(slotStart.getTime() + slotDuration * 60 * 1000);
+        let slotStartUtc = fromZonedTime(localStart, ruleTz);
+        const windowEndUtc = fromZonedTime(localEnd, ruleTz);
+
+        while (slotStartUtc.getTime() + slotDuration * 60 * 1000 <= windowEndUtc.getTime()) {
+          const slotEndUtc = addMinutes(slotStartUtc, slotDuration);
 
           // Only create future slots
-          if (slotStart > new Date()) {
+          if (slotStartUtc > now) {
             slots.push({
               mentorId,
-              startAt: new Date(slotStart),
-              endAt: slotEnd,
+              startAt: new Date(slotStartUtc),
+              endAt: new Date(slotEndUtc),
               status: 'free',
             });
           }
 
-          slotStart = slotEnd;
+          slotStartUtc = slotEndUtc;
         }
       }
     }

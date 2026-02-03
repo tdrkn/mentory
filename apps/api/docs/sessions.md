@@ -11,9 +11,9 @@
 ## Session Flow
 
 ```
-[mentee] POST /booking → status: requested
+[mentee] POST /booking/hold → status: requested (slot held)
     ↓
-[mentor] PATCH /booking/:id/confirm → status: booked
+[mentor] POST /booking/confirm → status: booked
     ↓
 [mentee] POST /payments/intent → payment created
     ↓
@@ -43,9 +43,9 @@
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | /api/booking | Забронировать |
-| PATCH | /api/booking/:id/confirm | Подтвердить |
-| PATCH | /api/booking/:id/reject | Отклонить |
+| POST | /api/booking/hold | Забронировать (hold) |
+| POST | /api/booking/confirm | Подтвердить |
+| GET | /api/booking/:id | Детали бронирования |
 | PATCH | /api/booking/:id/cancel | Отменить |
 
 ### Reviews
@@ -58,21 +58,23 @@
 
 ```bash
 # Book session
-curl -X POST http://localhost:3001/api/booking \
+curl -X POST http://localhost:4000/api/booking/hold \
   -H "Authorization: Bearer MENTEE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"slotId":"SLOT_ID","serviceId":"SERVICE_ID"}'
 
 # Confirm booking
-curl -X PATCH http://localhost:3001/api/booking/SESSION_ID/confirm \
-  -H "Authorization: Bearer MENTOR_TOKEN"
+curl -X POST http://localhost:4000/api/booking/confirm \
+  -H "Authorization: Bearer MENTOR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"sessionId":"SESSION_ID"}'
 
 # Get my sessions
-curl http://localhost:3001/api/sessions \
+curl http://localhost:4000/api/sessions \
   -H "Authorization: Bearer TOKEN"
 
 # Leave review
-curl -X POST http://localhost:3001/api/reviews/SESSION_ID \
+curl -X POST http://localhost:4000/api/reviews/SESSION_ID \
   -H "Authorization: Bearer MENTEE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"rating":5,"text":"Great session!"}'

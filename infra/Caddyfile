@@ -2,27 +2,37 @@
 # Replace mentory.local with your domain in production
 
 mentory.local {
-    # Web app
-    handle {
-        reverse_proxy web:3000
+    # Admin panel
+    handle /admin* {
+        reverse_proxy api:4000
     }
 
     # API routes
     handle /api/* {
         reverse_proxy api:4000
     }
+
+    # Web app
+    handle {
+        reverse_proxy web:3000
+    }
 }
 
 # Production example (uncomment and configure)
 # mentory.io {
-#     # Web app
-#     handle {
-#         reverse_proxy web:3000
+#     # Admin panel
+#     handle /admin* {
+#         reverse_proxy api:4000
 #     }
 # 
 #     # API routes
 #     handle /api/* {
 #         reverse_proxy api:4000
+#     }
+# 
+#     # Web app
+#     handle {
+#         reverse_proxy web:3000
 #     }
 # 
 #     # Enable automatic HTTPS

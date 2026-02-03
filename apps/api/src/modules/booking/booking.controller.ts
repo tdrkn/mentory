@@ -6,13 +6,13 @@ import { HoldSlotDto } from './dto/hold-slot.dto';
 import { ConfirmSessionDto } from './dto/confirm-session.dto';
 import { CancelSessionDto } from './dto/cancel-session.dto';
 
-@Controller('sessions')
+@Controller('booking')
 @UseGuards(JwtAuthGuard)
 export class BookingController {
   constructor(private readonly bookingService: BookingService) {}
 
   /**
-   * POST /api/sessions/hold
+   * POST /api/booking/hold
    * Hold a slot for booking (10 min hold)
    * Access: Mentee
    * 
@@ -31,7 +31,7 @@ export class BookingController {
   }
 
   /**
-   * POST /api/sessions/confirm
+   * POST /api/booking/confirm
    * Confirm session (after mentor approval or payment)
    * Access: Mentor or Mentee
    * 
@@ -47,7 +47,7 @@ export class BookingController {
   }
 
   /**
-   * PATCH /api/sessions/:id/cancel
+   * PATCH /api/booking/:id/cancel
    * Cancel a session
    * Access: Session participant
    * 
@@ -64,7 +64,7 @@ export class BookingController {
   }
 
   /**
-   * GET /api/sessions/:id
+   * GET /api/booking/:id
    * Get session details
    * Access: Session participant
    */
@@ -77,10 +77,12 @@ export class BookingController {
   }
 
   /**
-   * POST /api/sessions/release-expired
+   * POST /api/booking/release-expired
    * Release expired holds (admin/cron)
-   * Access: Admin or internal
+   * Access: Admin
    */
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   @Post('release-expired')
   async releaseExpired() {
     return this.bookingService.releaseExpiredHolds();

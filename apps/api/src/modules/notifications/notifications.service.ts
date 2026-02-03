@@ -143,7 +143,7 @@ export class NotificationsService {
         sessionDate: new Date(session.startAt).toLocaleDateString('ru-RU'),
         sessionTime: new Date(session.startAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
         topic: session.topic?.name || 'Общее менторство',
-        sessionLink: `${process.env.WEB_URL || 'http://localhost:3000'}/sessions/${session.id}`,
+        sessionLink: `${process.env.WEB_URL || process.env.PUBLIC_APP_URL || 'http://localhost:3000'}/sessions/${session.id}`,
       },
     });
 
@@ -199,8 +199,8 @@ export class NotificationsService {
         recipientName,
         senderName: sender.fullName,
         messagePreview: messagePreview.substring(0, 100) + (messagePreview.length > 100 ? '...' : ''),
-        conversationLink: `${process.env.WEB_URL || 'http://localhost:3000'}/chat/${conversationId}`,
-        unsubscribeLink: `${process.env.WEB_URL || 'http://localhost:3000'}/settings/notifications`,
+        conversationLink: `${process.env.WEB_URL || process.env.PUBLIC_APP_URL || 'http://localhost:3000'}/chat/${conversationId}`,
+        unsubscribeLink: `${process.env.WEB_URL || process.env.PUBLIC_APP_URL || 'http://localhost:3000'}/settings/notifications`,
       },
     });
 

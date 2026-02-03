@@ -5,14 +5,14 @@ import { ProfilesService } from './profiles.service';
 import { UpdateMentorProfileDto } from './dto/update-mentor-profile.dto';
 import { UpdateTopicsDto } from './dto/update-topics.dto';
 
-@Controller('profiles/mentor')
+@Controller('profile/mentor')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('mentor', 'both')
 export class MentorProfileController {
   constructor(private readonly profilesService: ProfilesService) {}
 
   /**
-   * GET /api/profiles/mentor
+   * GET /api/profile/mentor
    * Get mentor profile
    * Access: Mentor
    */
@@ -22,7 +22,7 @@ export class MentorProfileController {
   }
 
   /**
-   * PATCH /api/profiles/mentor
+   * PATCH /api/profile/mentor
    * Update mentor profile (headline, bio, languages)
    * Access: Mentor
    */
@@ -35,7 +35,7 @@ export class MentorProfileController {
   }
 
   /**
-   * PUT /api/profiles/mentor/topics
+   * PUT /api/profile/mentor/topics
    * Replace all mentor topics
    * Access: Mentor
    */
@@ -48,7 +48,7 @@ export class MentorProfileController {
   }
 
   /**
-   * POST /api/profiles/mentor/topics/:topicId
+   * POST /api/profile/mentor/topics/:topicId
    * Add topic to mentor's expertise
    * Access: Mentor
    */
@@ -61,7 +61,7 @@ export class MentorProfileController {
   }
 
   /**
-   * DELETE /api/profiles/mentor/topics/:topicId
+   * DELETE /api/profile/mentor/topics/:topicId
    * Remove topic from mentor's expertise
    * Access: Mentor
    */
@@ -74,7 +74,7 @@ export class MentorProfileController {
   }
 
   /**
-   * PATCH /api/profiles/mentor/activate
+   * PATCH /api/profile/mentor/activate
    * Activate mentor profile (make visible)
    * Access: Mentor
    */
@@ -84,7 +84,7 @@ export class MentorProfileController {
   }
 
   /**
-   * PATCH /api/profiles/mentor/deactivate
+   * PATCH /api/profile/mentor/deactivate
    * Deactivate mentor profile (hide from search)
    * Access: Mentor
    */
