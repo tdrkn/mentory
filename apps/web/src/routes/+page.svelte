@@ -1,5 +1,6 @@
 <script lang="ts">
   import AppHeader from '$lib/components/AppHeader.svelte';
+  import { Search, CalendarDays, MessageCircle } from 'lucide-svelte';
 </script>
 
 <div class="page">
@@ -45,17 +46,17 @@
     <section class="section">
       <div class="grid cols-3">
         <div class="card reveal">
-          <div class="tag">🔍 Поиск</div>
+          <div class="tag"><Search size="16" /> Поиск</div>
           <h3 style="margin-top:12px;">Найдите своего эксперта</h3>
           <p class="muted">Фильтры по цене, рейтингу и специализациям.</p>
         </div>
         <div class="card reveal" style="animation-delay:0.1s;">
-          <div class="tag">📅 Гибкость</div>
+          <div class="tag"><CalendarDays size="16" /> Гибкость</div>
           <h3 style="margin-top:12px;">Управляйте слотами</h3>
           <p class="muted">Создавайте правила доступности на недели вперёд.</p>
         </div>
         <div class="card reveal" style="animation-delay:0.2s;">
-          <div class="tag">💬 Коммуникация</div>
+          <div class="tag"><MessageCircle size="16" /> Коммуникация</div>
           <h3 style="margin-top:12px;">Обсуждайте детали</h3>
           <p class="muted">Чат, заметки и напоминания — всё под рукой.</p>
         </div>

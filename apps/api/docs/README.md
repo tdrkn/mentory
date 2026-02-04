@@ -32,6 +32,8 @@ Mentory API построен как **модульный монолит** на N
 - Auth: `Authorization: Bearer <token>`
 - Content-Type: `application/json`
 - Errors: `{ statusCode, message, error }`
+- Swagger UI: `/api/docs`
+- OpenAPI JSON: `/api/docs-json`
 
 ### Running Locally
 

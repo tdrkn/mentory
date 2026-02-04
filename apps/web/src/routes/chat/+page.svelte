@@ -2,10 +2,12 @@
   import AppHeader from '$lib/components/AppHeader.svelte';
   import Loading from '$lib/components/Loading.svelte';
   import { api } from '$lib/api';
+  import { connectSocket, disconnectSocket } from '$lib/socket';
   import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/stores';
   import { user, isAuthenticated, isLoading as authLoading } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
+  import type { Socket } from 'socket.io-client';
 
   interface Conversation {
     id: string;
@@ -28,7 +30,9 @@
   let newMessage = '';
   let isLoading = true;
   let isSending = false;
-  let pollTimer: any;
+  let socket: Socket | null = null;
+  let typingUserId: string | null = null;
+  let typingTimeout: any;
 
   const loadConversations = async () => {
     conversations = await api.get<Conversation[]>('/conversations');
@@ -38,6 +42,7 @@
     if (!activeConversation) return;
     messages = await api.get<Message[]>(`/conversations/${activeConversation}/messages?limit=50`);
     await api.patch(`/chat/${activeConversation}/read`);
+    socket?.emit('mark_read', { conversationId: activeConversation });
     conversations = conversations.map((c) => (c.id === activeConversation ? { ...c, unreadCount: 0 } : c));
   };
 
@@ -49,10 +54,52 @@
 
     try {
       const message = await api.post<Message>(`/chat/${activeConversation}/messages`, { content: text });
-      messages = [...messages, message];
+      if (!messages.find((m) => m.id === message.id)) {
+        messages = [...messages, message];
+      }
     } finally {
       isSending = false;
     }
+  };
+
+  const ensureSocket = () => {
+    if (socket) return socket;
+    const token = localStorage.getItem('accessToken');
+    socket = connectSocket(token);
+    if (!socket) return null;
+
+    socket.on('connect', () => {
+      if (activeConversation) {
+        socket?.emit('join_conversation', { conversationId: activeConversation });
+      }
+    });
+
+    socket.on('new_message', ({ conversationId, message }) => {
+      conversations = conversations.map((c) =>
+        c.id === conversationId ? { ...c, lastMessage: message, unreadCount: c.unreadCount + 1 } : c,
+      );
+      if (conversationId === activeConversation) {
+        if (!messages.find((m) => m.id === message.id)) {
+          messages = [...messages, message];
+        }
+        socket?.emit('mark_read', { conversationId });
+        conversations = conversations.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c));
+      }
+    });
+
+    socket.on('messages_read', ({ conversationId }) => {
+      if (conversationId === activeConversation) {
+        conversations = conversations.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c));
+      }
+    });
+
+    socket.on('user_typing', ({ conversationId, userId, isTyping }) => {
+      if (conversationId === activeConversation && userId !== $user?.id) {
+        typingUserId = isTyping ? userId : null;
+      }
+    });
+
+    return socket;
   };
 
   const partnerName = (conv: Conversation) => {
@@ -77,15 +124,34 @@
 
     if (activeConversation) {
       await loadMessages();
-      pollTimer = setInterval(loadMessages, 5000);
+      ensureSocket();
+      socket?.emit('join_conversation', { conversationId: activeConversation });
     }
 
     isLoading = false;
   });
 
   onDestroy(() => {
-    if (pollTimer) clearInterval(pollTimer);
+    if (typingTimeout) clearTimeout(typingTimeout);
+    if (socket) {
+      socket.off('new_message');
+      socket.off('messages_read');
+      socket.off('user_typing');
+    }
+    disconnectSocket();
   });
+
+  const emitTyping = (isTyping: boolean) => {
+    if (!activeConversation) return;
+    ensureSocket();
+    socket?.emit('typing', { conversationId: activeConversation, isTyping });
+  };
+
+  const handleTyping = () => {
+    emitTyping(true);
+    if (typingTimeout) clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => emitTyping(false), 1200);
+  };
 </script>
 
 <div class="page">
@@ -109,7 +175,10 @@
                   style={`text-align:left;border:2px solid ${activeConversation === conv.id ? 'var(--accent)' : 'transparent'};`}
                   on:click={() => {
                     activeConversation = conv.id;
+                    typingUserId = null;
                     loadMessages();
+                    ensureSocket();
+                    socket?.emit('join_conversation', { conversationId: conv.id });
                   }}
                 >
                   <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -145,8 +214,12 @@
               {/each}
             </div>
 
+            {#if typingUserId}
+              <div class="muted" style="font-size:0.85rem;margin-top:8px;">Печатает...</div>
+            {/if}
+
             <div style="display:flex;gap:8px;margin-top:12px;">
-              <input class="input" bind:value={newMessage} placeholder="Введите сообщение..." />
+              <input class="input" bind:value={newMessage} placeholder="Введите сообщение..." on:input={handleTyping} />
               <button class="btn btn-primary" on:click={handleSend} disabled={isSending || !newMessage.trim()}>
                 {isSending ? '...' : 'Отправить'}
               </button>

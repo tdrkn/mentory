@@ -68,38 +68,38 @@ reset-db: ## Reset database (drop & recreate + migrate + seed)
 	$(COMPOSE_DEV) exec db psql -U mentory -c "DROP DATABASE IF EXISTS mentory;"
 	$(COMPOSE_DEV) exec db psql -U mentory -c "CREATE DATABASE mentory;"
 	@echo "$(CYAN)Running migrations...$(NC)"
-	$(COMPOSE_DEV) exec api pnpm prisma migrate deploy
+	$(COMPOSE_DEV) exec api pnpm --filter @mentory/api prisma:migrate:deploy
 	@echo "$(CYAN)Seeding database...$(NC)"
-	$(COMPOSE_DEV) exec api pnpm prisma db seed
+	$(COMPOSE_DEV) exec api pnpm --filter @mentory/api seed
 	@echo "$(GREEN)Database reset complete.$(NC)"
 
 migrate: ## Run database migrations (dev mode - creates migration if needed)
 	@echo "$(CYAN)Running migrations...$(NC)"
-	$(COMPOSE_DEV) exec api pnpm prisma migrate dev
+	$(COMPOSE_DEV) exec api pnpm --filter @mentory/api prisma:migrate
 	@echo "$(GREEN)Migrations complete.$(NC)"
 
 migrate-deploy: ## Apply migrations (production mode)
 	@echo "$(CYAN)Deploying migrations...$(NC)"
-	$(COMPOSE_DEV) exec api pnpm prisma migrate deploy
+	$(COMPOSE_DEV) exec api pnpm --filter @mentory/api prisma:migrate:deploy
 
 migrate-generate: ## Generate new migration without applying
 	@echo "$(CYAN)Generating migration...$(NC)"
-	$(COMPOSE_DEV) exec api pnpm prisma migrate dev --create-only
+	$(COMPOSE_DEV) exec api pnpm --filter @mentory/api migrate:generate
 
 migrate-status: ## Show migration status
-	$(COMPOSE_DEV) exec api pnpm prisma migrate status
+	$(COMPOSE_DEV) exec api pnpm --filter @mentory/api exec prisma migrate status
 
 seed: ## Seed database with test data
 	@echo "$(CYAN)Seeding database...$(NC)"
-	$(COMPOSE_DEV) exec api pnpm prisma db seed
+	$(COMPOSE_DEV) exec api pnpm --filter @mentory/api seed
 	@echo "$(GREEN)Seeding complete.$(NC)"
 
 prisma-studio: ## Open Prisma Studio (DB GUI)
 	@echo "$(CYAN)Opening Prisma Studio...$(NC)"
-	$(COMPOSE_DEV) exec api pnpm prisma studio
+	$(COMPOSE_DEV) exec api pnpm --filter @mentory/api prisma:studio
 
 prisma-generate: ## Generate Prisma client
-	$(COMPOSE_DEV) exec api pnpm prisma generate
+	$(COMPOSE_DEV) exec api pnpm --filter @mentory/api prisma:generate
 
 db-shell: ## Open PostgreSQL shell
 	$(COMPOSE_DEV) exec db psql -U mentory -d mentory
@@ -214,16 +214,20 @@ start: ## 🚀 START EVERYTHING - one command deployment
 	@pnpm --filter @mentory/shared build
 	@echo ""
 	@echo "$(CYAN)[4/5]$(NC) Starting Docker containers..."
-	@$(COMPOSE_DEV) up -d --build
+	@$(COMPOSE_DEV) up -d --build --renew-anon-volumes
 	@echo ""
 	@echo "$(CYAN)[5/5]$(NC) Waiting for services..."
 	@sleep 5
 	@echo ""
 	@echo "$(CYAN)Running database migrations...$(NC)"
-	@$(COMPOSE_DEV) exec -T api pnpm prisma migrate deploy 2>/dev/null || $(COMPOSE_DEV) exec -T api pnpm prisma db push 2>/dev/null || echo "$(YELLOW)⚠️  Migrations will run on first request$(NC)"
+	@if [ -d apps/api/prisma/migrations ] && [ "$$(ls -A apps/api/prisma/migrations 2>/dev/null)" ]; then \
+		$(COMPOSE_DEV) exec -T api pnpm --filter @mentory/api prisma:migrate:deploy; \
+	else \
+		$(COMPOSE_DEV) exec -T api pnpm --filter @mentory/api prisma:push; \
+	fi
 	@echo ""
 	@echo "$(CYAN)Seeding database...$(NC)"
-	@$(COMPOSE_DEV) exec -T api pnpm prisma db seed 2>/dev/null || echo "$(YELLOW)⚠️  Seed will run separately$(NC)"
+	@$(COMPOSE_DEV) exec -T api pnpm --filter @mentory/api seed 2>/dev/null || echo "$(YELLOW)⚠️  Seed will run separately$(NC)"
 	@echo ""
 	@echo "$(GREEN)╔═══════════════════════════════════════╗$(NC)"
 	@echo "$(GREEN)║         ✓ MENTORY IS READY!           ║$(NC)"

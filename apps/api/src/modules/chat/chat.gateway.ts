@@ -11,7 +11,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { Logger } from '@nestjs/common';
+import { Logger, OnModuleInit } from '@nestjs/common';
 import { ChatService } from './chat.service';
 
 /**
@@ -45,7 +45,7 @@ import { ChatService } from './chat.service';
     credentials: true,
   },
 })
-export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit {
   @WebSocketServer()
   server: Server;
 
@@ -59,6 +59,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly configService: ConfigService,
     private readonly chatService: ChatService,
   ) {}
+
+  onModuleInit() {
+    this.chatService.setChatGateway(this);
+  }
 
   // ============================================
   // Connection Lifecycle

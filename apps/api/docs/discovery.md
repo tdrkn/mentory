@@ -52,10 +52,6 @@
 
 Список всех топиков.
 
-### GET /api/topics/:slug
-
-Топик по slug.
-
 ## curl Examples
 
 ```bash

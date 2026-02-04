@@ -79,7 +79,7 @@ src/modules/profiles/
   "ratingCount": 25,
   "isVisible": true,
   "topics": [
-    { "id": "uuid", "name": "JavaScript", "slug": "javascript" }
+    { "id": "uuid", "name": "JavaScript" }
   ]
 }
 ```

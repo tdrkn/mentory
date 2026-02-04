@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --bg: #f6f1eb;
   --surface: #ffffff;
@@ -17,6 +21,14 @@
   --radius-sm: 10px;
   --font-display: 'Fraunces', serif;
   --font-body: 'Space Grotesk', system-ui, sans-serif;
+}
+
+[data-theme='skeleton'] {
+  --theme-font-family-base: var(--font-body);
+  --theme-font-family-heading: var(--font-display);
+  --theme-rounded-base: 14px;
+  --theme-rounded-container: 22px;
+  --theme-rounded-input: 10px;
 }
 
 * {

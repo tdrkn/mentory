@@ -124,6 +124,7 @@ pnpm docker:down
 - Web: http://localhost:3000
 - API: http://localhost:4000
 - Admin: http://localhost:4000/admin
+- Swagger: http://localhost:4000/api/docs
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
 

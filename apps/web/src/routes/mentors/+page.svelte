@@ -2,7 +2,7 @@
   import AppHeader from '$lib/components/AppHeader.svelte';
   import Loading from '$lib/components/Loading.svelte';
   import { api, ApiError } from '$lib/api';
-  import { onMount } from 'svelte';
+  import { createQuery } from '@tanstack/svelte-query';
 
   type Topic = { id: string; name: string };
   type MentorProfile = {
@@ -26,11 +26,11 @@
     completedSessions: number;
   };
 
-  let mentors: MentorProfile[] = [];
   let topics: Topic[] = [];
-  let isLoading = true;
-  let error: string | null = null;
+  let mentors: MentorProfile[] = [];
   let total = 0;
+  let isLoading = false;
+  let error: string | null = null;
 
   let topicId = '';
   let minPrice = '';
@@ -38,19 +38,21 @@
   let minRating = '';
   let sort = '';
 
-  const loadTopics = async () => {
-    try {
-      topics = await api.get<Topic[]>('/topics');
-    } catch {
-      topics = [];
-    }
-  };
+  const topicsQuery = createQuery({
+    queryKey: ['topics'],
+    queryFn: async () => {
+      try {
+        return await api.get<Topic[]>('/topics');
+      } catch {
+        return [];
+      }
+    },
+  });
 
-  const loadMentors = async () => {
-    isLoading = true;
-    error = null;
-
-    try {
+  $: mentorsQuery = createQuery({
+    queryKey: ['mentors', topicId, minPrice, maxPrice, minRating, sort],
+    queryFn: async () => {
+      error = null;
       const params = new URLSearchParams();
       if (topicId) params.set('topicId', topicId);
       if (minPrice) params.set('minPrice', minPrice);
@@ -59,24 +61,26 @@
       if (sort) params.set('sort', sort);
 
       const query = params.toString() ? `?${params.toString()}` : '';
-      const response = await api.get<{ data: MentorProfile[]; meta: { total: number } }>(`/mentors${query}`);
-      mentors = response.data || [];
-      total = response.meta?.total || 0;
-    } catch (err) {
-      if (err instanceof ApiError) {
-        error = 'Не удалось загрузить менторов';
-      } else {
-        error = 'Ошибка соединения';
+      try {
+        return await api.get<{ data: MentorProfile[]; meta: { total: number } }>(`/mentors${query}`);
+      } catch (err) {
+        if (err instanceof ApiError) {
+          error = 'Не удалось загрузить менторов';
+        } else {
+          error = 'Ошибка соединения';
+        }
+        return { data: [], meta: { total: 0 } };
       }
-    } finally {
-      isLoading = false;
-    }
-  };
-
-  onMount(async () => {
-    await loadTopics();
-    await loadMentors();
+    },
   });
+
+  $: topics = $topicsQuery.data || [];
+  $: mentors = $mentorsQuery.data?.data || [];
+  $: total = $mentorsQuery.data?.meta?.total || 0;
+  $: isLoading =
+    $mentorsQuery.isLoading ??
+    $mentorsQuery.isPending ??
+    $mentorsQuery.status === 'pending';
 </script>
 
 <div class="page">
@@ -87,20 +91,20 @@
 
     <div class="card" style="margin:18px 0;">
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;">
-        <select class="select" bind:value={topicId} on:change={loadMentors}>
+        <select class="select" bind:value={topicId}>
           <option value="">Все темы</option>
           {#each topics as topic}
             <option value={topic.id}>{topic.name}</option>
           {/each}
         </select>
-        <input class="input" type="number" min="0" placeholder="Мин. цена" bind:value={minPrice} on:change={loadMentors} />
-        <input class="input" type="number" min="0" placeholder="Макс. цена" bind:value={maxPrice} on:change={loadMentors} />
-        <select class="select" bind:value={minRating} on:change={loadMentors}>
+        <input class="input" type="number" min="0" placeholder="Мин. цена" bind:value={minPrice} />
+        <input class="input" type="number" min="0" placeholder="Макс. цена" bind:value={maxPrice} />
+        <select class="select" bind:value={minRating}>
           <option value="">Любой рейтинг</option>
           <option value="4">4+ ⭐</option>
           <option value="4.5">4.5+ ⭐</option>
         </select>
-        <select class="select" bind:value={sort} on:change={loadMentors}>
+        <select class="select" bind:value={sort}>
           <option value="">Сортировка</option>
           <option value="rating">По рейтингу</option>
           <option value="price_asc">Цена ↑</option>

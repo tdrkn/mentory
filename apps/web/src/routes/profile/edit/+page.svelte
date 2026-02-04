@@ -5,6 +5,9 @@
   import { onMount } from 'svelte';
   import { isAuthenticated, isLoading as authLoading, isMentor } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
+  import { superForm } from 'sveltekit-superforms/client';
+  import { zodClient } from 'sveltekit-superforms/adapters';
+  import { profileSchema, type ProfileForm } from '$lib/validators/profile';
 
   interface Topic {
     id: string;
@@ -24,16 +27,26 @@
   let saving = false;
   let message: string | null = null;
 
-  let fullName = '';
-  let timezone = 'UTC';
+  const form = superForm<ProfileForm>(
+    {
+      fullName: '',
+      timezone: 'UTC',
+      headline: '',
+      bio: '',
+      languages: '',
+      background: '',
+      goals: '',
+      interests: '',
+    },
+    {
+      validators: zodClient(profileSchema as any),
+      SPA: true,
+      resetForm: false,
+    },
+  );
 
-  let headline = '';
-  let bio = '';
-  let languages = '';
-
-  let background = '';
-  let goals = '';
-  let interests = '';
+  const { form: formData, errors } = form;
+  const errorMessage = (err: unknown) => (Array.isArray(err) ? err[0] : err);
 
   let topics: Topic[] = [];
   let selectedTopicIds: string[] = [];
@@ -43,45 +56,59 @@
 
   const loadProfile = async () => {
     const profile = await api.get<any>('/profile');
-    fullName = profile.fullName || '';
-    timezone = profile.timezone || 'UTC';
+    const nextForm: ProfileForm = {
+      fullName: profile.fullName || '',
+      timezone: profile.timezone || 'UTC',
+      headline: '',
+      bio: '',
+      languages: '',
+      background: '',
+      goals: '',
+      interests: '',
+    };
 
     if ($isMentor) {
       const mentorProfile = await api.get<any>('/profile/mentor');
-      headline = mentorProfile.headline || '';
-      bio = mentorProfile.bio || '';
-      languages = (mentorProfile.languages || []).join(', ');
+      nextForm.headline = mentorProfile.headline || '';
+      nextForm.bio = mentorProfile.bio || '';
+      nextForm.languages = (mentorProfile.languages || []).join(', ');
       selectedTopicIds = (mentorProfile.topics || []).map((t: any) => t.topic?.id || t.topicId).filter(Boolean);
       services = await api.get<Service[]>('/services');
     } else {
       const menteeProfile = await api.get<any>('/profile/mentee');
-      background = menteeProfile.background || '';
-      goals = menteeProfile.goals || '';
-      interests = (menteeProfile.interests || []).join(', ');
+      nextForm.background = menteeProfile.background || '';
+      nextForm.goals = menteeProfile.goals || '';
+      nextForm.interests = (menteeProfile.interests || []).join(', ');
     }
 
+    formData.set(nextForm);
     topics = await api.get<Topic[]>('/topics');
   };
 
   const saveProfile = async () => {
+    const validation = await form.validateForm({ update: true });
+    if (!validation.valid) {
+      message = 'Проверьте корректность заполнения профиля.';
+      return;
+    }
     saving = true;
     message = null;
     try {
-      await api.patch('/profile', { fullName, timezone });
+      await api.patch('/profile', { fullName: $formData.fullName, timezone: $formData.timezone });
 
       if ($isMentor) {
         await api.patch('/profile/mentor', {
-          headline,
-          bio,
-          languages: languages.split(',').map((l) => l.trim()).filter(Boolean),
-          timezone,
+          headline: $formData.headline,
+          bio: $formData.bio,
+          languages: $formData.languages.split(',').map((l) => l.trim()).filter(Boolean),
+          timezone: $formData.timezone,
         });
         await api.put('/profile/mentor/topics', { topicIds: selectedTopicIds });
       } else {
         await api.patch('/profile/mentee', {
-          background,
-          goals,
-          interests: interests.split(',').map((i) => i.trim()).filter(Boolean),
+          background: $formData.background,
+          goals: $formData.goals,
+          interests: $formData.interests.split(',').map((i) => i.trim()).filter(Boolean),
         });
       }
 
@@ -163,11 +190,17 @@
             <h2 class="section-title">Основная информация</h2>
             <label>
               <div class="muted" style="margin-bottom:6px;">Полное имя</div>
-              <input class="input" bind:value={fullName} />
+              <input class="input" bind:value={$formData.fullName} />
+              {#if $errors.fullName}
+                <div class="muted" style="font-size:0.8rem;color:#b45309;">{errorMessage($errors.fullName)}</div>
+              {/if}
             </label>
             <label style="margin-top:12px;display:block;">
               <div class="muted" style="margin-bottom:6px;">Часовой пояс</div>
-              <input class="input" bind:value={timezone} placeholder="Europe/Moscow" />
+              <input class="input" bind:value={$formData.timezone} placeholder="Europe/Moscow" />
+              {#if $errors.timezone}
+                <div class="muted" style="font-size:0.8rem;color:#b45309;">{errorMessage($errors.timezone)}</div>
+              {/if}
             </label>
           </div>
 
@@ -176,15 +209,15 @@
               <h2 class="section-title">Профиль ментора</h2>
               <label>
                 <div class="muted" style="margin-bottom:6px;">Заголовок</div>
-                <input class="input" bind:value={headline} />
+                <input class="input" bind:value={$formData.headline} />
               </label>
               <label style="margin-top:12px;display:block;">
                 <div class="muted" style="margin-bottom:6px;">О себе</div>
-                <textarea class="textarea" bind:value={bio}></textarea>
+                <textarea class="textarea" bind:value={$formData.bio}></textarea>
               </label>
               <label style="margin-top:12px;display:block;">
                 <div class="muted" style="margin-bottom:6px;">Языки (через запятую)</div>
-                <input class="input" bind:value={languages} placeholder="Русский, English" />
+                <input class="input" bind:value={$formData.languages} placeholder="Русский, English" />
               </label>
             </div>
 
@@ -208,15 +241,15 @@
               <h2 class="section-title">Профиль менти</h2>
               <label>
                 <div class="muted" style="margin-bottom:6px;">Бэкграунд</div>
-                <textarea class="textarea" bind:value={background}></textarea>
+                <textarea class="textarea" bind:value={$formData.background}></textarea>
               </label>
               <label style="margin-top:12px;display:block;">
                 <div class="muted" style="margin-bottom:6px;">Цели</div>
-                <textarea class="textarea" bind:value={goals}></textarea>
+                <textarea class="textarea" bind:value={$formData.goals}></textarea>
               </label>
               <label style="margin-top:12px;display:block;">
                 <div class="muted" style="margin-bottom:6px;">Интересы (через запятую)</div>
-                <input class="input" bind:value={interests} />
+                <input class="input" bind:value={$formData.interests} />
               </label>
             </div>
           {/if}
