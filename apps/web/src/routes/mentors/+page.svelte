@@ -3,6 +3,7 @@
   import Loading from '$lib/components/Loading.svelte';
   import { api, ApiError } from '$lib/api';
   import { createQuery } from '@tanstack/svelte-query';
+  import { Search, Star, Users, ChevronRight, SlidersHorizontal, X } from 'lucide-svelte';
 
   type Topic = { id: string; name: string };
   type MentorProfile = {
@@ -31,12 +32,14 @@
   let total = 0;
   let isLoading = false;
   let error: string | null = null;
+  let showFilters = false;
 
   let topicId = '';
   let minPrice = '';
   let maxPrice = '';
   let minRating = '';
   let sort = '';
+  let searchQuery = '';
 
   const topicsQuery = createQuery({
     queryKey: ['topics'],
@@ -81,83 +84,202 @@
     $mentorsQuery.isLoading ??
     $mentorsQuery.isPending ??
     $mentorsQuery.status === 'pending';
+
+  $: filteredMentors = searchQuery
+    ? mentors.filter(m => 
+        m.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.headline?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.topics?.some(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : mentors;
+
+  const clearFilters = () => {
+    topicId = '';
+    minPrice = '';
+    maxPrice = '';
+    minRating = '';
+    sort = '';
+    searchQuery = '';
+  };
+
+  const hasActiveFilters = () => topicId || minPrice || maxPrice || minRating || sort;
 </script>
 
 <div class="page">
   <AppHeader />
 
   <main class="container section">
-    <h1 class="section-title">Найти ментора</h1>
+    <!-- Hero section -->
+    <div class="mentors-hero reveal">
+      <h1 class="section-title" style="font-size:2.25rem;">Найдите идеального ментора</h1>
+      <p class="section-subtitle" style="max-width:560px;">
+        Более {total > 0 ? total : '100'} экспертов готовы помочь вам с карьерой, навыками и профессиональным ростом.
+      </p>
 
-    <div class="card" style="margin:18px 0;">
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;">
-        <select class="select" bind:value={topicId}>
-          <option value="">Все темы</option>
-          {#each topics as topic}
-            <option value={topic.id}>{topic.name}</option>
-          {/each}
-        </select>
-        <input class="input" type="number" min="0" placeholder="Мин. цена" bind:value={minPrice} />
-        <input class="input" type="number" min="0" placeholder="Макс. цена" bind:value={maxPrice} />
-        <select class="select" bind:value={minRating}>
-          <option value="">Любой рейтинг</option>
-          <option value="4">4+ ⭐</option>
-          <option value="4.5">4.5+ ⭐</option>
-        </select>
-        <select class="select" bind:value={sort}>
-          <option value="">Сортировка</option>
-          <option value="rating">По рейтингу</option>
-          <option value="price_asc">Цена ↑</option>
-          <option value="price_desc">Цена ↓</option>
-          <option value="sessions">По кол-ву сессий</option>
-        </select>
+      <!-- Search bar -->
+      <div class="search-bar">
+        <Search size={20} />
+        <input 
+          class="search-input" 
+          type="text" 
+          placeholder="Поиск по имени, специальности или теме..." 
+          bind:value={searchQuery}
+        />
+        <button class="btn btn-icon btn-ghost" on:click={() => showFilters = !showFilters}>
+          <SlidersHorizontal size={20} />
+        </button>
       </div>
+    </div>
+
+    <!-- Filters panel -->
+    {#if showFilters}
+      <div class="filters-panel card reveal">
+        <div class="flex-between" style="margin-bottom:16px;">
+          <h3 style="margin:0;">Фильтры</h3>
+          {#if hasActiveFilters()}
+            <button class="btn btn-sm btn-ghost" on:click={clearFilters}>
+              <X size={14} /> Сбросить
+            </button>
+          {/if}
+        </div>
+        <div class="filters-grid">
+          <div class="form-group">
+            <label class="label">Тема</label>
+            <select class="select" bind:value={topicId}>
+              <option value="">Все темы</option>
+              {#each topics as topic}
+                <option value={topic.id}>{topic.name}</option>
+              {/each}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="label">Мин. цена</label>
+            <input class="input" type="number" min="0" placeholder="От" bind:value={minPrice} />
+          </div>
+          <div class="form-group">
+            <label class="label">Макс. цена</label>
+            <input class="input" type="number" min="0" placeholder="До" bind:value={maxPrice} />
+          </div>
+          <div class="form-group">
+            <label class="label">Рейтинг</label>
+            <select class="select" bind:value={minRating}>
+              <option value="">Любой</option>
+              <option value="4">4+ ⭐</option>
+              <option value="4.5">4.5+ ⭐</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="label">Сортировка</label>
+            <select class="select" bind:value={sort}>
+              <option value="">По умолчанию</option>
+              <option value="rating">По рейтингу</option>
+              <option value="price_asc">Цена ↑</option>
+              <option value="price_desc">Цена ↓</option>
+              <option value="sessions">По кол-ву сессий</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Quick topic filters -->
+    <div class="topics-scroll reveal">
+      <button 
+        class={`topic-chip ${!topicId ? 'active' : ''}`} 
+        on:click={() => topicId = ''}
+      >
+        Все
+      </button>
+      {#each topics.slice(0, 8) as topic}
+        <button 
+          class={`topic-chip ${topicId === topic.id ? 'active' : ''}`}
+          on:click={() => topicId = topic.id}
+        >
+          {topic.name}
+        </button>
+      {/each}
+    </div>
+
+    <!-- Results info -->
+    <div class="results-info">
+      <span class="muted">
+        {#if isLoading}
+          Загрузка...
+        {:else}
+          Найдено: <strong>{filteredMentors.length}</strong> менторов
+        {/if}
+      </span>
     </div>
 
     {#if isLoading}
       <Loading />
     {:else}
-      <p class="muted">Найдено: {total} менторов</p>
-
       {#if error}
-        <div class="surface" style="margin-top:16px;background:#fee2e2;border-color:#fecaca;color:#991b1b;">
+        <div class="alert alert-error" style="margin-bottom:24px;">
           {error}
         </div>
       {/if}
 
-      {#if mentors.length === 0}
-        <div class="card" style="margin-top:18px;">
-          <p class="muted">Менторы не найдены. Попробуйте изменить фильтры.</p>
+      {#if filteredMentors.length === 0}
+        <div class="empty-state card">
+          <div class="empty-icon">
+            <Users size={48} />
+          </div>
+          <h3>Менторы не найдены</h3>
+          <p class="muted">Попробуйте изменить фильтры или поисковый запрос.</p>
+          <button class="btn btn-outline" on:click={clearFilters}>Сбросить фильтры</button>
         </div>
       {:else}
-        <div class="grid cols-3" style="margin-top:18px;">
-          {#each mentors as mentor}
-            <a class="card" href={`/mentors/${mentor.id}`}>
-              <div style="display:flex;gap:14px;align-items:center;">
-                <div style="width:54px;height:54px;border-radius:50%;background:#e7f5f3;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);">
-                  {mentor.fullName?.charAt(0) || 'M'}
+        <div class="mentors-grid">
+          {#each filteredMentors as mentor, i}
+            <a class="mentor-card reveal" href={`/mentors/${mentor.id}`} style={`animation-delay:${i * 0.05}s`}>
+              <div class="mentor-card-header">
+                <div class="avatar avatar-lg">
+                  {#if mentor.avatarUrl}
+                    <img src={mentor.avatarUrl} alt={mentor.fullName} />
+                  {:else}
+                    {mentor.fullName?.charAt(0) || 'M'}
+                  {/if}
                 </div>
-                <div>
-                  <strong>{mentor.fullName}</strong>
-                  <div class="muted" style="font-size:0.9rem;">{mentor.headline || 'Эксперт'}</div>
-                  <div style="display:flex;gap:8px;align-items:center;margin-top:4px;">
-                    <span class="badge">⭐ {mentor.rating?.average || 0}</span>
-                    <span class="muted">{mentor.completedSessions} сессий</span>
+                <div class="mentor-card-info">
+                  <div class="mentor-card-name">{mentor.fullName}</div>
+                  <div class="mentor-card-title">{mentor.headline || 'Эксперт'}</div>
+                  <div class="mentor-card-meta">
+                    <span class="rating">
+                      <Star size={14} fill="currentColor" />
+                      {mentor.rating?.average || '0'}
+                    </span>
+                    <span class="muted">
+                      <Users size={14} style="display:inline;vertical-align:-2px;" />
+                      {mentor.completedSessions} сессий
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px;">
-                {#each (mentor.topics || []).slice(0, 3) as topic}
-                  <span class="tag">{topic.name}</span>
-                {/each}
-              </div>
+              {#if mentor.topics?.length}
+                <div class="mentor-card-topics">
+                  {#each (mentor.topics || []).slice(0, 3) as topic}
+                    <span class="tag">{topic.name}</span>
+                  {/each}
+                  {#if mentor.topics.length > 3}
+                    <span class="tag violet">+{mentor.topics.length - 3}</span>
+                  {/if}
+                </div>
+              {/if}
 
-              <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
-                <strong style="color:var(--accent);">
-                  {mentor.startingPrice ? `${mentor.startingPrice.priceAmount} ${mentor.startingPrice.currency}` : 'Цена по запросу'}
-                </strong>
-                <span class="muted">→</span>
+              <div class="mentor-card-footer">
+                <div class="mentor-card-price">
+                  {mentor.startingPrice 
+                    ? `${mentor.startingPrice.priceAmount} ${mentor.startingPrice.currency}` 
+                    : 'По запросу'}
+                  {#if mentor.startingPrice}
+                    <span>/ {mentor.startingPrice.durationMin} мин</span>
+                  {/if}
+                </div>
+                <span class="view-profile">
+                  Профиль <ChevronRight size={16} />
+                </span>
               </div>
             </a>
           {/each}
@@ -166,3 +288,136 @@
     {/if}
   </main>
 </div>
+
+<style>
+  .mentors-hero {
+    text-align: center;
+    padding: 40px 0 32px;
+  }
+
+  .search-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 600px;
+    margin: 24px auto 0;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 8px 16px;
+    transition: all 0.2s ease;
+  }
+
+  .search-bar:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-muted);
+  }
+
+  .search-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 1rem;
+    padding: 8px 0;
+    outline: none;
+    font-family: var(--font-body);
+    color: var(--ink);
+  }
+
+  .search-input::placeholder {
+    color: var(--muted-light);
+  }
+
+  .filters-panel {
+    margin-bottom: 24px;
+  }
+
+  .filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+  }
+
+  .topics-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 8px 0 16px;
+    margin-bottom: 8px;
+    scrollbar-width: none;
+  }
+
+  .topics-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .topic-chip {
+    flex-shrink: 0;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--ink-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .topic-chip:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .topic-chip.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .results-info {
+    margin-bottom: 24px;
+  }
+
+  .mentors-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 24px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 64px 24px;
+  }
+
+  .empty-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 24px;
+    background: var(--bg-alt);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+  }
+
+  .view-profile {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--accent);
+    font-weight: 500;
+    font-size: 0.875rem;
+  }
+
+  @media (max-width: 768px) {
+    .mentors-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .filters-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>

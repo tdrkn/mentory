@@ -72,9 +72,14 @@ export class ChatService {
       throw new NotFoundException('Session not found');
     }
 
-    // Check if conversation exists
-    let conversation = await this.prisma.conversation.findUnique({
-      where: { sessionId },
+    // Check if conversation exists either by session or by participant pair
+    let conversation = await this.prisma.conversation.findFirst({
+      where: {
+        OR: [
+          { sessionId },
+          { mentorId: session.mentorId, menteeId: session.menteeId },
+        ],
+      },
       include: {
         mentor: { select: { id: true, fullName: true, avatarUrl: true } },
         mentee: { select: { id: true, fullName: true, avatarUrl: true } },
@@ -88,6 +93,15 @@ export class ChatService {
           mentorId: session.mentorId,
           menteeId: session.menteeId,
         },
+        include: {
+          mentor: { select: { id: true, fullName: true, avatarUrl: true } },
+          mentee: { select: { id: true, fullName: true, avatarUrl: true } },
+        },
+      });
+    } else if (conversation.sessionId !== sessionId) {
+      conversation = await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { sessionId },
         include: {
           mentor: { select: { id: true, fullName: true, avatarUrl: true } },
           mentee: { select: { id: true, fullName: true, avatarUrl: true } },

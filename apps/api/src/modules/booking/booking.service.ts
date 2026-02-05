@@ -5,10 +5,10 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
+import { Prisma, SlotStatus, SessionStatus } from '@prisma/client';
 import { RedisLockService } from './redis-lock.service';
 import { HoldSlotDto } from './dto/hold-slot.dto';
 import { ConfirmSessionDto } from './dto/confirm-session.dto';
-import { SlotStatus, SessionStatus } from '@prisma/client';
 
 /**
  * BOOKING FLOW:
@@ -78,12 +78,12 @@ export class BookingService {
           end_at: Date;
           status: string;
           held_until: Date | null;
-        }>>`
+        }>>(Prisma.sql`
           SELECT id, mentor_id, start_at, end_at, status, held_until
           FROM slots
-          WHERE id = ${slotId}
+          WHERE id = ${slotId}::uuid
           FOR UPDATE
-        `;
+        `);
 
         if (!slot || slot.length === 0) {
           throw new NotFoundException('Slot not found');

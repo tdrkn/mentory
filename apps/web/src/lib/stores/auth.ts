@@ -88,6 +88,10 @@ export async function register(email: string, password: string, fullName: string
   }
 }
 
+export function clearAuthError() {
+  setState({ error: null });
+}
+
 export function logout(redirect = true) {
   if (browser) {
     localStorage.removeItem('accessToken');
