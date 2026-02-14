@@ -51,14 +51,15 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
 
-COPY --from=builder --chown=svelte:nodejs /app/apps/web/build ./build
-COPY --from=builder --chown=svelte:nodejs /app/apps/web/package.json ./
+COPY --from=builder --chown=svelte:nodejs /app/apps/web/build ./apps/web/build
+COPY --from=builder --chown=svelte:nodejs /app/apps/web/package.json ./apps/web/package.json
+COPY --from=builder --chown=svelte:nodejs /app/apps/web/node_modules ./apps/web/node_modules
 COPY --from=builder --chown=svelte:nodejs /app/node_modules ./node_modules
 
 USER svelte
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/ || exit 1
 
-CMD ["node", "build"]
+CMD ["node", "apps/web/build"]

@@ -12,6 +12,9 @@ importers:
 
   .:
     devDependencies:
+      '@babel/plugin-syntax-import-assertions':
+        specifier: ^7.28.6
+        version: 7.28.6(@babel/core@7.28.6)
       '@types/node':
         specifier: ^22.10.0
         version: 22.19.7
@@ -30,6 +33,9 @@ importers:
       '@adminjs/prisma':
         specifier: ^5.0.4
         version: 5.0.4(@prisma/client@6.19.2(prisma@6.19.2(typescript@5.9.3))(typescript@5.9.3))(adminjs@7.8.17(@types/babel__core@7.20.5)(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27))
+      '@babel/plugin-syntax-import-assertions':
+        specifier: ^7.28.6
+        version: 7.28.6(@babel/core@7.28.6)
       '@mentory/shared':
         specifier: workspace:*
         version: link:../../packages/shared

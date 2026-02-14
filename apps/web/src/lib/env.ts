@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { PUBLIC_API_URL, PUBLIC_MINIO_URL } from '$env/static/public';
 
 /**
  * Auto-detect API URL based on the current browser location.
@@ -7,8 +8,20 @@ import { browser } from '$app/environment';
  * Works on any server without config changes.
  */
 export function getApiUrl(): string {
+  if (PUBLIC_API_URL) {
+    // Keep only origin-level base URL; api client adds `/api` itself.
+    return PUBLIC_API_URL.replace(/\/+$/, '').replace(/\/api$/, '');
+  }
+
   if (browser) {
-    const { protocol, hostname } = window.location;
+    const { origin, protocol, hostname, port } = window.location;
+
+    // Behind reverse proxy on standard ports: API is available on same origin.
+    if (!port || port === '80' || port === '443') {
+      return origin;
+    }
+
+    // Local/dev fallback where web runs on :3000 and API on :4000.
     return `${protocol}//${hostname}:4000`;
   }
   // SSR fallback — used inside containers where API is reachable via container name
@@ -16,6 +29,10 @@ export function getApiUrl(): string {
 }
 
 export function getMinioUrl(): string {
+  if (PUBLIC_MINIO_URL) {
+    return PUBLIC_MINIO_URL.replace(/\/+$/, '');
+  }
+
   if (browser) {
     const { protocol, hostname } = window.location;
     return `${protocol}//${hostname}:9000`;

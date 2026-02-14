@@ -3,7 +3,7 @@
 # ============================================
 # Usage: make <command>
 
-.PHONY: help dev dev-full down logs clean reset-db migrate seed build test lint format
+.PHONY: help dev dev-full down logs clean reset-db migrate seed build test lint format start start-dev start-prod
 
 # Default
 .DEFAULT_GOAL := help
@@ -196,7 +196,14 @@ setup: ## Initial project setup (install, build, start)
 	@echo ""
 
 # One command to rule them all
-start: ## 🚀 START EVERYTHING - one command deployment
+start: ## 🚀 START (auto: prod if DOMAIN set, else dev)
+	@if [ -n "$$DOMAIN" ]; then \
+		$(MAKE) start-prod; \
+	else \
+		$(MAKE) start-dev; \
+	fi
+
+start-dev: ## Start full development stack on localhost ports
 	@echo ""
 	@echo "$(CYAN)╔═══════════════════════════════════════╗$(NC)"
 	@echo "$(CYAN)║     MENTORY - Starting Everything     ║$(NC)"
@@ -255,6 +262,51 @@ start: ## 🚀 START EVERYTHING - one command deployment
 	@echo "    make down     - Stop everything"
 	@echo "    make help     - All commands"
 	@echo ""
+
+start-prod: ## Start production stack behind Caddy (domain ACME or IP internal TLS)
+	@set -e; \
+	echo ""; \
+	echo "$(CYAN)╔═══════════════════════════════════════╗$(NC)"; \
+	echo "$(CYAN)║   MENTORY - Production Deployment     ║$(NC)"; \
+	echo "$(CYAN)╚═══════════════════════════════════════╝$(NC)"; \
+	echo ""; \
+	if [ -f .env ]; then set -a; . ./.env; set +a; fi; \
+	if [ -z "$$TLS_EMAIL" ]; then \
+		echo "$(YELLOW)TLS_EMAIL is empty. Example: TLS_EMAIL=admin@example.com make start-prod$(NC)"; \
+		exit 1; \
+	fi; \
+	if [ -n "$$DOMAIN" ]; then \
+		TARGET_HOST="$$DOMAIN"; \
+		TLS_ISSUER_VALUE="$$TLS_EMAIL"; \
+		TLS_MODE="acme"; \
+	else \
+		TARGET_HOST="$$(hostname -I 2>/dev/null | awk '{print $$1}')"; \
+		[ -n "$$TARGET_HOST" ] || TARGET_HOST="localhost"; \
+		TLS_ISSUER_VALUE="internal"; \
+		TLS_MODE="internal"; \
+	fi; \
+	echo "$(CYAN)TLS mode: $$TLS_MODE ($(GREEN)$$TARGET_HOST$(CYAN))$(NC)"; \
+	echo "$(CYAN)[1/4]$(NC) Stopping development stack (if running)..."; \
+	$(COMPOSE_DEV) down --remove-orphans 2>/dev/null || true; \
+	echo "$(CYAN)[2/4]$(NC) Building production images..."; \
+	DOMAIN="$$TARGET_HOST" TLS_ISSUER="$$TLS_ISSUER_VALUE" $(COMPOSE_PROD) build; \
+	echo "$(CYAN)[3/4]$(NC) Starting production stack..."; \
+	DOMAIN="$$TARGET_HOST" TLS_ISSUER="$$TLS_ISSUER_VALUE" $(COMPOSE_PROD) up -d --remove-orphans; \
+	echo "$(CYAN)[4/4]$(NC) Running production migrations..."; \
+	if DOMAIN="$$TARGET_HOST" TLS_ISSUER="$$TLS_ISSUER_VALUE" $(COMPOSE_PROD) exec -T api sh -lc 'command -v pnpm >/dev/null 2>&1'; then \
+		DOMAIN="$$TARGET_HOST" TLS_ISSUER="$$TLS_ISSUER_VALUE" $(COMPOSE_PROD) exec -T api pnpm --filter @mentory/api prisma:migrate:deploy; \
+	else \
+		DOMAIN="$$TARGET_HOST" TLS_ISSUER="$$TLS_ISSUER_VALUE" $(COMPOSE_PROD) exec -T api sh -lc 'apps/api/node_modules/.bin/prisma migrate deploy --schema apps/api/prisma/schema.prisma || apps/api/node_modules/.bin/prisma db push --schema apps/api/prisma/schema.prisma'; \
+	fi; \
+	echo ""; \
+	echo "$(GREEN)✓ Production is up$(NC)"; \
+	echo "  App:    https://$$TARGET_HOST"; \
+	echo "  API:    https://$$TARGET_HOST/api"; \
+	echo "  Admin:  https://$$TARGET_HOST/admin"; \
+	if [ "$$TLS_MODE" = "internal" ]; then \
+		echo "  Note:   Internal/self-signed TLS is used for IP (browser warning is expected)."; \
+	fi; \
+	echo ""
 
 stop: down ## Stop everything (alias for down)
 

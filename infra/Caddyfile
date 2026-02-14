@@ -1,7 +1,15 @@
-# Development Caddyfile
-# Replace mentory.local with your domain in production
+{
+    servers {
+        # Allow direct-IP HTTPS clients that don't send SNI.
+        strict_sni_host insecure_off
+    }
+}
 
-mentory.local {
+# Direct HTTPS listener on 443 to support clients that may omit SNI for raw IP.
+:443 {
+    # Static cert ensures TLS also works for clients that do not send SNI on raw IP.
+    tls /etc/caddy/certs/ip.crt /etc/caddy/certs/ip.key
+
     # Admin panel
     handle /admin* {
         reverse_proxy api:4000
@@ -12,31 +20,18 @@ mentory.local {
         reverse_proxy api:4000
     }
 
+    # Socket.IO/WebSocket transport for chat gateway
+    handle /socket.io* {
+        reverse_proxy api:4000
+    }
+
     # Web app
     handle {
         reverse_proxy web:3000
     }
 }
 
-# Production example (uncomment and configure)
-# mentory.io {
-#     # Admin panel
-#     handle /admin* {
-#         reverse_proxy api:4000
-#     }
-# 
-#     # API routes
-#     handle /api/* {
-#         reverse_proxy api:4000
-#     }
-# 
-#     # Web app
-#     handle {
-#         reverse_proxy web:3000
-#     }
-# 
-#     # Enable automatic HTTPS
-#     tls {
-#         email admin@mentory.io
-#     }
-# }
+# Explicit HTTP -> HTTPS redirect.
+:80 {
+    redir https://{$DOMAIN:206.81.20.68}{uri} 308
+}
