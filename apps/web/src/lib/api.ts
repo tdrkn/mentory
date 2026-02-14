@@ -1,7 +1,5 @@
 import { browser } from '$app/environment';
-import { PUBLIC_API_URL } from '$env/static/public';
-
-const API_URL = PUBLIC_API_URL || 'http://localhost:4000';
+import { getApiUrl } from './env';
 
 export class ApiError extends Error {
   status: number;
@@ -44,7 +42,7 @@ export async function apiClient<T>(endpoint: string, options: RequestOptions = {
     config.body = JSON.stringify(body);
   }
 
-  const url = endpoint.startsWith('http') ? endpoint : `${API_URL}/api${endpoint}`;
+  const url = endpoint.startsWith('http') ? endpoint : `${getApiUrl()}/api${endpoint}`;
   const response = await fetch(url, config);
 
   if (response.status === 204) {

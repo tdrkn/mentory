@@ -15,10 +15,7 @@ async function bootstrap() {
   });
 
   app.enableCors({
-    origin:
-      process.env.CORS_ORIGIN ||
-      process.env.PUBLIC_APP_URL ||
-      'http://localhost:3000',
+    origin: true, // reflect request origin — works from any IP/domain
     credentials: true,
   });
 
@@ -46,9 +43,10 @@ async function bootstrap() {
   await setupAdmin(app);
 
   const port = process.env.API_PORT || 4000;
-  await app.listen(port);
+  const host = process.env.API_HOST || '0.0.0.0';
+  await app.listen(port, host);
   
-  logger.log(`🚀 API running on http://localhost:${port}`);
+  logger.log(`🚀 API running on http://${host}:${port}`);
   logger.log(`📊 Health check: http://localhost:${port}/api/health/ready`);
 }
 

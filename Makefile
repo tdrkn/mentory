@@ -233,12 +233,15 @@ start: ## 🚀 START EVERYTHING - one command deployment
 	@echo "$(GREEN)║         ✓ MENTORY IS READY!           ║$(NC)"
 	@echo "$(GREEN)╚═══════════════════════════════════════╝$(NC)"
 	@echo ""
-	@echo "  $(GREEN)🌐 Web App:$(NC)      http://localhost:3000"
-	@echo "  $(GREEN)🔌 API:$(NC)          http://localhost:4000"
-	@echo "  $(GREEN)❤️  Health:$(NC)       http://localhost:4000/api/health/ready"
-	@echo "  $(GREEN)🛠️  Admin:$(NC)        http://localhost:4000/admin"
-	@echo "  $(GREEN)📧 MailHog:$(NC)      http://localhost:8025"
-	@echo "  $(GREEN)📦 MinIO:$(NC)        http://localhost:9001"
+	@LOCAL_IP=$$(hostname -I 2>/dev/null | awk '{print $$1}' || ipconfig getifaddr en0 2>/dev/null || echo "localhost"); \
+	echo "  $(GREEN)🌐 Web App:$(NC)      http://$$LOCAL_IP:3000"; \
+	echo "  $(GREEN)🔌 API:$(NC)          http://$$LOCAL_IP:4000"; \
+	echo "  $(GREEN)❤️  Health:$(NC)       http://$$LOCAL_IP:4000/api/health/ready"; \
+	echo "  $(GREEN)🛠️  Admin:$(NC)        http://$$LOCAL_IP:4000/admin"; \
+	echo "  $(GREEN)📧 MailHog:$(NC)      http://$$LOCAL_IP:8025"; \
+	echo "  $(GREEN)📦 MinIO:$(NC)        http://$$LOCAL_IP:9001"; \
+	echo ""; \
+	echo "  Also available at http://localhost:3000 (locally)"
 	@echo "  $(GREEN)🗄️  Prisma:$(NC)       make prisma-studio"
 	@echo ""
 	@echo "  $(YELLOW)Test accounts:$(NC)"
