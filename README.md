@@ -7,6 +7,7 @@
 [![NestJS](https://img.shields.io/badge/NestJS-10-red.svg)](https://nestjs.com/)
 [![pnpm](https://img.shields.io/badge/pnpm-9.15-orange.svg)](https://pnpm.io/)
 [![Docker](https://img.shields.io/badge/Docker-ready-blue.svg)](https://docker.com/)
+[![CI/CD](https://github.com/tdrkn/mentory/actions/workflows/deploy-main.yml/badge.svg)](https://github.com/tdrkn/mentory/actions/workflows/deploy-main.yml)
 
 ---
 
@@ -127,6 +128,42 @@ pnpm docker:down
 - Swagger: http://localhost:4000/api/docs
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
+
+---
+
+## ⚙️ CI/CD (автодеплой в main)
+
+Добавлен workflow: `.github/workflows/deploy-main.yml`
+
+Что происходит:
+- при `push` в `main` запускается CI (install, lint, check, build);
+- если CI зеленый, GitHub Actions подключается по SSH к серверу;
+- на сервере выполняется `scripts/deploy_prod.sh`:
+  - `git pull` из `main`;
+  - `docker compose -f infra/docker-compose.prod.yml up -d --build --remove-orphans`;
+  - `npx prisma migrate deploy`.
+
+### GitHub Secrets (Repository → Settings → Secrets and variables → Actions)
+
+- `DEPLOY_HOST` — IP/домен сервера
+- `DEPLOY_PORT` — SSH порт (обычно `22`)
+- `DEPLOY_USER` — SSH пользователь
+- `DEPLOY_PATH` — путь до папки проекта на сервере (где лежит этот репозиторий)
+- `DEPLOY_SSH_PRIVATE_KEY` — приватный SSH ключ для доступа к серверу
+
+### Что нужно сделать на сервере один раз
+
+```bash
+# 1) Клонировать репозиторий в директорию из DEPLOY_PATH
+git clone <your-repo-url> /opt/mentory
+cd /opt/mentory
+
+# 2) Создать и заполнить продовый .env
+cp .env.example .env
+
+# 3) Проверить ручной деплой
+bash scripts/deploy_prod.sh main
+```
 
 ### 3. Локальный запуск (без Docker)
 
