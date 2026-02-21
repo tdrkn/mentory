@@ -62,7 +62,7 @@ services:
   # MinIO (S3-compatible Object Storage)
   # ============================================
   minio:
-    image: minio/minio:latest
+    image: ${MINIO_IMAGE:-quay.io/minio/minio:RELEASE.2025-02-28T09-55-16Z}
     container_name: mentory-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -90,6 +90,7 @@ services:
     image: mailhog/mailhog:latest
     container_name: mentory-mailhog
     restart: unless-stopped
+    profiles: ["mail"]
     ports:
       - "${MAILHOG_SMTP_PORT:-1025}:1025"   # SMTP
       - "${MAILHOG_UI_PORT:-8025}:8025"      # Web UI

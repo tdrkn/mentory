@@ -8,6 +8,12 @@
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
   import { profileSchema, type ProfileForm } from '$lib/validators/profile';
+  import {
+    EDUCATION_SUGGESTIONS,
+    HOBBY_OPTIONS,
+    SKILL_OPTIONS,
+    WORKPLACE_SUGGESTIONS,
+  } from '$lib/constants/profile-options';
 
   interface Topic {
     id: string;
@@ -31,11 +37,17 @@
     {
       fullName: '',
       timezone: 'UTC',
+      age: null,
+      education: '',
+      workplace: '',
+      goals: [],
+      hobbies: [],
+      certificates: [],
+      skills: [],
       headline: '',
       bio: '',
       languages: '',
       background: '',
-      goals: '',
       interests: '',
     },
     {
@@ -54,21 +66,98 @@
   let services: Service[] = [];
   let newService = { title: '', durationMin: 60, priceAmount: '0', currency: 'RUB' };
 
+  let hobbySearch = '';
+  let skillSearch = '';
+
+  const normalizeStringArray = (items: string[]) => items.map((item) => item.trim()).filter(Boolean);
+  const inputValue = (event: Event) => (event.currentTarget as HTMLInputElement | null)?.value || '';
+  const inputChecked = (event: Event) => !!(event.currentTarget as HTMLInputElement | null)?.checked;
+
+  const addGoal = () => {
+    formData.update((current) => ({ ...current, goals: [...current.goals, ''] }));
+  };
+
+  const updateGoal = (index: number, value: string) => {
+    formData.update((current) => ({
+      ...current,
+      goals: current.goals.map((goal, i) => (i === index ? value : goal)),
+    }));
+  };
+
+  const removeGoal = (index: number) => {
+    formData.update((current) => ({
+      ...current,
+      goals: current.goals.filter((_, i) => i !== index),
+    }));
+  };
+
+  const addCertificate = () => {
+    formData.update((current) => ({ ...current, certificates: [...current.certificates, ''] }));
+  };
+
+  const updateCertificate = (index: number, value: string) => {
+    formData.update((current) => ({
+      ...current,
+      certificates: current.certificates.map((certificate, i) => (i === index ? value : certificate)),
+    }));
+  };
+
+  const removeCertificate = (index: number) => {
+    formData.update((current) => ({
+      ...current,
+      certificates: current.certificates.filter((_, i) => i !== index),
+    }));
+  };
+
+  const toggleSelectable = (field: 'hobbies' | 'skills', value: string, checked: boolean) => {
+    formData.update((current) => {
+      const currentValues = current[field] || [];
+      if (checked && !currentValues.includes(value)) {
+        return { ...current, [field]: [...currentValues, value] };
+      }
+      if (!checked) {
+        return { ...current, [field]: currentValues.filter((item) => item !== value) };
+      }
+      return current;
+    });
+  };
+
+  $: filteredHobbyOptions = HOBBY_OPTIONS.filter((item) =>
+    item.toLowerCase().includes(hobbySearch.trim().toLowerCase()),
+  );
+
+  $: filteredSkillOptions = SKILL_OPTIONS.filter((item) =>
+    item.toLowerCase().includes(skillSearch.trim().toLowerCase()),
+  );
+
   const loadProfile = async () => {
     const profile = await api.get<any>('/profile');
     const nextForm: ProfileForm = {
       fullName: profile.fullName || '',
       timezone: profile.timezone || 'UTC',
+      age: null,
+      education: '',
+      workplace: '',
+      goals: [],
+      hobbies: [],
+      certificates: [],
+      skills: [],
       headline: '',
       bio: '',
       languages: '',
       background: '',
-      goals: '',
       interests: '',
     };
 
     if ($isMentor) {
       const mentorProfile = await api.get<any>('/profile/mentor');
+      nextForm.age = mentorProfile.age ?? null;
+      nextForm.education = mentorProfile.education || '';
+      nextForm.workplace = mentorProfile.workplace || '';
+      nextForm.goals = mentorProfile.goals || [];
+      nextForm.hobbies = mentorProfile.hobbies || [];
+      nextForm.certificates = mentorProfile.certificates || [];
+      nextForm.skills = mentorProfile.skills || [];
       nextForm.headline = mentorProfile.headline || '';
       nextForm.bio = mentorProfile.bio || '';
       nextForm.languages = (mentorProfile.languages || []).join(', ');
@@ -76,8 +165,18 @@
       services = await api.get<Service[]>('/services');
     } else {
       const menteeProfile = await api.get<any>('/profile/mentee');
+      nextForm.age = menteeProfile.age ?? null;
+      nextForm.education = menteeProfile.education || '';
+      nextForm.workplace = menteeProfile.workplace || '';
       nextForm.background = menteeProfile.background || '';
-      nextForm.goals = menteeProfile.goals || '';
+      nextForm.goals = Array.isArray(menteeProfile.goals)
+        ? menteeProfile.goals
+        : menteeProfile.goals
+          ? [menteeProfile.goals]
+          : [];
+      nextForm.hobbies = menteeProfile.hobbies || menteeProfile.interests || [];
+      nextForm.certificates = menteeProfile.certificates || [];
+      nextForm.skills = menteeProfile.skills || [];
       nextForm.interests = (menteeProfile.interests || []).join(', ');
     }
 
@@ -86,18 +185,40 @@
   };
 
   const saveProfile = async () => {
+    const preparedGoals = normalizeStringArray($formData.goals || []);
+    const preparedCertificates = normalizeStringArray($formData.certificates || []);
+    const preparedHobbies = normalizeStringArray($formData.hobbies || []);
+    const preparedSkills = normalizeStringArray($formData.skills || []);
+
+    formData.update((current) => ({
+      ...current,
+      goals: preparedGoals,
+      certificates: preparedCertificates,
+      hobbies: preparedHobbies,
+      skills: preparedSkills,
+    }));
+
     const validation = await form.validateForm({ update: true });
     if (!validation.valid) {
       message = 'Проверьте корректность заполнения профиля.';
       return;
     }
+
     saving = true;
     message = null;
+
     try {
       await api.patch('/profile', { fullName: $formData.fullName, timezone: $formData.timezone });
 
       if ($isMentor) {
         await api.patch('/profile/mentor', {
+          age: $formData.age,
+          education: $formData.education,
+          workplace: $formData.workplace,
+          goals: preparedGoals,
+          hobbies: preparedHobbies,
+          certificates: preparedCertificates,
+          skills: preparedSkills,
           headline: $formData.headline,
           bio: $formData.bio,
           languages: $formData.languages.split(',').map((l) => l.trim()).filter(Boolean),
@@ -106,8 +227,14 @@
         await api.put('/profile/mentor/topics', { topicIds: selectedTopicIds });
       } else {
         await api.patch('/profile/mentee', {
+          age: $formData.age,
+          education: $formData.education,
+          workplace: $formData.workplace,
           background: $formData.background,
-          goals: $formData.goals,
+          goals: preparedGoals,
+          hobbies: preparedHobbies,
+          certificates: preparedCertificates,
+          skills: preparedSkills,
           interests: $formData.interests.split(',').map((i) => i.trim()).filter(Boolean),
         });
       }
@@ -171,6 +298,18 @@
     <Loading />
   {:else}
     <main class="container section" style="max-width:980px;">
+      <datalist id="education-suggestions">
+        {#each EDUCATION_SUGGESTIONS as education}
+          <option value={education}></option>
+        {/each}
+      </datalist>
+
+      <datalist id="workplace-suggestions">
+        {#each WORKPLACE_SUGGESTIONS as workplace}
+          <option value={workplace}></option>
+        {/each}
+      </datalist>
+
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
         <h1 class="section-title">Редактирование профиля</h1>
         <button class="btn btn-primary" on:click={saveProfile} disabled={saving}>
@@ -202,6 +341,158 @@
                 <div class="muted" style="font-size:0.8rem;color:#b45309;">{errorMessage($errors.timezone)}</div>
               {/if}
             </label>
+            <label style="margin-top:12px;display:block;">
+              <div class="muted" style="margin-bottom:6px;">Возраст</div>
+              <input class="input" type="number" min="18" max="120" bind:value={$formData.age} />
+              {#if $errors.age}
+                <div class="muted" style="font-size:0.8rem;color:#b45309;">{errorMessage($errors.age)}</div>
+              {/if}
+            </label>
+            <label style="margin-top:12px;display:block;">
+              <div class="muted" style="margin-bottom:6px;">Образование</div>
+              <input
+                class="input"
+                list="education-suggestions"
+                bind:value={$formData.education}
+                placeholder="Начните вводить и выберите подсказку"
+              />
+            </label>
+            <label style="margin-top:12px;display:block;">
+              <div class="muted" style="margin-bottom:6px;">Место работы</div>
+              <input
+                class="input"
+                list="workplace-suggestions"
+                bind:value={$formData.workplace}
+                placeholder="Начните вводить и выберите подсказку"
+              />
+            </label>
+          </div>
+
+          <div class="card">
+            <h2 class="section-title">Цели</h2>
+            <p class="muted" style="margin-bottom:10px;">Добавляйте отдельные цели в разных полях.</p>
+            <div class="stack" style="gap:8px;">
+              {#if $formData.goals.length === 0}
+                <div class="muted">Пока нет целей.</div>
+              {/if}
+              {#each $formData.goals as goal, goalIndex}
+                <div class="list-field-row">
+                  <input
+                    class="input"
+                    value={goal}
+                    on:input={(event) => updateGoal(goalIndex, inputValue(event))}
+                    placeholder="Например: Подготовиться к собеседованию"
+                  />
+                  <button class="btn btn-ghost" on:click={() => removeGoal(goalIndex)}>Удалить</button>
+                </div>
+              {/each}
+            </div>
+            <button class="btn btn-outline" style="margin-top:12px;" on:click={addGoal}>Добавить цель</button>
+          </div>
+
+          <div class="card">
+            <h2 class="section-title">Хобби (выбор и поиск)</h2>
+            <input
+              class="input"
+              bind:value={hobbySearch}
+              placeholder="Найти хобби в списке"
+              style="margin-bottom:10px;"
+            />
+            <div class="chips">
+              {#each $formData.hobbies as hobby}
+                <button
+                  class="chip selected"
+                  on:click={() => toggleSelectable('hobbies', hobby, false)}
+                  title="Убрать"
+                >
+                  {hobby}
+                </button>
+              {/each}
+            </div>
+            <div class="selection-grid" style="margin-top:10px;">
+              {#if filteredHobbyOptions.length === 0}
+                <div class="muted">Ничего не найдено.</div>
+              {/if}
+              {#each filteredHobbyOptions as hobbyOption}
+                <label class="surface select-item">
+                  <input
+                    type="checkbox"
+                    checked={$formData.hobbies.includes(hobbyOption)}
+                    on:change={(event) =>
+                      toggleSelectable(
+                        'hobbies',
+                        hobbyOption,
+                        inputChecked(event),
+                      )}
+                  />
+                  <span>{hobbyOption}</span>
+                </label>
+              {/each}
+            </div>
+          </div>
+
+          <div class="card">
+            <h2 class="section-title">Навыки (выбор и поиск)</h2>
+            <input
+              class="input"
+              bind:value={skillSearch}
+              placeholder="Найти навык в списке"
+              style="margin-bottom:10px;"
+            />
+            <div class="chips">
+              {#each $formData.skills as skill}
+                <button
+                  class="chip selected"
+                  on:click={() => toggleSelectable('skills', skill, false)}
+                  title="Убрать"
+                >
+                  {skill}
+                </button>
+              {/each}
+            </div>
+            <div class="selection-grid" style="margin-top:10px;">
+              {#if filteredSkillOptions.length === 0}
+                <div class="muted">Ничего не найдено.</div>
+              {/if}
+              {#each filteredSkillOptions as skillOption}
+                <label class="surface select-item">
+                  <input
+                    type="checkbox"
+                    checked={$formData.skills.includes(skillOption)}
+                    on:change={(event) =>
+                      toggleSelectable(
+                        'skills',
+                        skillOption,
+                        inputChecked(event),
+                      )}
+                  />
+                  <span>{skillOption}</span>
+                </label>
+              {/each}
+            </div>
+          </div>
+
+          <div class="card">
+            <h2 class="section-title">Сертификаты и дипломы</h2>
+            <div class="stack" style="gap:8px;">
+              {#if $formData.certificates.length === 0}
+                <div class="muted">Пока не добавлены.</div>
+              {/if}
+              {#each $formData.certificates as certificate, certificateIndex}
+                <div class="list-field-row">
+                  <input
+                    class="input"
+                    value={certificate}
+                    on:input={(event) => updateCertificate(certificateIndex, inputValue(event))}
+                    placeholder="Например: Google Professional Cloud Architect"
+                  />
+                  <button class="btn btn-ghost" on:click={() => removeCertificate(certificateIndex)}>Удалить</button>
+                </div>
+              {/each}
+            </div>
+            <button class="btn btn-outline" style="margin-top:12px;" on:click={addCertificate}>
+              Добавить сертификат/диплом
+            </button>
           </div>
 
           {#if $isMentor}
@@ -244,10 +535,6 @@
                 <textarea class="textarea" bind:value={$formData.background}></textarea>
               </label>
               <label style="margin-top:12px;display:block;">
-                <div class="muted" style="margin-bottom:6px;">Цели</div>
-                <textarea class="textarea" bind:value={$formData.goals}></textarea>
-              </label>
-              <label style="margin-top:12px;display:block;">
                 <div class="muted" style="margin-bottom:6px;">Интересы (через запятую)</div>
                 <input class="input" bind:value={$formData.interests} />
               </label>
@@ -274,7 +561,9 @@
                         <input class="input" bind:value={service.currency} />
                         <button class="btn btn-ghost" on:click={() => removeService(service.id)}>Удалить</button>
                       </div>
-                      <button class="btn btn-outline" style="margin-top:8px;" on:click={() => updateService(service)}>Сохранить</button>
+                      <button class="btn btn-outline" style="margin-top:8px;" on:click={() => updateService(service)}>
+                        Сохранить
+                      </button>
                     </div>
                   {/each}
                 </div>
@@ -297,3 +586,50 @@
     </main>
   {/if}
 </div>
+
+<style>
+  .list-field-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+  }
+
+  .selection-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 8px;
+  }
+
+  .select-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chip {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink-secondary);
+    font-size: 0.8rem;
+    padding: 5px 10px;
+  }
+
+  .chip.selected {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, #fff);
+  }
+
+  @media (max-width: 900px) {
+    .list-field-row {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

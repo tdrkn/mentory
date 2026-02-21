@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { PUBLIC_API_URL, PUBLIC_MINIO_URL } from '$env/static/public';
+import { env } from '$env/dynamic/public';
 
 /**
  * Auto-detect API URL based on the current browser location.
@@ -8,9 +8,9 @@ import { PUBLIC_API_URL, PUBLIC_MINIO_URL } from '$env/static/public';
  * Works on any server without config changes.
  */
 export function getApiUrl(): string {
-  if (PUBLIC_API_URL) {
+  if (env.PUBLIC_API_URL) {
     // Keep only origin-level base URL; api client adds `/api` itself.
-    return PUBLIC_API_URL.replace(/\/+$/, '').replace(/\/api$/, '');
+    return env.PUBLIC_API_URL.replace(/\/+$/, '').replace(/\/api$/, '');
   }
 
   if (browser) {
@@ -29,8 +29,8 @@ export function getApiUrl(): string {
 }
 
 export function getMinioUrl(): string {
-  if (PUBLIC_MINIO_URL) {
-    return PUBLIC_MINIO_URL.replace(/\/+$/, '');
+  if (env.PUBLIC_MINIO_URL) {
+    return env.PUBLIC_MINIO_URL.replace(/\/+$/, '');
   }
 
   if (browser) {

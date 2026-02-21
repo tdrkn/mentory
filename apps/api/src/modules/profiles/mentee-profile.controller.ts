@@ -22,7 +22,7 @@ export class MenteeProfileController {
 
   /**
    * PATCH /api/profile/mentee
-   * Update mentee profile (background, goals, interests)
+   * Update mentee profile
    * Access: Mentee
    */
   @Patch()

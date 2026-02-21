@@ -79,6 +79,8 @@ model User {
   avatarUrl    String?  @map("avatar_url")
   timezone     String   @default("UTC")
   role         UserRole @default(mentee)
+  isEmailVerified Boolean @default(false) @map("is_email_verified")
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
@@ -106,6 +108,13 @@ model User {
 
 model MentorProfile {
   userId          String   @id @map("user_id") @db.Uuid
+  age             Int?
+  education       String?
+  workplace       String?
+  goals           String[] @default([])
+  hobbies         String[] @default([])
+  certificates    String[] @default([])
+  skills          String[] @default([])
   headline        String?
   bio             String?
   languages       String[] @default([])
@@ -124,8 +133,14 @@ model MentorProfile {
 
 model MenteeProfile {
   userId     String   @id @map("user_id") @db.Uuid
+  age        Int?
+  education  String?
+  workplace  String?
   background String?
-  goals      String?
+  goals      String[] @default([])
+  hobbies    String[] @default([])
+  certificates String[] @default([])
+  skills     String[] @default([])
   interests  String[] @default([])
 
   // Relations
@@ -438,6 +453,7 @@ model Review {
   @@index([mentorId])
   @@index([menteeId])
   @@index([rating])
+  @@unique([menteeId, mentorId])
   @@map("reviews")
 }
 

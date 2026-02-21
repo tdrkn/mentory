@@ -27,6 +27,22 @@ export class SearchMentorsDto {
   language?: string;
 
   @IsOptional()
+  @IsString()
+  education?: string;
+
+  @IsOptional()
+  @IsString()
+  workplace?: string;
+
+  @IsOptional()
+  @IsString()
+  hobby?: string;
+
+  @IsOptional()
+  @IsString()
+  skill?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)

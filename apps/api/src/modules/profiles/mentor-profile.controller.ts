@@ -23,7 +23,7 @@ export class MentorProfileController {
 
   /**
    * PATCH /api/profile/mentor
-   * Update mentor profile (headline, bio, languages)
+   * Update mentor profile
    * Access: Mentor
    */
   @Patch()
@@ -91,5 +91,18 @@ export class MentorProfileController {
   @Patch('deactivate')
   async deactivate(@CurrentUser('id') userId: string) {
     return this.profilesService.setMentorActive(userId, false);
+  }
+
+  /**
+   * GET /api/profile/mentor/mentees/:menteeId
+   * Get mentee profile for mentor (only if they have shared sessions)
+   * Access: Mentor
+   */
+  @Get('mentees/:menteeId')
+  async getMenteeProfileForMentor(
+    @CurrentUser('id') mentorId: string,
+    @Param('menteeId') menteeId: string,
+  ) {
+    return this.profilesService.getMenteeProfileForMentor(mentorId, menteeId);
   }
 }

@@ -2,7 +2,16 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException,
 import { PrismaService } from '../../prisma';
 import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
 import { CreatePayoutAccountDto } from './dto/create-payout-account.dto';
-import { PaymentStatus, PayoutStatus } from '@prisma/client';
+import { RequestPayoutDto } from './dto/request-payout.dto';
+import { PayoutStatus } from '@prisma/client';
+
+const SUPPORTED_ACQUIRING_METHODS = ['qr', 'card', 'cbr'] as const;
+const DEFAULT_ACQUIRER_CHECKOUT_BASE_URL = 'https://acquirer.example/checkout';
+const SUPPORTED_PAYOUT_METHODS = [
+  { id: 'card', label: 'Банковская карта', description: 'Зачисление на карту через эквайринг' },
+  { id: 'korona_pay', label: 'korona.pay', description: 'Зачисление на счёт лицензированного приложения' },
+  { id: 'cbr', label: 'CBR', description: 'Вывод через канал CBR в эквайринге' },
+] as const;
 
 @Injectable()
 export class PaymentsService {
@@ -64,14 +73,19 @@ export class PaymentsService {
         platformFee,
         mentorAmount,
         status: 'pending',
-        provider: 'stripe',
+        provider: 'acquirer_mock',
         providerPaymentId: `pi_mock_${Date.now()}`, // Mock
       },
     });
 
+    const checkoutBaseUrl = process.env.ACQUIRER_CHECKOUT_BASE_URL || DEFAULT_ACQUIRER_CHECKOUT_BASE_URL;
+    const checkoutUrl = `${checkoutBaseUrl}/${payment.providerPaymentId}`;
+
     return {
       payment,
       clientSecret: `mock_secret_${payment.id}`, // Mock - would be paymentIntent.client_secret
+      checkoutUrl,
+      paymentMethods: [...SUPPORTED_ACQUIRING_METHODS],
     };
   }
 
@@ -222,6 +236,14 @@ export class PaymentsService {
     };
   }
 
+  getSupportedPayoutMethods() {
+    return SUPPORTED_PAYOUT_METHODS.map((method) => ({
+      id: method.id,
+      label: method.label,
+      description: method.description,
+    }));
+  }
+
   async connectPayoutAccount(mentorId: string, dto: CreatePayoutAccountDto) {
     // TODO: Create Stripe Connect account
     // const account = await stripe.accounts.create({...});
@@ -236,13 +258,10 @@ export class PaymentsService {
     return { connected: true };
   }
 
-  async requestPayout(mentorId: string) {
-    const profile = await this.prisma.mentorProfile.findUnique({
-      where: { userId: mentorId },
-    });
-
-    if (!profile?.stripeAccountId) {
-      throw new BadRequestException('Payout account not connected');
+  async requestPayout(mentorId: string, dto: RequestPayoutDto) {
+    const payoutMethod = SUPPORTED_PAYOUT_METHODS.find((method) => method.id === dto.method);
+    if (!payoutMethod) {
+      throw new BadRequestException('Unsupported payout method');
     }
 
     const balance = await this.getMentorBalance(mentorId);
@@ -258,13 +277,116 @@ export class PaymentsService {
         amount: balance.available,
         currency: balance.currency,
         status: 'pending',
-        provider: 'stripe',
+        provider: `acquirer_mock_${dto.method}`,
       },
     });
 
-    // TODO: Initiate Stripe transfer
-    // const transfer = await stripe.transfers.create({...});
+    return {
+      ...payout,
+      method: payoutMethod.id,
+      destinationTokenAccepted: !!dto.destinationToken,
+    };
+  }
 
-    return payout;
+  async adminFreezePayment(adminId: string, paymentId: string, reason?: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: { id: true, status: true },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.status === 'refunded') {
+      throw new BadRequestException('Refunded payment cannot be frozen');
+    }
+
+    const updated = await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: { status: 'pending' },
+    });
+
+    return {
+      action: 'freeze',
+      processedBy: adminId,
+      reason: reason || null,
+      payment: updated,
+    };
+  }
+
+  async adminUnfreezePayment(adminId: string, paymentId: string, reason?: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: { id: true, sessionId: true, status: true },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.status === 'refunded') {
+      throw new BadRequestException('Refunded payment cannot be unfrozen');
+    }
+
+    const now = new Date();
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: 'paid',
+          paidAt: now,
+        },
+      }),
+      this.prisma.session.update({
+        where: { id: payment.sessionId },
+        data: { status: 'paid' },
+      }),
+    ]);
+
+    return {
+      action: 'unfreeze',
+      processedBy: adminId,
+      reason: reason || null,
+      payment: updated,
+    };
+  }
+
+  async adminCancelPayment(adminId: string, paymentId: string, reason?: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      select: { id: true, sessionId: true, status: true },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.status === 'refunded') {
+      throw new BadRequestException('Payment already refunded');
+    }
+
+    const now = new Date();
+    const [updatedPayment] = await this.prisma.$transaction([
+      this.prisma.payment.update({
+        where: { id: paymentId },
+        data: { status: 'refunded' },
+      }),
+      this.prisma.session.update({
+        where: { id: payment.sessionId },
+        data: {
+          status: 'canceled',
+          canceledAt: now,
+          cancelReason: reason || 'Canceled by admin',
+        },
+      }),
+    ]);
+
+    return {
+      action: 'cancel',
+      processedBy: adminId,
+      reason: reason || null,
+      payment: updatedPayment,
+    };
   }
 }

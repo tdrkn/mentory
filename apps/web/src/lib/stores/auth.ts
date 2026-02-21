@@ -69,15 +69,27 @@ export async function login(email: string, password: string) {
 export async function register(email: string, password: string, fullName: string, role: 'mentor' | 'mentee') {
   setState({ error: null, isLoading: true });
   try {
-    const response = await api.post<{ accessToken: string; user: User }>('/auth/register', {
+    const response = await api.post<{ accessToken?: string; user: User; requiresEmailVerification?: boolean }>(
+      '/auth/register',
+      {
       email,
       password,
       fullName,
       role,
-    });
-    localStorage.setItem('accessToken', response.accessToken);
-    setState({ user: response.user, isLoading: false, error: null });
-    return response.user;
+    },
+    );
+
+    if (response.accessToken) {
+      localStorage.setItem('accessToken', response.accessToken);
+      setState({ user: response.user, isLoading: false, error: null });
+      return { user: response.user, requiresEmailVerification: false };
+    }
+
+    if (browser) {
+      localStorage.removeItem('accessToken');
+    }
+    setState({ user: null, isLoading: false, error: null });
+    return { user: response.user, requiresEmailVerification: !!response.requiresEmailVerification };
   } catch (err) {
     if (err instanceof ApiError) {
       setState({ error: err.data?.message || 'Ошибка регистрации', isLoading: false });
@@ -85,6 +97,54 @@ export async function register(email: string, password: string, fullName: string
       setState({ error: 'Ошибка подключения к серверу', isLoading: false });
     }
     throw err;
+  }
+}
+
+export async function forgotPassword(email: string) {
+  try {
+    await api.post('/auth/forgot-password', { email });
+    return true;
+  } catch (err) {
+    if (err instanceof ApiError) {
+      throw new Error(err.data?.message || 'Не удалось отправить письмо для восстановления');
+    }
+    throw new Error('Ошибка подключения к серверу');
+  }
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  try {
+    await api.post('/auth/reset-password', { token, newPassword });
+    return true;
+  } catch (err) {
+    if (err instanceof ApiError) {
+      throw new Error(err.data?.message || 'Не удалось обновить пароль');
+    }
+    throw new Error('Ошибка подключения к серверу');
+  }
+}
+
+export async function verifyEmail(token: string) {
+  try {
+    const response = await api.post<{ success: boolean; alreadyVerified?: boolean }>('/auth/verify-email', { token });
+    return response;
+  } catch (err) {
+    if (err instanceof ApiError) {
+      throw new Error(err.data?.message || 'Не удалось подтвердить email');
+    }
+    throw new Error('Ошибка подключения к серверу');
+  }
+}
+
+export async function resendVerificationEmail(email: string) {
+  try {
+    await api.post('/auth/resend-verification', { email });
+    return true;
+  } catch (err) {
+    if (err instanceof ApiError) {
+      throw new Error(err.data?.message || 'Не удалось отправить письмо повторно');
+    }
+    throw new Error('Ошибка подключения к серверу');
   }
 }
 

@@ -132,12 +132,15 @@
           <h2 class="section-title">Заметки по сессии</h2>
           <label>
             <div class="muted" style="margin-bottom:6px;">Приватные заметки</div>
-            <textarea class="textarea" bind:value={notes}></textarea>
+            <textarea class="textarea" bind:value={notes} maxlength={10000}></textarea>
           </label>
           <label style="margin-top:12px;display:block;">
             <div class="muted" style="margin-bottom:6px;">Резюме для менти</div>
-            <textarea class="textarea" bind:value={sharedSummary}></textarea>
+            <textarea class="textarea" bind:value={sharedSummary} maxlength={10000}></textarea>
           </label>
+          <div class="muted" style="font-size:0.82rem;margin-top:8px;">
+            Приватные заметки: {notes.length}/10000 · Резюме: {sharedSummary.length}/10000
+          </div>
           <button class="btn btn-primary" style="margin-top:12px;" on:click={handleSaveNotes} disabled={isSaving}>
             {isSaving ? 'Сохранение...' : 'Сохранить заметки'}
           </button>

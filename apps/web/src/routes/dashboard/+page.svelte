@@ -23,6 +23,7 @@
   let sessions: SessionItem[] = [];
   let balance: Balance | null = null;
   let isLoading = true;
+  let actionInProgressId: string | null = null;
 
   onMount(async () => {
     if (!$isAuthenticated && !$authLoading) {
@@ -47,6 +48,28 @@
   const now = new Date();
   const upcoming = () => sessions.filter((s) => new Date(s.startAt) > now && s.status !== 'canceled');
   const pending = () => sessions.filter((s) => s.status === 'requested');
+
+  const approveRequest = async (sessionId: string) => {
+    actionInProgressId = sessionId;
+    try {
+      await api.post('/booking/confirm', { sessionId });
+      sessions = await api.get<SessionItem[]>('/sessions?role=mentor');
+    } finally {
+      actionInProgressId = null;
+    }
+  };
+
+  const rejectRequest = async (sessionId: string) => {
+    actionInProgressId = sessionId;
+    try {
+      await api.patch(`/booking/${sessionId}/cancel`, {
+        reason: 'Rejected by mentor',
+      });
+      sessions = await api.get<SessionItem[]>('/sessions?role=mentor');
+    } finally {
+      actionInProgressId = null;
+    }
+  };
 </script>
 
 <div class="page">
@@ -78,6 +101,45 @@
             {balance ? `${balance.available} ${balance.currency}` : '—'}
           </div>
         </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <h2 class="section-title">Заявки на встречи со мной</h2>
+        {#if pending().length === 0}
+          <p class="muted">Новых заявок нет.</p>
+        {:else}
+          <div class="stack">
+            {#each pending() as request}
+              <div class="surface" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+                <div>
+                  <strong>{request.mentee.fullName}</strong>
+                  <div class="muted">{request.service.title}</div>
+                  <div class="muted" style="font-size:0.86rem;">
+                    {new Date(request.startAt).toLocaleDateString('ru-RU')} · {new Date(request.startAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button
+                    class="btn btn-primary"
+                    on:click={() => approveRequest(request.id)}
+                    disabled={actionInProgressId === request.id}
+                  >
+                    Принять
+                  </button>
+                  <button
+                    class="btn btn-ghost"
+                    on:click={() => rejectRequest(request.id)}
+                    disabled={actionInProgressId === request.id}
+                  >
+                    Отклонить
+                  </button>
+                  <a class="btn btn-outline" href={`/chat?session=${request.id}`}>Чат</a>
+                  <a class="btn btn-outline" href={`/mentees/${request.mentee.id}`}>Профиль менти</a>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
       </div>
 
       <div class="grid" style="grid-template-columns:2fr 1fr;gap:20px;">

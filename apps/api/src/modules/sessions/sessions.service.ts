@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateSessionNotesDto } from './dto/update-session-notes.dto';
-import { SessionStatus, SlotStatus } from '@prisma/client';
+import { SessionStatus } from '@prisma/client';
 
 @Injectable()
 export class SessionsService {
@@ -17,6 +17,15 @@ export class SessionsService {
     from?: string,
     to?: string,
   ) {
+    const mentorScope =
+      roleFilter !== undefined
+        ? roleFilter === 'mentor'
+        : userRole === 'mentor' || userRole === 'both';
+
+    if (mentorScope) {
+      await this.autoCancelExpiredMentorRequests(userId);
+    }
+
     const where: any = {};
 
     // Determine which sessions to fetch
@@ -41,6 +50,54 @@ export class SessionsService {
       },
       orderBy: { startAt: 'desc' },
     });
+  }
+
+  private async autoCancelExpiredMentorRequests(mentorId: string) {
+    const expirationDate = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    const now = new Date();
+
+    const staleSessions = await this.prisma.session.findMany({
+      where: {
+        mentorId,
+        status: 'requested',
+        createdAt: { lte: expirationDate },
+      },
+      select: {
+        id: true,
+        slotId: true,
+      },
+    });
+
+    if (staleSessions.length === 0) {
+      return;
+    }
+
+    const sessionIds = staleSessions.map((session) => session.id);
+    const slotIds = staleSessions.map((session) => session.slotId);
+
+    await this.prisma.$transaction([
+      this.prisma.session.updateMany({
+        where: {
+          id: { in: sessionIds },
+          status: 'requested',
+        },
+        data: {
+          status: 'canceled',
+          canceledAt: now,
+          cancelReason: 'Auto-canceled: mentor did not respond within 3 days',
+        },
+      }),
+      this.prisma.slot.updateMany({
+        where: {
+          id: { in: slotIds },
+          status: 'held',
+        },
+        data: {
+          status: 'free',
+          heldUntil: null,
+        },
+      }),
+    ]);
   }
 
   async getSessionDetails(userId: string, sessionId: string) {
@@ -291,6 +348,11 @@ export class SessionsService {
       throw new NotFoundException('Session not found or not completed');
     }
 
+    const reviewAvailableAt = new Date(session.endAt.getTime() + 24 * 60 * 60 * 1000);
+    if (new Date() < reviewAvailableAt) {
+      throw new BadRequestException('Review can be submitted only 24 hours after session end');
+    }
+
     // Check if review already exists
     const existing = await this.prisma.review.findUnique({
       where: { sessionId },
@@ -298,6 +360,19 @@ export class SessionsService {
 
     if (existing) {
       throw new BadRequestException('Review already exists');
+    }
+
+    // FR: one review per mentee-mentor pair
+    const existingPairReview = await this.prisma.review.findFirst({
+      where: {
+        menteeId,
+        mentorId: session.mentorId,
+      },
+      select: { id: true },
+    });
+
+    if (existingPairReview) {
+      throw new BadRequestException('Review for this mentor has already been submitted');
     }
 
     // Create review and update mentor rating

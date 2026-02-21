@@ -153,4 +153,38 @@ export class ProfilesService {
       data: dto,
     });
   }
+
+  async getMenteeProfileForMentor(mentorId: string, menteeId: string) {
+    const hasSharedSession = await this.prisma.session.findFirst({
+      where: {
+        mentorId,
+        menteeId,
+      },
+      select: { id: true },
+    });
+
+    if (!hasSharedSession) {
+      throw new NotFoundException('Mentee not found');
+    }
+
+    const profile = await this.prisma.menteeProfile.findUnique({
+      where: { userId: menteeId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            timezone: true,
+          },
+        },
+      },
+    });
+
+    if (!profile) {
+      throw new NotFoundException('Mentee profile not found');
+    }
+
+    return profile;
+  }
 }

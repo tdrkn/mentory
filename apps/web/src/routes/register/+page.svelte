@@ -41,8 +41,14 @@
     }
     submitting = true;
     try {
-      const user = await register($formData.email, $formData.password, $formData.fullName, $formData.role);
-      if (user.role === 'mentor' || user.role === 'both') {
+      const result = await register($formData.email, $formData.password, $formData.fullName, $formData.role);
+
+      if (result.requiresEmailVerification) {
+        goto(`/login?verifyEmail=${encodeURIComponent(result.user.email)}`);
+        return;
+      }
+
+      if (result.user.role === 'mentor' || result.user.role === 'both') {
         goto('/dashboard');
       } else {
         goto('/mentors');
@@ -124,7 +130,24 @@
         </div>
 
         <div class="form-group">
-          <label class="label">Я хочу</label>
+          <label class="label" for="confirmPassword">Повторите пароль</label>
+          <div class="input-with-icon">
+            <Lock size={18} />
+            <input
+              id="confirmPassword"
+              class="input"
+              type="password"
+              bind:value={$formData.confirmPassword}
+              placeholder="Введите пароль ещё раз"
+            />
+          </div>
+          {#if $errors.confirmPassword}
+            <span class="form-error">{errorMessage($errors.confirmPassword)}</span>
+          {/if}
+        </div>
+
+        <div class="form-group">
+          <div class="label">Я хочу</div>
           <div class="role-selector">
             <button 
               type="button" 
@@ -154,6 +177,11 @@
             </button>
           </div>
         </div>
+
+        <p class="terms-group muted">
+          Создавая аккаунт, вы автоматически соглашаетесь с{' '}
+          <a href="/terms" class="auth-link">пользовательским соглашением</a>.
+        </p>
 
         <button class="btn btn-primary btn-lg auth-submit" type="submit" disabled={submitting}>
           {submitting ? 'Регистрация...' : 'Создать аккаунт'}
@@ -242,6 +270,12 @@
     font-size: 0.8rem;
     color: #dc2626;
     margin-top: 4px;
+  }
+
+  .terms-group {
+    margin-top: -4px;
+    font-size: 0.92rem;
+    line-height: 1.4;
   }
 
   .role-selector {

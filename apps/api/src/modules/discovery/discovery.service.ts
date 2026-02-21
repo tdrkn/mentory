@@ -22,6 +22,10 @@ export class DiscoveryService {
       topic,
       topicId,
       language,
+      education,
+      workplace,
+      hobby,
+      skill,
       minPrice,
       maxPrice,
       minRating,
@@ -36,12 +40,14 @@ export class DiscoveryService {
     const skip = page ? (page - 1) * limit : offset;
 
     // Build WHERE clause
+    const mentorProfileFilters: Prisma.MentorProfileWhereInput = {
+      isActive: true,
+      ...(minRating && { ratingAvg: { gte: minRating } }),
+    };
+
     const where: Prisma.UserWhereInput = {
       role: { in: ['mentor', 'both'] },
-      mentorProfile: {
-        isActive: true,
-        ...(minRating && { ratingAvg: { gte: minRating } }),
-      },
+      mentorProfile: mentorProfileFilters,
     };
 
     // Topic filter - by id or name
@@ -59,7 +65,23 @@ export class DiscoveryService {
 
     // Language filter
     if (language) {
-      (where.mentorProfile as any).languages = { has: language };
+      mentorProfileFilters.languages = { has: language };
+    }
+
+    if (education) {
+      mentorProfileFilters.education = { contains: education, mode: 'insensitive' };
+    }
+
+    if (workplace) {
+      mentorProfileFilters.workplace = { contains: workplace, mode: 'insensitive' };
+    }
+
+    if (hobby) {
+      mentorProfileFilters.hobbies = { has: hobby };
+    }
+
+    if (skill) {
+      mentorProfileFilters.skills = { has: skill };
     }
 
     // Price filter - check if mentor has at least one service in range
@@ -79,6 +101,8 @@ export class DiscoveryService {
         { fullName: { contains: search, mode: 'insensitive' } },
         { mentorProfile: { headline: { contains: search, mode: 'insensitive' } } },
         { mentorProfile: { bio: { contains: search, mode: 'insensitive' } } },
+        { mentorProfile: { education: { contains: search, mode: 'insensitive' } } },
+        { mentorProfile: { workplace: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
@@ -125,6 +149,8 @@ export class DiscoveryService {
       avatarUrl: null, // TODO: Add avatarUrl to User model
       headline: mentor.mentorProfile?.headline,
       bio: mentor.mentorProfile?.bio?.substring(0, 200), // Truncate for list
+      education: mentor.mentorProfile?.education || null,
+      workplace: mentor.mentorProfile?.workplace || null,
       languages: mentor.mentorProfile?.languages || [],
       rating: {
         average: mentor.mentorProfile?.ratingAvg || 0,
@@ -194,6 +220,10 @@ export class DiscoveryService {
           select: {
             headline: true,
             bio: true,
+            education: true,
+            workplace: true,
+            goals: true,
+            hobbies: true,
             languages: true,
             ratingAvg: true,
             ratingCount: true,

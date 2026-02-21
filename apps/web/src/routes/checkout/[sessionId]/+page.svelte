@@ -19,12 +19,25 @@
     slot: { id: string; startAt: string; endAt: string; heldUntil?: string | null };
   }
 
+  interface PaymentIntentResponse {
+    payment: {
+      id: string;
+      providerPaymentId: string;
+    };
+    checkoutUrl?: string;
+    paymentMethods?: string[];
+  }
+
   let session: SessionDetail | null = null;
   let isLoading = true;
   let error: string | null = null;
   let isProcessing = false;
   let timeLeft = 0;
   let timer: any;
+  let paymentIntentId: string | null = null;
+  let checkoutUrl: string | null = null;
+  let paymentMethods: string[] = [];
+  let paymentRequested = false;
 
   const loadSession = async () => {
     try {
@@ -66,19 +79,55 @@
   };
 
   const handlePayment = async () => {
-    if (!session) return;
+    if (!session || paymentRequested) return;
     isProcessing = true;
     error = null;
 
     try {
-      await api.post('/payments/intent', { sessionId: session.id });
-      await api.post('/booking/confirm', { sessionId: session.id });
-      goto('/sessions?success=1');
+      const paymentIntent = await api.post<PaymentIntentResponse>('/payments/intent', {
+        sessionId: session.id,
+      });
+
+      paymentIntentId = paymentIntent.payment.providerPaymentId;
+      checkoutUrl = paymentIntent.checkoutUrl || null;
+      paymentMethods = paymentIntent.paymentMethods || [];
+      paymentRequested = true;
+
+      if (checkoutUrl) {
+        window.open(checkoutUrl, '_blank', 'noopener,noreferrer');
+      }
     } catch (err) {
       if (err instanceof ApiError && err.status === 410) {
         error = 'Время на оплату истекло. Слот освобожден.';
       } else {
         error = 'Ошибка оплаты. Попробуйте ещё раз.';
+      }
+    } finally {
+      isProcessing = false;
+    }
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!session || !paymentRequested || !paymentIntentId) return;
+
+    isProcessing = true;
+    error = null;
+
+    try {
+      await api.post('/payments/webhook', {
+        type: 'payment_intent.succeeded',
+        data: { object: { id: paymentIntentId } },
+      });
+      await api.post('/booking/confirm', { sessionId: session.id, paymentIntentId });
+      goto('/sessions?success=1');
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 410) {
+        error = 'Время на оплату истекло. Слот освобожден.';
+      } else {
+        error =
+          err instanceof ApiError
+            ? err.data?.message || 'Не удалось подтвердить оплату.'
+            : 'Не удалось подтвердить оплату.';
       }
     } finally {
       isProcessing = false;
@@ -162,12 +211,41 @@
           </strong>
         </div>
 
-        <button class="btn btn-primary" style="width:100%;margin-top:18px;" on:click={handlePayment} disabled={isProcessing || timeLeft <= 0}>
-          {isProcessing ? 'Обработка...' : 'Оплатить'}
+        <button
+          class="btn btn-primary"
+          style="width:100%;margin-top:18px;"
+          on:click={handlePayment}
+          disabled={isProcessing || timeLeft <= 0 || paymentRequested}
+        >
+          {isProcessing ? 'Обработка...' : 'Перейти к оплате'}
         </button>
 
+        {#if paymentRequested}
+          <div class="surface" style="margin-top:12px;">
+            <div style="font-weight:600;">Платёжная сессия создана</div>
+            {#if paymentMethods.length > 0}
+              <div class="muted" style="margin-top:6px;">
+                Доступные способы: {paymentMethods.join(', ')}
+              </div>
+            {/if}
+            {#if checkoutUrl}
+              <a class="btn btn-ghost btn-sm" style="margin-top:10px;" href={checkoutUrl} target="_blank" rel="noreferrer">
+                Открыть страницу оплаты
+              </a>
+            {/if}
+            <button
+              class="btn btn-primary"
+              style="width:100%;margin-top:12px;"
+              on:click={handleConfirmPayment}
+              disabled={isProcessing || timeLeft <= 0}
+            >
+              {isProcessing ? 'Проверка...' : 'Я оплатил'}
+            </button>
+          </div>
+        {/if}
+
         <p class="muted" style="margin-top:10px;font-size:0.85rem;text-align:center;">
-          Платёж симулируется. В продакшене будет Stripe Checkout.
+          Оплата проходит на стороне внешнего эквайринга. Реквизиты карты не сохраняются в Mentory.
         </p>
       </div>
     </main>

@@ -1,47 +1,99 @@
 <script lang="ts">
   import AppHeader from '$lib/components/AppHeader.svelte';
   import { onMount } from 'svelte';
-  import { login, error, isAuthenticated, isLoading, clearAuthError } from '$lib/stores/auth';
+  import {
+    login,
+    error,
+    isAuthenticated,
+    isLoading,
+    clearAuthError,
+    resendVerificationEmail,
+  } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
-  import { superForm } from 'sveltekit-superforms/client';
-  import { zodClient } from 'sveltekit-superforms/adapters';
-  import { loginSchema, type LoginForm } from '$lib/validators/auth';
+  import { page } from '$app/stores';
+  import { loginSchema } from '$lib/validators/auth';
   import { Mail, Lock, ArrowRight, Sparkles } from 'lucide-svelte';
 
-  export let data;
-
-  const form = superForm<LoginForm>(data.form, {
-    validators: zodClient(loginSchema as any),
-    SPA: true,
-    resetForm: false,
-  });
-
-  const { form: formData, errors } = form;
-  const errorMessage = (err: unknown) => (Array.isArray(err) ? err[0] : err);
+  let email = '';
+  let password = '';
+  let fieldErrors: { email?: string; password?: string } = {};
   let submitting = false;
+  let pendingVerificationEmail = '';
+  let verificationInfo: string | null = null;
+  let verificationBusy = false;
+  let showErrorModal = false;
+
+  const closeErrorModal = () => {
+    clearAuthError();
+  };
+
+  const handleBackdropKeydown = (event: KeyboardEvent) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      closeErrorModal();
+    }
+    if (event.key === 'Escape') {
+      closeErrorModal();
+    }
+  };
 
   onMount(() => {
     clearAuthError();
+    const verifyEmail = $page.url.searchParams.get('verifyEmail');
+    if (verifyEmail) {
+      pendingVerificationEmail = verifyEmail;
+      verificationInfo = `Мы отправили письмо для подтверждения на ${verifyEmail}.`;
+    }
     if ($isAuthenticated && !$isLoading) {
       goto('/mentors');
     }
   });
 
+  $: showErrorModal = !!$error;
+
+  const fillTestAccount = (e: string, p: string) => {
+    email = e;
+    password = p;
+  };
+
   const handleSubmit = async () => {
-    const validation = await form.validateForm({ update: true });
-    if (!validation.valid) {
+    // Validate with zod
+    fieldErrors = {};
+    const result = loginSchema.safeParse({ email, password });
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        const key = issue.path[0] as 'email' | 'password';
+        if (!fieldErrors[key]) fieldErrors[key] = issue.message;
+      }
       return;
     }
+
     submitting = true;
     try {
-      const user = await login($formData.email, $formData.password);
-      if (user.role === 'mentor' || user.role === 'both') {
-        goto('/dashboard');
+      const u = await login(email, password);
+      if (u.role === 'mentor' || u.role === 'both') {
+        await goto('/dashboard');
       } else {
-        goto('/mentors');
+        await goto('/mentors');
       }
+    } catch {
+      // error is already set in the auth store by login()
     } finally {
       submitting = false;
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!pendingVerificationEmail || verificationBusy) return;
+
+    verificationBusy = true;
+    try {
+      await resendVerificationEmail(pendingVerificationEmail);
+      verificationInfo = `Письмо отправлено повторно на ${pendingVerificationEmail}.`;
+    } catch (err) {
+      verificationInfo = err instanceof Error ? err.message : 'Не удалось отправить письмо';
+    } finally {
+      verificationBusy = false;
     }
   };
 </script>
@@ -59,6 +111,22 @@
         <p class="auth-subtitle">Войдите, чтобы продолжить обучение</p>
       </div>
 
+      {#if verificationInfo}
+        <div class="surface" style="margin-bottom:16px;background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;">
+          <div>{verificationInfo}</div>
+          {#if pendingVerificationEmail}
+            <button
+              class="btn btn-outline btn-sm"
+              style="margin-top:10px;"
+              on:click={handleResendVerification}
+              disabled={verificationBusy}
+            >
+              {verificationBusy ? 'Отправка...' : 'Отправить письмо ещё раз'}
+            </button>
+          {/if}
+        </div>
+      {/if}
+
       {#if $error}
         <div class="alert alert-error">
           {$error}
@@ -74,29 +142,32 @@
               id="email"
               class="input" 
               type="email" 
-              bind:value={$formData.email} 
+              bind:value={email} 
               placeholder="you@example.com" 
             />
           </div>
-          {#if $errors.email}
-            <span class="form-error">{errorMessage($errors.email)}</span>
+          {#if fieldErrors.email}
+            <span class="form-error">{fieldErrors.email}</span>
           {/if}
         </div>
 
         <div class="form-group">
-          <label class="label" for="password">Пароль</label>
+          <div class="password-label-row">
+            <label class="label" for="password">Пароль</label>
+            <a href="/forgot-password" class="forgot-link">Забыли пароль?</a>
+          </div>
           <div class="input-with-icon">
             <Lock size={18} />
             <input 
               id="password"
               class="input" 
               type="password" 
-              bind:value={$formData.password} 
+              bind:value={password} 
               placeholder="••••••••" 
             />
           </div>
-          {#if $errors.password}
-            <span class="form-error">{errorMessage($errors.password)}</span>
+          {#if fieldErrors.password}
+            <span class="form-error">{fieldErrors.password}</span>
           {/if}
         </div>
 
@@ -113,22 +184,39 @@
       </div>
 
       <div class="test-accounts">
-        <div class="test-accounts-header">Тестовые аккаунты</div>
+        <div class="test-accounts-header">Тестовые аккаунты <span class="test-hint">(нажмите, чтобы заполнить)</span></div>
         <div class="test-accounts-grid">
-          <div class="test-account">
+          <button class="test-account" type="button" on:click={() => fillTestAccount('maria.mentor@example.com', 'password123')}>
             <span class="test-role">Ментор</span>
             <code>maria.mentor@example.com</code>
-          </div>
-          <div class="test-account">
+          </button>
+          <button class="test-account" type="button" on:click={() => fillTestAccount('ivan.mentee@example.com', 'password123')}>
             <span class="test-role">Менти</span>
             <code>ivan.mentee@example.com</code>
-          </div>
+          </button>
         </div>
         <div class="test-password">Пароль: <code>password123</code></div>
       </div>
     </div>
   </main>
 </div>
+
+{#if showErrorModal}
+  <div
+    class="error-modal-backdrop"
+    role="button"
+    tabindex="0"
+    aria-label="Закрыть окно ошибки"
+    on:click={closeErrorModal}
+    on:keydown={handleBackdropKeydown}
+  >
+    <div class="error-modal">
+      <h3>Ошибка входа</h3>
+      <p>{$error}</p>
+      <button class="btn btn-primary" on:click={closeErrorModal}>Повторить</button>
+    </div>
+  </div>
+{/if}
 
 <style>
   .auth-container {
@@ -204,6 +292,24 @@
     margin-top: 4px;
   }
 
+  .password-label-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .forgot-link {
+    font-size: 0.82rem;
+    color: var(--accent);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .forgot-link:hover {
+    text-decoration: underline;
+  }
+
   .auth-submit {
     margin-top: 8px;
     width: 100%;
@@ -241,6 +347,12 @@
     margin-bottom: 12px;
   }
 
+  .test-hint {
+    font-weight: 400;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
   .test-accounts-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -252,6 +364,26 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    font-family: inherit;
+    font-size: 0.85rem;
+  }
+
+  .test-account:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft, rgba(13, 148, 136, 0.06));
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  .test-account:active {
+    transform: translateY(0);
   }
 
   .test-role {
@@ -273,6 +405,36 @@
     color: var(--muted);
     padding-top: 8px;
     border-top: 1px solid var(--border);
+  }
+
+  .error-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 120;
+    padding: 20px;
+  }
+
+  .error-modal {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    max-width: 420px;
+    width: 100%;
+    box-shadow: var(--shadow-xl);
+  }
+
+  .error-modal h3 {
+    margin: 0 0 8px;
+  }
+
+  .error-modal p {
+    margin: 0 0 14px;
+    color: var(--ink-secondary);
   }
 
   @media (max-width: 480px) {

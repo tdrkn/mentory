@@ -18,6 +18,6 @@ export const EMAIL_QUEUE = 'email';
   imports: [ConfigModule],
   controllers: [NotificationsController],
   providers: [NotificationsService, EmailService],
-  exports: [NotificationsService],
+  exports: [NotificationsService, EmailService],
 })
 export class NotificationsModule {}

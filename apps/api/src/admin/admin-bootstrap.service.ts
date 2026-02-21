@@ -48,6 +48,8 @@ export class AdminBootstrapService implements OnModuleInit {
         fullName: 'Admin',
         role: 'admin',
         timezone: 'UTC',
+        isEmailVerified: true,
+        emailVerifiedAt: new Date(),
       },
     });
 

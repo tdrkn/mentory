@@ -101,7 +101,7 @@ describe('ProfilesService', () => {
     it('should return mentee profile with user data', async () => {
       const mockProfile = {
         userId: 'user-id',
-        goals: 'Learn programming',
+        goals: ['Learn programming'],
         user: {
           id: 'user-id',
           email: 'test@example.com',
@@ -114,7 +114,7 @@ describe('ProfilesService', () => {
       const result = await service.getMenteeProfile('user-id');
 
       expect(result).toEqual(mockProfile);
-      expect(result.goals).toBe('Learn programming');
+      expect(result.goals).toContain('Learn programming');
     });
 
     it('should throw NotFoundException if mentee profile not found', async () => {

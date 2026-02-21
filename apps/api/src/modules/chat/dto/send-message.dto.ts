@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, ValidateNested, IsInt } from 'class-validator';
+import { IsString, IsOptional, IsArray, ValidateNested, IsInt, MaxLength, Min, Max, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class AttachmentDto {
@@ -12,16 +12,21 @@ class AttachmentDto {
   url: string;
 
   @IsInt()
+  @Min(1)
+  @Max(134217728) // 128 MB
   size: number;
 }
 
 export class SendMessageDto {
+  @IsOptional()
   @IsString()
-  content: string;
+  @MaxLength(1000)
+  content?: string;
 
   @IsOptional()
   @IsString()
-  contentType?: string; // text, file, image
+  @IsIn(['text', 'file', 'image', 'emoji'])
+  contentType?: string;
 
   @IsOptional()
   @IsArray()

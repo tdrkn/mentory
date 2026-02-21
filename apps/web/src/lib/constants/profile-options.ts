@@ -1,0 +1,60 @@
+export const EDUCATION_SUGGESTIONS = [
+  'Среднее общее',
+  'Среднее специальное',
+  'Бакалавриат',
+  'Специалитет',
+  'Магистратура',
+  'Аспирантура',
+  'MBA',
+  'Курсы повышения квалификации',
+  'Самообразование',
+];
+
+export const WORKPLACE_SUGGESTIONS = [
+  'IT-компания',
+  'Продуктовая компания',
+  'Стартап',
+  'Аутсорс',
+  'Фриланс',
+  'Корпорация',
+  'Гос. сектор',
+  'EdTech',
+  'FinTech',
+  'Без опыта / в поиске',
+];
+
+export const HOBBY_OPTIONS = [
+  'Чтение',
+  'Путешествия',
+  'Спорт',
+  'Бег',
+  'Йога',
+  'Фотография',
+  'Музыка',
+  'Кино',
+  'Настольные игры',
+  'Волонтёрство',
+  'Программирование',
+  'Блогинг',
+  'Подкасты',
+  'Рисование',
+  'Кулинария',
+];
+
+export const SKILL_OPTIONS = [
+  'JavaScript',
+  'TypeScript',
+  'React',
+  'Svelte',
+  'Node.js',
+  'Python',
+  'SQL',
+  'System Design',
+  'Product Management',
+  'UX Research',
+  'Public Speaking',
+  'Leadership',
+  'Negotiation',
+  'Time Management',
+  'Critical Thinking',
+];

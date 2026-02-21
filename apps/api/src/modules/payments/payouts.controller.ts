@@ -3,6 +3,7 @@ import { JwtAuthGuard, RolesGuard } from '../auth/guards';
 import { CurrentUser, Roles } from '../auth/decorators';
 import { PaymentsService } from './payments.service';
 import { CreatePayoutAccountDto } from './dto/create-payout-account.dto';
+import { RequestPayoutDto } from './dto/request-payout.dto';
 
 @Controller('payouts')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -34,6 +35,16 @@ export class PayoutsController {
   }
 
   /**
+   * GET /api/payouts/methods
+   * Get available payout methods from acquirer side
+   * Access: Mentor
+   */
+  @Get('methods')
+  async getPayoutMethods() {
+    return this.paymentsService.getSupportedPayoutMethods();
+  }
+
+  /**
    * POST /api/payouts/account
    * Connect Stripe account for payouts
    * Access: Mentor
@@ -52,7 +63,10 @@ export class PayoutsController {
    * Access: Mentor
    */
   @Post('request')
-  async requestPayout(@CurrentUser('id') mentorId: string) {
-    return this.paymentsService.requestPayout(mentorId);
+  async requestPayout(
+    @CurrentUser('id') mentorId: string,
+    @Body() dto: RequestPayoutDto,
+  ) {
+    return this.paymentsService.requestPayout(mentorId, dto);
   }
 }

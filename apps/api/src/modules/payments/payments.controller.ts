@@ -5,7 +5,6 @@ import { PaymentsService } from './payments.service';
 import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
 
 @Controller('payments')
-@UseGuards(JwtAuthGuard)
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
@@ -13,8 +12,8 @@ export class PaymentsController {
    * POST /api/payments/intent
    * Create payment intent for session
    * Access: Mentee
-   */
-  @UseGuards(RolesGuard)
+  */
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('mentee', 'both')
   @Post('intent')
   async createPaymentIntent(
@@ -39,8 +38,9 @@ export class PaymentsController {
    * GET /api/payments
    * Get user's payment history
    * Access: Authenticated
-   */
+  */
   @Get()
+  @UseGuards(JwtAuthGuard)
   async getPayments(
     @CurrentUser('id') userId: string,
     @Query('role') role?: 'mentor' | 'mentee',
@@ -52,8 +52,9 @@ export class PaymentsController {
    * GET /api/payments/:id
    * Get payment details
    * Access: Payment participant
-   */
+  */
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
   async getPayment(
     @CurrentUser('id') userId: string,
     @Param('id') paymentId: string,

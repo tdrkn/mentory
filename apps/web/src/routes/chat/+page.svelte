@@ -8,6 +8,7 @@
   import { user, isAuthenticated, isLoading as authLoading } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
   import type { Socket } from 'socket.io-client';
+  import { Phone } from 'lucide-svelte';
 
   interface Conversation {
     id: string;
@@ -15,6 +16,7 @@
     mentee: { id: string; fullName: string };
     lastMessage?: { content: string; createdAt: string; senderId: string } | null;
     unreadCount: number;
+    session?: { id: string; startAt: string; status: string } | null;
   }
 
   interface Message {
@@ -48,6 +50,7 @@
 
   const handleSend = async () => {
     if (!newMessage.trim() || !activeConversation || isSending) return;
+    if (newMessage.length > 1000) return;
     isSending = true;
     const text = newMessage;
     newMessage = '';
@@ -106,6 +109,19 @@
     return $user?.id === conv.mentor.id ? conv.mentee.fullName : conv.mentor.fullName;
   };
 
+  const handleJoinCall = async () => {
+    if (!activeConversationData?.session?.id) return;
+    const room = await api.get<{ joinUrlMentor?: string; joinUrlMentee?: string }>(
+      `/sessions/${activeConversationData.session.id}/video`,
+    );
+    const isMentorSide = $user?.id === activeConversationData.mentor.id;
+    const url = isMentorSide ? room.joinUrlMentor : room.joinUrlMentee;
+    const fallbackUrl = room.joinUrlMentor || room.joinUrlMentee;
+    if (url || fallbackUrl) {
+      window.open(url || fallbackUrl, '_blank');
+    }
+  };
+
   onMount(async () => {
     if (!$isAuthenticated && !$authLoading) {
       goto('/login');
@@ -152,6 +168,9 @@
     if (typingTimeout) clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => emitTyping(false), 1200);
   };
+
+  $: activeConversationData = conversations.find((conv) => conv.id === activeConversation) || null;
+  $: remainingChars = 1000 - newMessage.length;
 </script>
 
 <div class="page">
@@ -200,6 +219,26 @@
           {#if !activeConversation}
             <div class="muted">Выберите диалог</div>
           {:else}
+            <div class="surface" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <button
+                  class="btn btn-ghost btn-sm"
+                  on:click={handleJoinCall}
+                  disabled={!activeConversationData?.session?.id}
+                >
+                  <Phone size={14} /> Видеозвонок
+                </button>
+                <strong>{activeConversationData ? partnerName(activeConversationData) : ''}</strong>
+              </div>
+              <span class="muted" style="font-size:0.8rem;">
+                {#if activeConversationData?.session?.id}
+                  Сессия привязана
+                {:else}
+                  Без сессии
+                {/if}
+              </span>
+            </div>
+
             <div style="flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px;">
               {#each messages as msg}
                 <div style={`display:flex;justify-content:${msg.senderId === $user?.id ? 'flex-end' : 'flex-start'};`}>
@@ -219,11 +258,23 @@
             {/if}
 
             <div style="display:flex;gap:8px;margin-top:12px;">
-              <input class="input" bind:value={newMessage} placeholder="Введите сообщение..." on:input={handleTyping} />
+              <input
+                class="input"
+                bind:value={newMessage}
+                placeholder="Введите сообщение..."
+                maxlength={1000}
+                on:input={handleTyping}
+              />
               <button class="btn btn-primary" on:click={handleSend} disabled={isSending || !newMessage.trim()}>
                 {isSending ? '...' : 'Отправить'}
               </button>
             </div>
+            <div class="muted" style="font-size:0.8rem;margin-top:6px;text-align:right;">
+              {newMessage.length}/1000
+            </div>
+            {#if remainingChars < 0}
+              <div class="muted" style="font-size:0.8rem;color:#dc2626;">Превышен лимит 1000 символов.</div>
+            {/if}
           {/if}
         </section>
       </div>

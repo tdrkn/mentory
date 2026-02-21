@@ -1,7 +1,24 @@
-import { Injectable, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { SendMessageDto } from './dto/send-message.dto';
 import { ChatGateway } from './chat.gateway';
+
+const MAX_ATTACHMENT_SIZE_BYTES = 128 * 1024 * 1024;
+const ALLOWED_DOCUMENT_EXTENSIONS = new Set(['.pptx', '.pdf', '.txt', '.mvd']);
+const ALLOWED_CHAT_EMOJIS = new Set([
+  '😀',
+  '😂',
+  '😊',
+  '😍',
+  '👍',
+  '👏',
+  '🔥',
+  '💡',
+  '🎉',
+  '🙏',
+  '🤝',
+  '❤️',
+]);
 
 @Injectable()
 export class ChatService {
@@ -183,14 +200,16 @@ export class ChatService {
       throw new NotFoundException('Conversation not found');
     }
 
+    const payload = this.validateAndNormalizeMessage(dto);
+
     const message = await this.prisma.$transaction(async (tx) => {
       // Create message
       const msg = await tx.message.create({
         data: {
           conversationId,
           senderId: userId,
-          content: dto.content,
-          contentType: dto.contentType || 'text',
+          content: payload.content,
+          contentType: payload.contentType,
         },
         include: {
           sender: { select: { id: true, fullName: true, avatarUrl: true } },
@@ -198,9 +217,9 @@ export class ChatService {
       });
 
       // Create attachments if any
-      if (dto.attachments?.length) {
+      if (payload.attachments.length) {
         await tx.attachment.createMany({
-          data: dto.attachments.map((a) => ({
+          data: payload.attachments.map((a) => ({
             messageId: msg.id,
             filename: a.filename,
             mimeType: a.mimeType,
@@ -241,6 +260,80 @@ export class ChatService {
     }
 
     return message;
+  }
+
+  private validateAndNormalizeMessage(dto: SendMessageDto) {
+    const contentType = dto.contentType || 'text';
+    const content = dto.content?.trim() || '';
+    const attachments = dto.attachments || [];
+
+    for (const attachment of attachments) {
+      if (attachment.size < 1 || attachment.size > MAX_ATTACHMENT_SIZE_BYTES) {
+        throw new BadRequestException('Attachment size must be between 1 byte and 128MB');
+      }
+    }
+
+    switch (contentType) {
+      case 'text': {
+        if (!content) {
+          throw new BadRequestException('Text message cannot be empty');
+        }
+        if (attachments.length > 0) {
+          throw new BadRequestException('Text message does not support attachments');
+        }
+        break;
+      }
+      case 'emoji': {
+        if (!ALLOWED_CHAT_EMOJIS.has(content)) {
+          throw new BadRequestException('Unsupported emoji');
+        }
+        if (attachments.length > 0) {
+          throw new BadRequestException('Emoji message does not support attachments');
+        }
+        break;
+      }
+      case 'image': {
+        if (attachments.length === 0) {
+          throw new BadRequestException('Image message must include at least one attachment');
+        }
+        for (const attachment of attachments) {
+          if (!attachment.mimeType.toLowerCase().startsWith('image/')) {
+            throw new BadRequestException(`Unsupported image format: ${attachment.filename}`);
+          }
+        }
+        break;
+      }
+      case 'file': {
+        if (attachments.length === 0) {
+          throw new BadRequestException('Document message must include at least one attachment');
+        }
+        for (const attachment of attachments) {
+          const extension = this.getFileExtension(attachment.filename);
+          if (!ALLOWED_DOCUMENT_EXTENSIONS.has(extension)) {
+            throw new BadRequestException(
+              `Unsupported document format for ${attachment.filename}. Allowed: .pptx, .pdf, .txt, .mvd`,
+            );
+          }
+        }
+        break;
+      }
+      default:
+        throw new BadRequestException('Unsupported message type');
+    }
+
+    return {
+      contentType,
+      content,
+      attachments,
+    };
+  }
+
+  private getFileExtension(filename: string) {
+    const dotIndex = filename.lastIndexOf('.');
+    if (dotIndex < 0) {
+      return '';
+    }
+    return filename.slice(dotIndex).toLowerCase();
   }
 
   async markAsRead(userId: string, conversationId: string) {

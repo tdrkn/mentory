@@ -186,6 +186,33 @@ export class BookingService {
         throw new BadRequestException(`Cannot confirm session with status: ${session.status}`);
       }
 
+      if (paymentIntentId) {
+        const payment = await tx.payment.findUnique({
+          where: { sessionId },
+          select: {
+            providerPaymentId: true,
+            status: true,
+            menteeId: true,
+          },
+        });
+
+        if (!payment) {
+          throw new BadRequestException('Payment not found for this session');
+        }
+
+        if (payment.menteeId !== session.menteeId) {
+          throw new BadRequestException('Payment does not belong to session mentee');
+        }
+
+        if (payment.providerPaymentId !== paymentIntentId) {
+          throw new BadRequestException('Payment intent does not match session payment');
+        }
+
+        if (payment.status !== 'succeeded' && payment.status !== 'paid') {
+          throw new BadRequestException('Payment has not been confirmed by acquirer');
+        }
+      }
+
       // Check if hold expired
       if (session.slot.status === 'held' && session.slot.heldUntil && session.slot.heldUntil < new Date()) {
         // Release the slot

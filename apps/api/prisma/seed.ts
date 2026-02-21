@@ -83,6 +83,8 @@ async function main() {
       fullName: 'Алексей Петров',
       timezone: 'Europe/Moscow',
       role: UserRole.mentor,
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
       mentorProfile: {
         create: {
           headline: 'Senior Software Engineer @ Yandex',
@@ -104,6 +106,8 @@ async function main() {
       fullName: 'Мария Иванова',
       timezone: 'Europe/Moscow',
       role: UserRole.mentor,
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
       mentorProfile: {
         create: {
           headline: 'Engineering Manager @ VK',
@@ -132,10 +136,12 @@ async function main() {
       fullName: 'Иван Сидоров',
       timezone: 'Europe/Moscow',
       role: UserRole.mentee,
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
       menteeProfile: {
         create: {
           background: 'Junior Backend Developer, 1.5 года опыта. Работаю с Node.js и PostgreSQL.',
-          goals: 'Хочу вырасти до Middle/Senior уровня, улучшить понимание архитектуры и системного дизайна.',
+          goals: ['Хочу вырасти до Middle/Senior уровня', 'Улучшить понимание архитектуры и системного дизайна'],
           interests: ['Backend', 'System Design', 'Databases'],
         },
       },
@@ -149,10 +155,12 @@ async function main() {
       fullName: 'Анна Козлова',
       timezone: 'Europe/Moscow',
       role: UserRole.mentee,
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
       menteeProfile: {
         create: {
           background: 'Middle Frontend Developer, 3 года опыта. React, TypeScript.',
-          goals: 'Планирую переход в Product Management. Нужна помощь с подготовкой и пониманием роли.',
+          goals: ['Планирую переход в Product Management', 'Нужна помощь с подготовкой и пониманием роли'],
           interests: ['Product Management', 'Career', 'Leadership'],
         },
       },

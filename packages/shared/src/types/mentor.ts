@@ -1,5 +1,12 @@
 export interface MentorProfile {
   userId: string;
+  age?: number | null;
+  education?: string | null;
+  workplace?: string | null;
+  goals: string[];
+  hobbies: string[];
+  certificates: string[];
+  skills: string[];
   headline: string;
   bio: string;
   languages: string[];

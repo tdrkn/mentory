@@ -16,6 +16,10 @@
     mentorProfile: {
       headline: string;
       bio: string;
+      education?: string | null;
+      workplace?: string | null;
+      goals?: string[];
+      hobbies?: string[];
       languages: string[];
       ratingAvg: string;
       ratingCount: number;
@@ -181,6 +185,40 @@
               <MessageCircle size={20} /> О менторе
             </h2>
             <p class="bio-text">{mentor.mentorProfile?.bio || 'Описание не указано.'}</p>
+          </div>
+
+          <div class="card">
+            <h2 class="card-title">Профиль ментора</h2>
+            <div class="stack" style="gap:10px;">
+              <div>
+                <div class="muted">Место работы</div>
+                <div>{mentor.mentorProfile?.workplace || 'Не указано'}</div>
+              </div>
+              <div>
+                <div class="muted">Образование</div>
+                <div>{mentor.mentorProfile?.education || 'Не указано'}</div>
+              </div>
+              <div>
+                <div class="muted">Хобби</div>
+                <div>
+                  {#if mentor.mentorProfile?.hobbies?.length}
+                    {mentor.mentorProfile.hobbies.join(', ')}
+                  {:else}
+                    Не указано
+                  {/if}
+                </div>
+              </div>
+              <div>
+                <div class="muted">Цели</div>
+                <div>
+                  {#if mentor.mentorProfile?.goals?.length}
+                    {mentor.mentorProfile.goals.join(', ')}
+                  {:else}
+                    Не указано
+                  {/if}
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Topics -->

@@ -12,6 +12,8 @@
     avatarUrl: string | null;
     headline: string;
     bio: string;
+    education: string | null;
+    workplace: string | null;
     languages: string[];
     rating: { average: number; count: number };
     topics: { id: string; name: string }[];
@@ -39,6 +41,10 @@
   let maxPrice = '';
   let minRating = '';
   let sort = '';
+  let education = '';
+  let workplace = '';
+  let hobby = '';
+  let skill = '';
   let searchQuery = '';
 
   const topicsQuery = createQuery({
@@ -53,7 +59,7 @@
   });
 
   $: mentorsQuery = createQuery({
-    queryKey: ['mentors', topicId, minPrice, maxPrice, minRating, sort],
+    queryKey: ['mentors', topicId, minPrice, maxPrice, minRating, sort, education, workplace, hobby, skill],
     queryFn: async () => {
       error = null;
       const params = new URLSearchParams();
@@ -62,6 +68,10 @@
       if (maxPrice) params.set('maxPrice', maxPrice);
       if (minRating) params.set('minRating', minRating);
       if (sort) params.set('sort', sort);
+      if (education) params.set('education', education);
+      if (workplace) params.set('workplace', workplace);
+      if (hobby) params.set('hobby', hobby);
+      if (skill) params.set('skill', skill);
 
       const query = params.toString() ? `?${params.toString()}` : '';
       try {
@@ -89,6 +99,8 @@
     ? mentors.filter(m => 
         m.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.headline?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.education?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.workplace?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.topics?.some(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     : mentors;
@@ -99,10 +111,15 @@
     maxPrice = '';
     minRating = '';
     sort = '';
+    education = '';
+    workplace = '';
+    hobby = '';
+    skill = '';
     searchQuery = '';
   };
 
-  const hasActiveFilters = () => topicId || minPrice || maxPrice || minRating || sort;
+  const hasActiveFilters = () =>
+    topicId || minPrice || maxPrice || minRating || sort || education || workplace || hobby || skill;
 </script>
 
 <div class="page">
@@ -144,7 +161,7 @@
         </div>
         <div class="filters-grid">
           <div class="form-group">
-            <label class="label">Тема</label>
+            <div class="label">Тема</div>
             <select class="select" bind:value={topicId}>
               <option value="">Все темы</option>
               {#each topics as topic}
@@ -153,15 +170,15 @@
             </select>
           </div>
           <div class="form-group">
-            <label class="label">Мин. цена</label>
+            <div class="label">Мин. цена</div>
             <input class="input" type="number" min="0" placeholder="От" bind:value={minPrice} />
           </div>
           <div class="form-group">
-            <label class="label">Макс. цена</label>
+            <div class="label">Макс. цена</div>
             <input class="input" type="number" min="0" placeholder="До" bind:value={maxPrice} />
           </div>
           <div class="form-group">
-            <label class="label">Рейтинг</label>
+            <div class="label">Рейтинг</div>
             <select class="select" bind:value={minRating}>
               <option value="">Любой</option>
               <option value="4">4+ ⭐</option>
@@ -169,7 +186,7 @@
             </select>
           </div>
           <div class="form-group">
-            <label class="label">Сортировка</label>
+            <div class="label">Сортировка</div>
             <select class="select" bind:value={sort}>
               <option value="">По умолчанию</option>
               <option value="rating">По рейтингу</option>
@@ -177,6 +194,22 @@
               <option value="price_desc">Цена ↓</option>
               <option value="sessions">По кол-ву сессий</option>
             </select>
+          </div>
+          <div class="form-group">
+            <div class="label">Образование</div>
+            <input class="input" type="text" placeholder="Например, магистратура" bind:value={education} />
+          </div>
+          <div class="form-group">
+            <div class="label">Место работы</div>
+            <input class="input" type="text" placeholder="Например, продуктовая компания" bind:value={workplace} />
+          </div>
+          <div class="form-group">
+            <div class="label">Хобби</div>
+            <input class="input" type="text" placeholder="Например, спорт" bind:value={hobby} />
+          </div>
+          <div class="form-group">
+            <div class="label">Навык</div>
+            <input class="input" type="text" placeholder="Например, TypeScript" bind:value={skill} />
           </div>
         </div>
       </div>
@@ -244,6 +277,11 @@
                 <div class="mentor-card-info">
                   <div class="mentor-card-name">{mentor.fullName}</div>
                   <div class="mentor-card-title">{mentor.headline || 'Эксперт'}</div>
+                  {#if mentor.workplace || mentor.education}
+                    <div class="mentor-card-subtitle muted">
+                      {[mentor.workplace, mentor.education].filter(Boolean).join(' • ')}
+                    </div>
+                  {/if}
                   <div class="mentor-card-meta">
                     <span class="rating">
                       <Star size={14} fill="currentColor" />
@@ -377,6 +415,11 @@
 
   .results-info {
     margin-bottom: 24px;
+  }
+
+  .mentor-card-subtitle {
+    font-size: 0.82rem;
+    margin-top: 2px;
   }
 
   .mentors-grid {
