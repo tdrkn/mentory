@@ -7,7 +7,7 @@
     "dev": "vite dev --host 0.0.0.0 --port 3000",
     "build": "svelte-kit sync && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 3000",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check": "pnpm --filter @mentory/shared build && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "clean": "rm -rf .svelte-kit build node_modules"
   },
   "dependencies": {
