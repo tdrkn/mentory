@@ -70,4 +70,21 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          ssh -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && bash scripts/deploy_prod.sh main"
+          ssh -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'EOF'
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+
+          if [ ! -d .git ]; then
+            echo "DEPLOY_PATH is not a git repository: $DEPLOY_PATH"
+            exit 1
+          fi
+
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
+
+          docker compose -f infra/docker-compose.prod.yml up -d --build --remove-orphans
+          docker compose -f infra/docker-compose.prod.yml exec -T api npx prisma migrate deploy
+          docker image prune -f
+          docker compose -f infra/docker-compose.prod.yml ps
+          EOF
