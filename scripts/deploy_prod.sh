@@ -27,7 +27,9 @@ echo "Run Prisma migrations..."
 docker compose -f "${COMPOSE_FILE}" exec -T api npx prisma migrate deploy
 
 echo "Cleanup old images..."
-docker image prune -f
+docker image prune -af --filter "until=24h"
+docker builder prune -af --filter "until=24h"
+docker container prune -f
 
 echo "Current containers:"
 docker compose -f "${COMPOSE_FILE}" ps
