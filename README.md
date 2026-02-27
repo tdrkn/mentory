@@ -143,7 +143,7 @@ pnpm docker:down
 - на сервере выполняется `scripts/deploy_prod.sh`:
   - `git pull` из `main`;
   - `docker compose -f infra/docker-compose.prod.yml up -d --build --remove-orphans`;
-  - `npx prisma migrate deploy`.
+  - `cd apps/api && npx prisma migrate deploy`.
 
 ### GitHub Secrets (Repository → Settings → Secrets and variables → Actions)
 

@@ -26,11 +26,11 @@ docker compose "${COMPOSE_ARGS[@]}" up -d --build --remove-orphans
 
 echo "Apply database schema..."
 if [ -d apps/api/prisma/migrations ] && [ "$(ls -A apps/api/prisma/migrations 2>/dev/null)" ]; then
-  docker compose "${COMPOSE_ARGS[@]}" exec -T api \
-    npx prisma migrate deploy --schema /app/apps/api/prisma/schema.prisma
+  docker compose "${COMPOSE_ARGS[@]}" exec -T -w /app/apps/api api \
+    npx prisma@6.2.0 migrate deploy
 else
-  docker compose "${COMPOSE_ARGS[@]}" exec -T api \
-    npx prisma db push --schema /app/apps/api/prisma/schema.prisma --accept-data-loss
+  docker compose "${COMPOSE_ARGS[@]}" exec -T -w /app/apps/api api \
+    npx prisma@6.2.0 db push --accept-data-loss
 fi
 
 echo "Cleanup old images..."
