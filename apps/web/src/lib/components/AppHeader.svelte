@@ -183,7 +183,7 @@
   }
 
   .nav-link.active {
-    color: var(--accent);
+    color: var(--accent-link);
     background: var(--accent-muted);
   }
 
@@ -210,7 +210,7 @@
   }
 
   .nav-link-icon.active {
-    color: var(--accent);
+    color: var(--accent-link);
     background: var(--accent-muted);
   }
 
@@ -223,7 +223,7 @@
     height: 36px;
     border-radius: 50%;
     background: var(--accent-muted);
-    color: var(--accent);
+    color: var(--accent-link);
     border: none;
     cursor: pointer;
     display: flex;
@@ -234,7 +234,7 @@
 
   .user-avatar:hover {
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
   }
 
   .user-dropdown {
@@ -302,11 +302,11 @@
   }
 
   .user-dropdown-item.logout {
-    color: #dc2626;
+    color: var(--status-error-ink);
   }
 
   .user-dropdown-item.logout:hover {
-    background: #fef2f2;
+    background: var(--status-error-bg);
   }
 
   .mobile-menu-toggle {
@@ -364,7 +364,7 @@
   }
 
   .mobile-nav-link.logout {
-    color: #dc2626;
+    color: var(--status-error-ink);
   }
 
   .mobile-nav-divider {

@@ -118,7 +118,7 @@
       </div>
 
       {#if verificationInfo}
-        <div class="surface" style="margin-bottom:16px;background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;">
+        <div class="surface" style="margin-bottom:16px;background:var(--status-info-bg);border-color:var(--status-info-border);color:var(--status-info-ink);">
           <div>{verificationInfo}</div>
           {#if pendingVerificationEmail}
             <button
@@ -289,7 +289,7 @@
 
   .form-error {
     font-size: 0.8rem;
-    color: #dc2626;
+    color: var(--status-error-ink);
     margin-top: 4px;
   }
 
@@ -420,7 +420,7 @@
   }
 
   .error-modal {
-    background: #fff;
+    background: var(--surface-elevated);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 20px;

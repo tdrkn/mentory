@@ -387,10 +387,10 @@
       <p class="muted">Жалобы, коммуникация с модерацией и верификация регалий.</p>
 
       {#if notice}
-        <div class="surface" style="margin-top:12px;background:#dcfce7;border-color:#bbf7d0;color:#166534;">{notice}</div>
+        <div class="surface" style="margin-top:12px;background:var(--status-success-bg);border-color:var(--status-success-border);color:var(--status-success-ink);">{notice}</div>
       {/if}
       {#if error}
-        <div class="surface" style="margin-top:12px;background:#fee2e2;border-color:#fecaca;color:#991b1b;">{error}</div>
+        <div class="surface" style="margin-top:12px;background:var(--status-error-bg);border-color:var(--status-error-border);color:var(--status-error-ink);">{error}</div>
       {/if}
 
       <div class="grid" style="grid-template-columns:1.1fr 1fr;gap:20px;margin-top:18px;">
@@ -586,7 +586,7 @@
                         {item.mimeType || 'application/pdf'} · {formatBytes(item.size ?? item.sizeBytes ?? 0)}
                       </div>
                       {#if item.rejectionReason}
-                        <div style="margin-top:6px;color:#991b1b;">Причина отклонения: {item.rejectionReason}</div>
+                        <div style="margin-top:6px;color:var(--status-error-ink);">Причина отклонения: {item.rejectionReason}</div>
                       {/if}
                     </div>
                   {/each}

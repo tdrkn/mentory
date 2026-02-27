@@ -351,10 +351,10 @@
       </div>
 
       {#if notice}
-        <div class="surface" style="margin-top:12px;background:#dcfce7;border-color:#bbf7d0;color:#166534;">{notice}</div>
+        <div class="surface" style="margin-top:12px;background:var(--status-success-bg);border-color:var(--status-success-border);color:var(--status-success-ink);">{notice}</div>
       {/if}
       {#if error}
-        <div class="surface" style="margin-top:12px;background:#fee2e2;border-color:#fecaca;color:#991b1b;">{error}</div>
+        <div class="surface" style="margin-top:12px;background:var(--status-error-bg);border-color:var(--status-error-border);color:var(--status-error-ink);">{error}</div>
       {/if}
 
       <section class="card" style="margin-top:18px;">

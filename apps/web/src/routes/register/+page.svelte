@@ -295,7 +295,7 @@
 
   .form-error {
     font-size: 0.8rem;
-    color: #dc2626;
+    color: var(--status-error-ink);
     margin-top: 4px;
   }
 

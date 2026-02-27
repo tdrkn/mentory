@@ -401,9 +401,9 @@
   {#if $authLoading || isLoading}
     <Loading />
   {:else}
-    <main class="container" style="padding-bottom:40px;">
-      <div class="card" style="display:grid;grid-template-columns:280px 1fr;gap:20px;min-height:540px;">
-        <aside style="border-right:1px solid var(--border);padding-right:16px;">
+    <main class="container chat-main">
+      <div class="card chat-layout">
+        <aside class="chat-sidebar">
           <h3>Диалоги</h3>
           {#if conversations.length === 0}
             <p class="muted">Нет диалогов.</p>
@@ -439,12 +439,12 @@
           {/if}
         </aside>
 
-        <section style="display:flex;flex-direction:column;">
+        <section class="chat-thread">
           {#if !activeConversation}
             <div class="muted">Выберите диалог</div>
           {:else}
-            <div class="surface" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
-              <div style="display:flex;align-items:center;gap:8px;">
+            <div class="surface chat-thread-header">
+              <div class="chat-thread-header-main">
                 <button
                   class="btn btn-ghost btn-sm"
                   on:click={handleJoinCall}
@@ -454,7 +454,7 @@
                 </button>
                 <strong>{activeConversationData ? partnerName(activeConversationData) : ''}</strong>
               </div>
-              <span class="muted" style="font-size:0.8rem;">
+              <span class="muted chat-thread-status">
                 {#if activeConversationData?.session?.id}
                   Сессия привязана
                 {:else}
@@ -463,11 +463,10 @@
               </span>
             </div>
 
-            <div style="flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px;">
+            <div class="chat-messages">
               {#each messages as msg}
-                <div style={`display:flex;justify-content:${msg.senderId === $user?.id ? 'flex-end' : 'flex-start'};`}>
-                  <div class="surface" style={`max-width:70%;${msg.senderId === $user?.id ? 'background:var(--accent);color:#fff;' : ''}`}
-                    >
+                <div class={`chat-message-row ${msg.senderId === $user?.id ? 'mine' : 'theirs'}`}>
+                  <div class={`surface chat-message-bubble ${msg.senderId === $user?.id ? 'mine' : ''}`}>
                     {#if msg.contentType === 'image' && msg.attachments && msg.attachments.length > 0}
                       <div class="stack-sm">
                         {#each msg.attachments as attachment}
@@ -494,7 +493,7 @@
                             target="_blank"
                             rel="noreferrer"
                             download={attachment.filename}
-                            style={`text-decoration:underline;word-break:break-all;${msg.senderId === $user?.id ? 'color:#fff;' : 'color:var(--accent);'}`}
+                            style={`text-decoration:underline;word-break:break-all;${msg.senderId === $user?.id ? 'color:var(--on-accent);' : 'color:var(--accent-link);'}`}
                           >
                             {attachment.filename}
                           </a>
@@ -508,7 +507,7 @@
                             href={getFirstHttpLink(msg.content)}
                             target="_blank"
                             rel="noreferrer"
-                            style={`text-decoration:underline;word-break:break-all;${msg.senderId === $user?.id ? 'color:#fff;' : 'color:var(--accent);'}`}
+                            style={`text-decoration:underline;word-break:break-all;${msg.senderId === $user?.id ? 'color:var(--on-accent);' : 'color:var(--accent-link);'}`}
                           >
                             Открыть ссылку
                           </a>
@@ -527,7 +526,7 @@
               <div class="muted" style="font-size:0.85rem;margin-top:8px;">Печатает...</div>
             {/if}
 
-            <div style="display:flex;gap:8px;margin-top:12px;">
+            <div class="chat-composer">
               <input
                 class="input"
                 bind:value={newMessage}
@@ -539,13 +538,13 @@
                 {isSending ? '...' : 'Отправить'}
               </button>
             </div>
-            <div class="muted" style="font-size:0.8rem;margin-top:6px;text-align:right;">
+            <div class="muted chat-counter">
               {newMessage.length}/1000
             </div>
-            <details class="surface" style="margin-top:10px;">
-              <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;font-weight:600;">
+            <details class="surface chat-tools">
+              <summary class="chat-tools-summary">
                 Инструменты чата
-                <span class="muted" style="font-size:0.78rem;font-weight:500;">Эмодзи, фото, документы, ВКС</span>
+                <span class="muted chat-tools-caption">Эмодзи, фото, документы, ВКС</span>
               </summary>
 
               <div style="display:grid;gap:10px;margin-top:10px;">
@@ -562,7 +561,7 @@
 
                 <div>
                   <div class="muted" style="font-size:0.8rem;margin-bottom:8px;">Фото (JPG/PNG и другие image/*)</div>
-                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+                  <div class="chat-attach-row">
                     <input bind:this={imageInput} type="file" accept="image/*" on:change={handleImageFileChange} />
                     <button class="btn btn-outline btn-sm" on:click={handleSendImage} disabled={isSending || !imageFile}>
                       Отправить фото
@@ -575,7 +574,7 @@
 
                 <div>
                   <div class="muted" style="font-size:0.8rem;margin-bottom:8px;">Документ (.pptx, .pdf, .txt, .mvd)</div>
-                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+                  <div class="chat-attach-row">
                     <input bind:this={documentInput} type="file" accept=".pptx,.pdf,.txt,.mvd" on:change={handleDocumentFileChange} />
                     <button class="btn btn-outline btn-sm" on:click={handleSendDocument} disabled={isSending || !documentFile}>
                       Отправить документ
@@ -588,7 +587,7 @@
 
                 <div>
                   <div class="muted" style="font-size:0.8rem;margin-bottom:8px;">Ссылка на видеовстречу</div>
-                  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                  <div class="chat-attach-row">
                     <input class="input" bind:value={videoLink} placeholder="https://zoom.us/..." />
                     <button class="btn btn-outline btn-sm" on:click={handleSendVideoLink} disabled={isSending || !videoLink.trim()}>
                       Отправить ссылку
@@ -599,10 +598,10 @@
             </details>
 
             {#if composerNotice}
-              <div class="muted" style="font-size:0.8rem;color:#166534;margin-top:8px;">{composerNotice}</div>
+              <div class="muted" style="font-size:0.8rem;color:var(--status-success-ink);margin-top:8px;">{composerNotice}</div>
             {/if}
             {#if composerError}
-              <div class="muted" style="font-size:0.8rem;color:#dc2626;margin-top:8px;">{composerError}</div>
+              <div class="muted" style="font-size:0.8rem;color:var(--status-error-ink);margin-top:8px;">{composerError}</div>
             {/if}
           {/if}
         </section>
@@ -610,3 +609,166 @@
     </main>
   {/if}
 </div>
+
+<style>
+  .chat-main {
+    padding-bottom: 40px;
+  }
+
+  .chat-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 20px;
+    min-height: 540px;
+  }
+
+  .chat-sidebar {
+    border-right: 1px solid var(--border);
+    padding-right: 16px;
+    min-width: 0;
+  }
+
+  .chat-thread {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .chat-thread-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .chat-thread-header-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .chat-thread-status {
+    font-size: 0.8rem;
+    flex-shrink: 0;
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .chat-message-row {
+    display: flex;
+  }
+
+  .chat-message-row.mine {
+    justify-content: flex-end;
+  }
+
+  .chat-message-row.theirs {
+    justify-content: flex-start;
+  }
+
+  .chat-message-bubble {
+    max-width: 70%;
+    word-break: break-word;
+  }
+
+  .chat-message-bubble.mine {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .chat-composer {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .chat-counter {
+    font-size: 0.8rem;
+    margin-top: 6px;
+    text-align: right;
+  }
+
+  .chat-tools {
+    margin-top: 10px;
+  }
+
+  .chat-tools-summary {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+  }
+
+  .chat-tools-caption {
+    font-size: 0.78rem;
+    font-weight: 500;
+  }
+
+  .chat-attach-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  @media (max-width: 900px) {
+    .chat-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .chat-sidebar {
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+      padding-right: 0;
+      padding-bottom: 12px;
+    }
+
+    .chat-message-bubble {
+      max-width: 84%;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .chat-main {
+      padding-bottom: 24px;
+    }
+
+    .chat-layout {
+      gap: 14px;
+      padding: 14px;
+    }
+
+    .chat-thread-header-main {
+      flex-wrap: wrap;
+    }
+
+    .chat-composer {
+      flex-direction: column;
+    }
+
+    .chat-composer .btn {
+      width: 100%;
+    }
+
+    .chat-tools-summary {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .chat-message-bubble {
+      max-width: 100%;
+    }
+  }
+</style>

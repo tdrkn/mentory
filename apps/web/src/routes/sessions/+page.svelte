@@ -90,7 +90,7 @@
       <h1 class="section-title">Мои сессии</h1>
 
       {#if showSuccess()}
-        <div class="surface" style="margin-top:12px;background:#dcfce7;border-color:#bbf7d0;color:#166534;">
+        <div class="surface" style="margin-top:12px;background:var(--status-success-bg);border-color:var(--status-success-border);color:var(--status-success-ink);">
           🎉 Сессия успешно забронирована!
         </div>
       {/if}

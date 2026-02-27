@@ -45,7 +45,7 @@
       {#if verifying}
         <p class="auth-subtitle">Проверяем ссылку подтверждения...</p>
       {:else}
-        <div class={`alert ${success ? '' : 'alert-error'}`} style={success ? 'background:#dcfce7;border-color:#bbf7d0;color:#166534;' : ''}>
+        <div class={`alert ${success ? '' : 'alert-error'}`} style={success ? 'background:var(--status-success-bg);border-color:var(--status-success-border);color:var(--status-success-ink);' : ''}>
           {message}
         </div>
       {/if}

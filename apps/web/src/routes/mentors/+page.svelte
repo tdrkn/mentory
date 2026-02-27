@@ -409,14 +409,14 @@
   }
 
   .topic-chip:hover {
-    border-color: var(--accent);
-    color: var(--accent);
+    border-color: var(--accent-link);
+    color: var(--accent-link);
   }
 
   .topic-chip.active {
     background: var(--accent);
     border-color: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
   }
 
   .results-info {
@@ -455,7 +455,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    color: var(--accent);
+    color: var(--accent-link);
     font-weight: 500;
     font-size: 0.875rem;
   }

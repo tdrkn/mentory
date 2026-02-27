@@ -264,9 +264,9 @@
 
   .error-box {
     margin-top: 12px;
-    background: #fee2e2;
-    border-color: #fecaca;
-    color: #991b1b;
+    background: var(--status-error-bg);
+    border-color: var(--status-error-border);
+    color: var(--status-error-ink);
   }
 
   @media (max-width: 900px) {

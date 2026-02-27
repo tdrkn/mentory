@@ -382,7 +382,7 @@
     justify-content: center;
     font-weight: 700;
     font-size: 2.5rem;
-    color: #fff;
+    color: var(--on-accent);
     font-family: var(--font-display);
     flex-shrink: 0;
   }
@@ -417,7 +417,7 @@
   }
 
   .profile-stat :global(.star-icon) {
-    color: #f59e0b;
+    color: var(--amber);
   }
 
   .stat-value {
@@ -626,7 +626,7 @@
   .slot-btn.selected {
     background: var(--accent);
     border-color: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
   }
 
   .booking-btn {

@@ -230,14 +230,14 @@
         <h1 class="section-title">Оформление сессии</h1>
 
         {#if error}
-          <div class="surface" style="margin-top:12px;background:#fee2e2;border-color:#fecaca;color:#991b1b;">
+          <div class="surface" style="margin-top:12px;background:var(--status-error-bg);border-color:var(--status-error-border);color:var(--status-error-ink);">
             {error}
           </div>
         {/if}
 
         <div class="surface" style="margin-top:16px;">
           <div style="display:flex;gap:14px;align-items:center;">
-            <div style="width:52px;height:52px;border-radius:50%;background:#e7f5f3;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);">
+            <div style="width:52px;height:52px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);">
               {session.mentor.fullName.charAt(0)}
             </div>
             <div>

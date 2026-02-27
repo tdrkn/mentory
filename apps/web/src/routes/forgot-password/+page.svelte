@@ -43,7 +43,7 @@
       {/if}
 
       {#if success}
-        <div class="alert" style="background:#dcfce7;border-color:#bbf7d0;color:#166534;">
+        <div class="alert" style="background:var(--status-success-bg);border-color:var(--status-success-border);color:var(--status-success-ink);">
           {success}
         </div>
       {/if}

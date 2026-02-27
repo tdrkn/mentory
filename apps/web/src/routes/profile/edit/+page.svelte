@@ -318,7 +318,7 @@
       </div>
 
       {#if message}
-        <div class="surface" style="margin-top:12px;background:#dcfce7;border-color:#bbf7d0;color:#166534;">
+        <div class="surface" style="margin-top:12px;background:var(--status-success-bg);border-color:var(--status-success-border);color:var(--status-success-ink);">
           {message}
         </div>
       {/if}
@@ -331,21 +331,21 @@
               <div class="muted" style="margin-bottom:6px;">Полное имя</div>
               <input class="input" bind:value={$formData.fullName} />
               {#if $errors.fullName}
-                <div class="muted" style="font-size:0.8rem;color:#b45309;">{errorMessage($errors.fullName)}</div>
+                <div class="muted" style="font-size:0.8rem;color:var(--status-warning-ink);">{errorMessage($errors.fullName)}</div>
               {/if}
             </label>
             <label style="margin-top:12px;display:block;">
               <div class="muted" style="margin-bottom:6px;">Часовой пояс</div>
               <input class="input" bind:value={$formData.timezone} placeholder="Europe/Moscow" />
               {#if $errors.timezone}
-                <div class="muted" style="font-size:0.8rem;color:#b45309;">{errorMessage($errors.timezone)}</div>
+                <div class="muted" style="font-size:0.8rem;color:var(--status-warning-ink);">{errorMessage($errors.timezone)}</div>
               {/if}
             </label>
             <label style="margin-top:12px;display:block;">
               <div class="muted" style="margin-bottom:6px;">Возраст</div>
               <input class="input" type="number" min="18" max="120" bind:value={$formData.age} />
               {#if $errors.age}
-                <div class="muted" style="font-size:0.8rem;color:#b45309;">{errorMessage($errors.age)}</div>
+                <div class="muted" style="font-size:0.8rem;color:var(--status-warning-ink);">{errorMessage($errors.age)}</div>
               {/if}
             </label>
             <label style="margin-top:12px;display:block;">
@@ -624,7 +624,7 @@
   .chip.selected {
     border-color: var(--accent);
     color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 10%, #fff);
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface));
   }
 
   @media (max-width: 900px) {
