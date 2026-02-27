@@ -6,7 +6,7 @@ skinparam linetype ortho
 title Mentory ER (Admin/Trust MVP, Must Have)
 
 entity "users" as users {
-  * id : string <<PK>>
+  * id : int <<PK>>
   --
   role : string
   status : string
@@ -14,64 +14,64 @@ entity "users" as users {
 }
 
 entity "sessions (ref)" as sessions_ref {
-  * id : string <<PK>>
+  * id : int <<PK>>
   --
   status : string
 }
 
 entity "mentor_regalia" as mentor_regalia {
-  * id : string <<PK>>
+  * id : int <<PK>>
   --
-  mentor_id : string <<FK>>
+  mentor_id : int <<FK>>
   file_url : string
   status : string
-  reviewed_by : string <<FK>>
-  reviewed_at : date
-  created_at : date
+  reviewed_by : int <<FK>>
+  reviewed_at : timestamp
+  created_at : timestamp
 }
 
 entity "complaints" as complaints {
-  * id : string <<PK>>
+  * id : int <<PK>>
   --
-  author_id : string <<FK>>
-  target_user_id : string <<FK>>
-  target_session_id : string <<FK>>
-  assigned_admin_id : string <<FK>>
+  author_id : int <<FK>>
+  target_user_id : int <<FK>>
+  target_session_id : int <<FK>>
+  assigned_admin_id : int <<FK>>
   category : string
   status : string
-  resolution_comment : string
-  created_at : date
-  closed_at : date
+  resolution_comment : text
+  created_at : timestamp
+  closed_at : timestamp
 }
 
 entity "complaint_messages" as complaint_messages {
-  * id : string <<PK>>
+  * id : int <<PK>>
   --
-  complaint_id : string <<FK>>
-  sender_id : string <<FK>>
-  body : string
-  created_at : date
+  complaint_id : int <<FK>>
+  sender_id : int <<FK>>
+  body : text
+  created_at : timestamp
 }
 
 entity "moderation_actions" as moderation_actions {
-  * id : string <<PK>>
+  * id : int <<PK>>
   --
-  admin_id : string <<FK>>
+  admin_id : int <<FK>>
   target_type : string
-  target_id : string
+  target_id : int
   action : string
-  reason : string
-  created_at : date
+  reason : text
+  created_at : timestamp
 }
 
 entity "admin_audit_logs" as admin_audit_logs {
-  * id : string <<PK>>
+  * id : int <<PK>>
   --
-  admin_id : string <<FK>>
+  admin_id : int <<FK>>
   action : string
   target_type : string
-  target_id : string
-  created_at : date
+  target_id : int
+  created_at : timestamp
 }
 
 ' Layout anchors
