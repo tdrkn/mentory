@@ -53,7 +53,8 @@ mentory/
 │   └── Caddyfile
 ├── product/
 │   ├── usm.txt              # User Story Map
-│   └── er.puml              # ER-диаграмма базы данных
+│   ├── er.puml              # ER-диаграмма базы данных
+│   └── requirements-gap.md  # Gap-анализ FR/NFR/US против текущей реализации
 ├── .env.example
 ├── package.json
 ├── pnpm-workspace.yaml
@@ -310,6 +311,8 @@ ER-диаграмма находится в [product/er.puml](product/er.puml).
 | `conversations` / `messages` | Чат |
 | `video_rooms` | Видеокомнаты |
 | `reviews` | Отзывы и оценки |
+
+Дополнительно: [product/requirements-gap.md](product/requirements-gap.md) — свод расхождений между целевыми требованиями и текущей реализацией.
 
 ---
 

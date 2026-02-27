@@ -1,0 +1,75 @@
+- generic [ref=e2]:
+  - generic [ref=e52]:
+    - banner [ref=e53]:
+      - generic [ref=e54]:
+        - link "M Mentory" [ref=e55] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e56]: M
+          - generic [ref=e57]: Mentory
+        - navigation [ref=e58]:
+          - link "Найти ментора" [ref=e59] [cursor=pointer]:
+            - /url: /mentors
+          - link "Сессии" [ref=e60] [cursor=pointer]:
+            - /url: /sessions
+            - img [ref=e61]
+            - text: Сессии
+          - link "Чат" [ref=e64] [cursor=pointer]:
+            - /url: /chat
+            - img [ref=e65]
+            - text: Чат
+        - button "Меню пользователя" [ref=e69] [cursor=pointer]:
+          - img [ref=e70]
+    - main [ref=e73]:
+      - generic [ref=e74]:
+        - heading "Найдите идеального ментора" [level=1] [ref=e75]
+        - paragraph [ref=e76]: Более 2 экспертов готовы помочь вам с карьерой, навыками и профессиональным ростом.
+        - generic [ref=e77]:
+          - img [ref=e78]
+          - textbox "Поиск по имени, специальности или теме..." [ref=e81]
+          - button [ref=e82] [cursor=pointer]:
+            - img [ref=e83]
+      - button "Все" [ref=e85] [cursor=pointer]
+      - generic [ref=e87]:
+        - text: "Найдено:"
+        - strong [ref=e88]: "2"
+        - text: менторов
+      - generic [ref=e89]:
+        - link "M Maria Mentor Эксперт 0 0 сессий По запросу Профиль" [ref=e90] [cursor=pointer]:
+          - /url: /mentors/4e88cc56-23b5-4414-95ba-3ba635810086
+          - generic [ref=e91]:
+            - generic [ref=e92]: M
+            - generic [ref=e93]:
+              - generic [ref=e94]: Maria Mentor
+              - generic [ref=e95]: Эксперт
+              - generic [ref=e96]:
+                - generic [ref=e97]:
+                  - img [ref=e98]
+                  - text: "0"
+                - generic [ref=e100]:
+                  - img [ref=e101]
+                  - text: 0 сессий
+          - generic [ref=e106]:
+            - generic [ref=e107]: По запросу
+            - generic [ref=e108]:
+              - text: Профиль
+              - img [ref=e109]
+        - link "A Alex Mentor Эксперт 0 0 сессий По запросу Профиль" [ref=e111] [cursor=pointer]:
+          - /url: /mentors/64797758-7500-4faa-a456-4163e60f3aef
+          - generic [ref=e112]:
+            - generic [ref=e113]: A
+            - generic [ref=e114]:
+              - generic [ref=e115]: Alex Mentor
+              - generic [ref=e116]: Эксперт
+              - generic [ref=e117]:
+                - generic [ref=e118]:
+                  - img [ref=e119]
+                  - text: "0"
+                - generic [ref=e121]:
+                  - img [ref=e122]
+                  - text: 0 сессий
+          - generic [ref=e127]:
+            - generic [ref=e128]: По запросу
+            - generic [ref=e129]:
+              - text: Профиль
+              - img [ref=e130]
+  - generic [ref=e51]: untitled page

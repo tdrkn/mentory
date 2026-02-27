@@ -1,0 +1,65 @@
+- generic [ref=e2]:
+  - generic [ref=e52]:
+    - banner [ref=e53]:
+      - generic [ref=e54]:
+        - link "M Mentory" [ref=e55] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e56]: M
+          - generic [ref=e57]: Mentory
+        - navigation [ref=e58]:
+          - link "Найти ментора" [ref=e59] [cursor=pointer]:
+            - /url: /mentors
+          - link "Сессии" [ref=e60] [cursor=pointer]:
+            - /url: /sessions
+            - img [ref=e61]
+            - text: Сессии
+          - link "Чат" [ref=e64] [cursor=pointer]:
+            - /url: /chat
+            - img [ref=e65]
+            - text: Чат
+          - link "Дашборд" [ref=e67] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e68]
+            - text: Дашборд
+        - generic [ref=e73]:
+          - link "Расписание" [ref=e74] [cursor=pointer]:
+            - /url: /schedule
+            - img [ref=e75]
+          - link "Заработок" [ref=e77] [cursor=pointer]:
+            - /url: /earnings
+            - img [ref=e78]
+          - button "Меню пользователя" [ref=e82] [cursor=pointer]:
+            - img [ref=e83]
+    - main [ref=e86]:
+      - heading "Добро пожаловать, Maria Mentor" [level=1] [ref=e87]
+      - paragraph [ref=e88]: Ваш центр управления менторством
+      - generic [ref=e89]:
+        - generic [ref=e90]:
+          - generic [ref=e91]: Всего сессий
+          - generic [ref=e92]: "0"
+        - generic [ref=e93]:
+          - generic [ref=e94]: Предстоящие
+          - generic [ref=e95]: "0"
+        - generic [ref=e96]:
+          - generic [ref=e97]: Ожидают подтверждения
+          - generic [ref=e98]: "0"
+        - generic [ref=e99]:
+          - generic [ref=e100]: Баланс
+          - generic [ref=e101]: 0 USD
+      - generic [ref=e102]:
+        - heading "Заявки на встречи со мной" [level=2] [ref=e103]
+        - paragraph [ref=e104]: Новых заявок нет.
+      - generic [ref=e105]:
+        - generic [ref=e106]:
+          - heading "Предстоящие сессии" [level=2] [ref=e107]
+          - paragraph [ref=e108]: Пока нет предстоящих сессий.
+        - generic [ref=e109]:
+          - heading "Быстрые действия" [level=2] [ref=e110]
+          - generic [ref=e111]:
+            - link "Управлять расписанием" [ref=e112] [cursor=pointer]:
+              - /url: /schedule
+            - link "Редактировать профиль" [ref=e113] [cursor=pointer]:
+              - /url: /profile/edit
+            - link "Вывод средств" [ref=e114] [cursor=pointer]:
+              - /url: /earnings
+  - generic [ref=e51]: untitled page

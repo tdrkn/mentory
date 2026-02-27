@@ -1,28 +1,63 @@
 @startuml
-' ====== Style (optional) ======
 hide circle
 skinparam linetype ortho
+skinparam entityStyle rectangle
 
-' ====== ENTITIES ======
+' Mentory target data model (MVP scope from Отчет.pdf + monetization variants)
 
 entity "users" as users {
   * id : uuid <<PK>>
   --
   email : text <<UQ>>
+  username : text <<UQ>>
   password_hash : text
   full_name : text
+  role : text  ' mentee / mentor / admin
+  status : text  ' active / blocked
+  blocked_reason : text
   timezone : text
-  role : text  ' mentee / mentor / both / admin
+  is_email_verified : bool
+  email_verified_at : timestamptz
+  created_at : timestamptz
+  updated_at : timestamptz
+  last_login_at : timestamptz
+}
+
+entity "user_agreements" as user_agreements {
+  * id : uuid <<PK>>
+  --
+  user_id : uuid <<FK>>
+  document_type : text  ' terms / privacy
+  document_version : text
+  accepted_at : timestamptz
+  ip_address : inet
+}
+
+entity "auth_recovery_tokens" as auth_recovery_tokens {
+  * id : uuid <<PK>>
+  --
+  user_id : uuid <<FK>>
+  purpose : text  ' email_verification / password_reset
+  token_hash : text <<UQ>>
+  expires_at : timestamptz
+  used_at : timestamptz
   created_at : timestamptz
 }
 
 entity "mentor_profiles" as mentor_profiles {
   * user_id : uuid <<PK, FK>>
   --
+  age : int
+  education : text
+  workplace : text
+  goals : text[]
+  hobbies : text[]
+  skills : text[]
   headline : text
   bio : text
   languages : text[]
   timezone : text
+  verification_status : text  ' unverified / pending / verified / rejected
   is_active : bool
   rating_avg : numeric
   rating_count : int
@@ -31,9 +66,29 @@ entity "mentor_profiles" as mentor_profiles {
 entity "mentee_profiles" as mentee_profiles {
   * user_id : uuid <<PK, FK>>
   --
+  age : int
+  education : text
+  workplace : text
   background : text
-  goals : text
+  goals : text[]
+  hobbies : text[]
+  skills : text[]
   interests : text[]
+}
+
+entity "mentor_regalia" as mentor_regalia {
+  * id : uuid <<PK>>
+  --
+  mentor_id : uuid <<FK>>
+  file_name : text
+  file_url : text
+  mime_type : text
+  size_bytes : bigint
+  status : text  ' pending / approved / rejected
+  rejection_reason : text
+  reviewed_by : uuid <<FK>>
+  reviewed_at : timestamptz
+  created_at : timestamptz
 }
 
 entity "topics" as topics {
@@ -52,17 +107,44 @@ entity "mentor_services" as mentor_services {
   --
   mentor_id : uuid <<FK>>
   title : text
+  format : text  ' one_time / subscription_package
+  session_quota_month : int
   duration_min : int
   price_amount : numeric
   currency : text
   is_active : bool
+  created_at : timestamptz
+}
+
+entity "subscription_plans" as subscription_plans {
+  * id : uuid <<PK>>
+  --
+  mentor_id : uuid <<FK>>
+  name : text
+  sessions_per_month : int
+  price_amount : numeric
+  currency : text
+  is_active : bool
+  created_at : timestamptz
+}
+
+entity "mentee_subscriptions" as mentee_subscriptions {
+  * id : uuid <<PK>>
+  --
+  plan_id : uuid <<FK>>
+  mentee_id : uuid <<FK>>
+  status : text  ' active / paused / canceled / expired
+  starts_at : timestamptz
+  ends_at : timestamptz
+  next_billing_at : timestamptz
+  created_at : timestamptz
 }
 
 entity "availability_rules" as availability_rules {
   * id : uuid <<PK>>
   --
   mentor_id : uuid <<FK>>
-  weekday : int  ' 1-7
+  weekday : int
   start_time : time
   end_time : time
   timezone : text
@@ -83,7 +165,7 @@ entity "slots" as slots {
   mentor_id : uuid <<FK>>
   start_at : timestamptz
   end_at : timestamptz
-  status : text  ' free/held/booked
+  status : text  ' free / held / booked
   held_until : timestamptz
 }
 
@@ -94,62 +176,17 @@ entity "sessions" as sessions {
   mentee_id : uuid <<FK>>
   service_id : uuid <<FK>>
   slot_id : uuid <<FK>>
-  status : text  ' requested/booked/paid/canceled/completed/no_show
+  subscription_id : uuid <<FK>>
+  status : text  ' requested / booked / paid / canceled / completed / no_show
+  request_message : text
+  mentor_decision_comment : text
+  request_expires_at : timestamptz
   start_at : timestamptz
   end_at : timestamptz
   created_at : timestamptz
+  confirmed_at : timestamptz
   canceled_at : timestamptz
   cancel_reason : text
-}
-
-entity "payments" as payments {
-  * id : uuid <<PK>>
-  --
-  session_id : uuid <<FK>>
-  provider : text
-  amount : numeric
-  currency : text
-  status : text  ' pending/paid/failed/refunded
-  provider_payment_id : text
-  created_at : timestamptz
-}
-
-entity "payouts" as payouts {
-  * id : uuid <<PK>>
-  --
-  mentor_id : uuid <<FK>>
-  amount : numeric
-  currency : text
-  status : text  ' pending/paid/failed
-  created_at : timestamptz
-}
-
-entity "conversations" as conversations {
-  * id : uuid <<PK>>
-  --
-  mentor_id : uuid <<FK>>
-  mentee_id : uuid <<FK>>
-  session_id : uuid <<FK>>  ' nullable if общий чат
-  created_at : timestamptz
-}
-
-entity "messages" as messages {
-  * id : uuid <<PK>>
-  --
-  conversation_id : uuid <<FK>>
-  sender_id : uuid <<FK>>
-  body : text
-  created_at : timestamptz
-  read_at : timestamptz
-}
-
-entity "attachments" as attachments {
-  * id : uuid <<PK>>
-  --
-  message_id : uuid <<FK>>
-  url : text
-  mime_type : text
-  size_bytes : bigint
 }
 
 entity "video_rooms" as video_rooms {
@@ -157,10 +194,9 @@ entity "video_rooms" as video_rooms {
   --
   session_id : uuid <<FK>>
   provider : text
-  room_id : text
+  external_meeting_url : text
   join_url_mentee : text
   join_url_mentor : text
-  recording_url : text
   created_at : timestamptz
 }
 
@@ -174,6 +210,37 @@ entity "session_notes" as session_notes {
   updated_at : timestamptz
 }
 
+entity "conversations" as conversations {
+  * id : uuid <<PK>>
+  --
+  mentor_id : uuid <<FK>>
+  mentee_id : uuid <<FK>>
+  session_id : uuid <<FK>>
+  created_at : timestamptz
+  updated_at : timestamptz
+}
+
+entity "messages" as messages {
+  * id : uuid <<PK>>
+  --
+  conversation_id : uuid <<FK>>
+  sender_id : uuid <<FK>>
+  content : text
+  content_type : text  ' text / image / file / emoji
+  created_at : timestamptz
+  read_at : timestamptz
+}
+
+entity "attachments" as attachments {
+  * id : uuid <<PK>>
+  --
+  message_id : uuid <<FK>>
+  filename : text
+  url : text
+  mime_type : text
+  size_bytes : bigint
+}
+
 entity "reviews" as reviews {
   * id : uuid <<PK>>
   --
@@ -185,53 +252,223 @@ entity "reviews" as reviews {
   created_at : timestamptz
 }
 
+entity "payments" as payments {
+  * id : uuid <<PK>>
+  --
+  session_id : uuid <<FK>>
+  mentee_id : uuid <<FK>>
+  mentor_id : uuid <<FK>>
+  provider : text
+  payment_method : text  ' qr / card / cbr
+  amount_cents : int
+  platform_fee_cents : int
+  mentor_amount_cents : int
+  currency : text
+  status : text  ' pending / succeeded / failed / refunded
+  provider_payment_id : text
+  payment_deadline_at : timestamptz
+  paid_at : timestamptz
+  created_at : timestamptz
+}
+
+entity "refunds" as refunds {
+  * id : uuid <<PK>>
+  --
+  payment_id : uuid <<FK>>
+  amount_cents : int
+  reason : text
+  status : text  ' pending / succeeded / failed
+  created_at : timestamptz
+}
+
+entity "payout_accounts" as payout_accounts {
+  * id : uuid <<PK>>
+  --
+  mentor_id : uuid <<FK>>
+  provider : text
+  method : text  ' card / korona_pay / cbr
+  destination_token : text
+  is_active : bool
+  created_at : timestamptz
+}
+
+entity "payouts" as payouts {
+  * id : uuid <<PK>>
+  --
+  mentor_id : uuid <<FK>>
+  payout_account_id : uuid <<FK>>
+  amount_cents : int
+  currency : text
+  status : text  ' pending / processing / completed / failed
+  scheduled_at : timestamptz
+  created_at : timestamptz
+  paid_at : timestamptz
+}
+
+entity "platform_withdrawals" as platform_withdrawals {
+  * id : uuid <<PK>>
+  --
+  admin_id : uuid <<FK>>
+  amount_cents : int
+  currency : text
+  provider : text
+  status : text
+  created_at : timestamptz
+}
+
+entity "complaints" as complaints {
+  * id : uuid <<PK>>
+  --
+  author_id : uuid <<FK>>
+  target_user_id : uuid <<FK>>
+  target_session_id : uuid <<FK>>
+  assigned_admin_id : uuid <<FK>>
+  category : text
+  description : text
+  occurred_on : date
+  status : text  ' new / in_progress / resolved / rejected
+  resolution_comment : text
+  created_at : timestamptz
+  closed_at : timestamptz
+}
+
+entity "complaint_attachments" as complaint_attachments {
+  * id : uuid <<PK>>
+  --
+  complaint_id : uuid <<FK>>
+  url : text
+  mime_type : text
+  size_bytes : bigint
+}
+
+entity "complaint_messages" as complaint_messages {
+  * id : uuid <<PK>>
+  --
+  complaint_id : uuid <<FK>>
+  sender_id : uuid <<FK>>
+  body : text
+  created_at : timestamptz
+}
+
+entity "moderation_actions" as moderation_actions {
+  * id : uuid <<PK>>
+  --
+  admin_id : uuid <<FK>>
+  target_type : text  ' profile / review / message / document
+  target_id : uuid
+  action : text  ' hide / edit / delete / restore
+  reason : text
+  created_at : timestamptz
+}
+
+entity "user_blocks" as user_blocks {
+  * id : uuid <<PK>>
+  --
+  user_id : uuid <<FK>>
+  admin_id : uuid <<FK>>
+  status : text  ' blocked / unblocked
+  reason : text
+  created_at : timestamptz
+}
+
+entity "admin_audit_logs" as admin_audit_logs {
+  * id : uuid <<PK>>
+  --
+  admin_id : uuid <<FK>>
+  action : text
+  target_type : text
+  target_id : uuid
+  payload_json : jsonb
+  created_at : timestamptz
+}
+
 entity "notifications" as notifications {
   * id : uuid <<PK>>
   --
   user_id : uuid <<FK>>
   type : text
+  channel : text  ' in_app / email / push
   payload_json : jsonb
   created_at : timestamptz
   read_at : timestamptz
 }
 
-' ====== RELATIONSHIPS ======
+entity "notification_settings" as notification_settings {
+  * user_id : uuid <<PK, FK>>
+  --
+  email_enabled : bool
+  push_enabled : bool
+  session_reminder : bool
+  new_message : bool
+  marketing_enabled : bool
+  updated_at : timestamptz
+}
 
-users ||--o| mentor_profiles : "has"
-users ||--o| mentee_profiles : "has"
+' Relationships
 
-mentor_profiles ||--o{ mentor_topics : "maps"
-topics ||--o{ mentor_topics : "maps"
+users ||--o{ user_agreements : accepts
+users ||--o{ auth_recovery_tokens : owns
 
-users ||--o{ mentor_services : "mentor provides"
-users ||--o{ availability_rules : "mentor sets"
-users ||--o{ availability_exceptions : "mentor sets"
-users ||--o{ slots : "mentor owns"
+users ||--o| mentor_profiles : has
+users ||--o| mentee_profiles : has
+users ||--o{ mentor_regalia : uploads
+users ||--o{ mentor_regalia : reviews
 
-slots ||--o| sessions : "booked_for"
-mentor_services ||--o{ sessions : "chosen_service"
+mentor_profiles ||--o{ mentor_topics : maps
+topics ||--o{ mentor_topics : maps
 
-users ||--o{ sessions : "mentor"
-users ||--o{ sessions : "mentee"
+users ||--o{ mentor_services : offers
+users ||--o{ subscription_plans : offers
+subscription_plans ||--o{ mentee_subscriptions : subscribes_to
+users ||--o{ mentee_subscriptions : buys
 
-sessions ||--o{ payments : "paid_by"
-users ||--o{ payouts : "mentor receives"
+users ||--o{ availability_rules : defines
+users ||--o{ availability_exceptions : defines
+users ||--o{ slots : owns
 
-sessions ||--o| video_rooms : "has"
+mentor_services ||--o{ sessions : selected_service
+slots ||--o| sessions : reserved_slot
+mentee_subscriptions ||--o{ sessions : package_usage
+users ||--o{ sessions : mentor
+users ||--o{ sessions : mentee
 
-sessions ||--o{ session_notes : "notes"
-users ||--o{ session_notes : "writes"
+sessions ||--o| video_rooms : has
+sessions ||--o{ session_notes : has
+users ||--o{ session_notes : writes
 
-conversations ||--o{ messages : "contains"
-users ||--o{ messages : "sends"
-messages ||--o{ attachments : "has"
+sessions ||--o| conversations : chat_for
+conversations ||--o{ messages : contains
+users ||--o{ messages : sends
+messages ||--o{ attachments : has
 
-sessions ||--o| conversations : "chat_for"
+sessions ||--o| reviews : reviewed_by
+users ||--o{ reviews : writes
+users ||--o{ reviews : receives
 
-sessions ||--o| reviews : "review_for"
-users ||--o{ reviews : "mentee writes"
-users ||--o{ reviews : "mentor receives"
+sessions ||--o| payments : paid_by
+users ||--o{ payments : mentee_pays
+users ||--o{ payments : mentor_receives
+payments ||--o{ refunds : refunded_with
 
-users ||--o{ notifications : "gets"
+users ||--o{ payout_accounts : configures
+payout_accounts ||--o{ payouts : uses
+users ||--o{ payouts : receives
+users ||--o{ platform_withdrawals : executes
+
+users ||--o{ complaints : creates
+users ||--o{ complaints : targets
+sessions ||--o{ complaints : related_to
+users ||--o{ complaints : assigned_to
+complaints ||--o{ complaint_attachments : has
+complaints ||--o{ complaint_messages : thread
+users ||--o{ complaint_messages : writes
+
+users ||--o{ moderation_actions : performs
+users ||--o{ user_blocks : blocked_user
+users ||--o{ user_blocks : blocked_by
+users ||--o{ admin_audit_logs : logs
+
+users ||--o{ notifications : receives
+users ||--|| notification_settings : configures
 
 @enduml
