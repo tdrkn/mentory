@@ -142,8 +142,16 @@ pnpm docker:down
 - если CI зеленый, GitHub Actions подключается по SSH к серверу;
 - на сервере выполняется `scripts/deploy_prod.sh`:
   - `git pull` из `main`;
-  - `docker compose -f infra/docker-compose.prod.yml up -d --build --remove-orphans`;
-  - `cd apps/api && npx prisma migrate deploy`.
+  - сборка образов `api/web`, запуск `db/redis`;
+  - применение Prisma-схемы в one-off контейнере (`migrate deploy` или fallback `db push`);
+  - запуск `api/web/caddy`.
+
+Если на проде видите `Prisma P2022` (например нет `users.username`), выполните:
+
+```bash
+cd /opt/mentory
+bash scripts/deploy_prod.sh main
+```
 
 ### GitHub Secrets (Repository → Settings → Secrets and variables → Actions)
 

@@ -118,5 +118,8 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:4000/api/health || exit 1
 
-# Start application
-CMD ["node", "apps/api/dist/main.js"]
+# Start application:
+# 1) try migration history path (if/when prisma migrations appear),
+# 2) enforce schema sync for legacy environments without migrations,
+# 3) start API.
+CMD ["sh", "-c", "cd apps/api && ./node_modules/.bin/prisma migrate deploy || true; ./node_modules/.bin/prisma db push --skip-generate && node dist/main.js"]
