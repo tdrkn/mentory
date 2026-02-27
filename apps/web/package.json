@@ -12,19 +12,19 @@
   },
   "dependencies": {
     "@mentory/shared": "workspace:*",
-    "@sveltejs/kit": "^2.5.6",
     "@skeletonlabs/skeleton": "2.10.0",
+    "@sveltejs/kit": "^2.53.3",
     "@tanstack/svelte-query": "^5.62.1",
     "lucide-svelte": "^0.563.0",
     "socket.io-client": "^4.8.3",
-    "svelte": "^4.2.19",
+    "svelte": "^5.53.5",
     "sveltekit-superforms": "^2.29.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@skeletonlabs/tw-plugin": "0.4.1",
     "@sveltejs/adapter-node": "^5.5.2",
-    "@sveltejs/vite-plugin-svelte": "^3.1.2",
+    "@sveltejs/vite-plugin-svelte": "^4.0.4",
     "@types/node": "^22.10.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.41",
