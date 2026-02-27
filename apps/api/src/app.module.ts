@@ -14,6 +14,7 @@ import { BookingModule } from './modules/booking';
 import { PaymentsModule } from './modules/payments';
 import { ChatModule } from './modules/chat';
 import { NotificationsModule } from './modules/notifications';
+import { TrustModule } from './modules/trust';
 import { AdminBootstrapService } from './admin/admin-bootstrap.service';
 
 @Module({
@@ -22,6 +23,7 @@ import { AdminBootstrapService } from './admin/admin-bootstrap.service';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '../../.env',
+      expandVariables: true,
     }),
     PrismaModule,
 
@@ -35,6 +37,7 @@ import { AdminBootstrapService } from './admin/admin-bootstrap.service';
     PaymentsModule,
     ChatModule,
     NotificationsModule,
+    TrustModule,
   ],
   controllers: [HealthController],
   providers: [AdminBootstrapService],

@@ -1,7 +1,7 @@
 <script lang="ts">
   import AppHeader from '$lib/components/AppHeader.svelte';
   import Loading from '$lib/components/Loading.svelte';
-  import { api } from '$lib/api';
+  import { api, ApiError } from '$lib/api';
   import { connectSocket, disconnectSocket } from '$lib/socket';
   import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/stores';
@@ -10,11 +10,22 @@
   import type { Socket } from 'socket.io-client';
   import { Phone } from 'lucide-svelte';
 
+  type MessageType = 'text' | 'emoji' | 'image' | 'file';
+
+  interface MessageAttachment {
+    id?: string;
+    filename: string;
+    mimeType: string;
+    url: string;
+    size?: number;
+    sizeBytes?: number;
+  }
+
   interface Conversation {
     id: string;
     mentor: { id: string; fullName: string };
     mentee: { id: string; fullName: string };
-    lastMessage?: { content: string; createdAt: string; senderId: string } | null;
+    lastMessage?: { content: string; contentType?: MessageType; createdAt: string; senderId: string } | null;
     unreadCount: number;
     session?: { id: string; startAt: string; status: string } | null;
   }
@@ -23,18 +34,59 @@
     id: string;
     senderId: string;
     content: string;
+    contentType?: MessageType;
+    attachments?: MessageAttachment[];
     createdAt: string;
   }
+
+  type SendMessagePayload = {
+    content?: string;
+    contentType?: MessageType;
+    attachments?: Array<{ filename: string; mimeType: string; url: string; size: number }>;
+  };
+
+  const ALLOWED_CHAT_EMOJIS = ['😀', '😂', '😊', '😍', '👍', '👏', '🔥', '💡', '🎉', '🙏', '🤝', '❤️'];
+  const ALLOWED_DOCUMENT_EXTENSIONS = ['.pptx', '.pdf', '.txt', '.mvd'];
+  const MAX_ATTACHMENT_BYTES = 128 * 1024 * 1024;
 
   let conversations: Conversation[] = [];
   let activeConversation: string | null = null;
   let messages: Message[] = [];
   let newMessage = '';
+  let videoLink = '';
   let isLoading = true;
   let isSending = false;
   let socket: Socket | null = null;
   let typingUserId: string | null = null;
+  let composerError: string | null = null;
+  let composerNotice: string | null = null;
+  let imageFile: File | null = null;
+  let documentFile: File | null = null;
+  let imageInput: HTMLInputElement | null = null;
+  let documentInput: HTMLInputElement | null = null;
   let typingTimeout: any;
+
+  const extractApiError = (error: unknown, fallback: string) => {
+    if (error instanceof ApiError) {
+      if (typeof error.data?.message === 'string') return error.data.message;
+      if (Array.isArray(error.data?.message) && error.data.message.length > 0) return error.data.message[0];
+    }
+    return fallback;
+  };
+
+  const pushMessageIfMissing = (message: Message) => {
+    if (!messages.find((item) => item.id === message.id)) {
+      messages = [...messages, message];
+    }
+  };
+
+  const getMessagePreview = (message: Conversation['lastMessage']) => {
+    if (!message) return 'Без сообщений';
+    if (message.contentType === 'emoji') return message.content || 'Эмодзи';
+    if (message.contentType === 'image') return 'Фото';
+    if (message.contentType === 'file') return 'Документ';
+    return message.content || 'Сообщение';
+  };
 
   const loadConversations = async () => {
     conversations = await api.get<Conversation[]>('/conversations');
@@ -48,21 +100,194 @@
     conversations = conversations.map((c) => (c.id === activeConversation ? { ...c, unreadCount: 0 } : c));
   };
 
-  const handleSend = async () => {
-    if (!newMessage.trim() || !activeConversation || isSending) return;
-    if (newMessage.length > 1000) return;
+  const sendPayload = async (payload: SendMessagePayload) => {
+    if (!activeConversation || isSending) return false;
     isSending = true;
-    const text = newMessage;
-    newMessage = '';
+    composerError = null;
 
     try {
-      const message = await api.post<Message>(`/chat/${activeConversation}/messages`, { content: text });
-      if (!messages.find((m) => m.id === message.id)) {
-        messages = [...messages, message];
-      }
+      const message = await api.post<Message>(`/chat/${activeConversation}/messages`, payload);
+      pushMessageIfMissing(message);
+      return true;
+    } catch (error) {
+      composerError = extractApiError(error, 'Не удалось отправить сообщение.');
+      return false;
     } finally {
       isSending = false;
     }
+  };
+
+  const handleSend = async () => {
+    const text = newMessage.trim();
+    if (!text || !activeConversation || isSending) return;
+    if (text.length > 1000) {
+      composerError = 'Превышен лимит 1000 символов.';
+      return;
+    }
+
+    const sent = await sendPayload({ content: text, contentType: 'text' });
+    if (sent) {
+      newMessage = '';
+      emitTyping(false);
+      composerNotice = null;
+    }
+  };
+
+  const handleSendEmoji = async (emoji: string) => {
+    composerNotice = null;
+    await sendPayload({ content: emoji, contentType: 'emoji' });
+  };
+
+  const fileToDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+          return;
+        }
+        reject(new Error('Не удалось прочитать файл'));
+      };
+      reader.onerror = () => reject(new Error('Не удалось прочитать файл'));
+      reader.readAsDataURL(file);
+    });
+
+  const getFileExtension = (filename: string) => {
+    const dot = filename.lastIndexOf('.');
+    if (dot < 0) return '';
+    return filename.slice(dot).toLowerCase();
+  };
+
+  const validateAttachmentSize = (file: File) => {
+    if (file.size < 1 || file.size > MAX_ATTACHMENT_BYTES) {
+      composerError = 'Размер файла должен быть от 1 байта до 128MB.';
+      return false;
+    }
+    return true;
+  };
+
+  const resetImageSelection = () => {
+    imageFile = null;
+    if (imageInput) imageInput.value = '';
+  };
+
+  const resetDocumentSelection = () => {
+    documentFile = null;
+    if (documentInput) documentInput.value = '';
+  };
+
+  const handleImageFileChange = (event: Event) => {
+    const target = event.currentTarget as HTMLInputElement;
+    imageFile = target.files?.[0] || null;
+    composerError = null;
+    composerNotice = null;
+  };
+
+  const handleDocumentFileChange = (event: Event) => {
+    const target = event.currentTarget as HTMLInputElement;
+    documentFile = target.files?.[0] || null;
+    composerError = null;
+    composerNotice = null;
+  };
+
+  const handleSendImage = async () => {
+    if (!imageFile) {
+      composerError = 'Выберите изображение.';
+      return;
+    }
+    if (!imageFile.type.toLowerCase().startsWith('image/')) {
+      composerError = 'Допустимы только изображения.';
+      return;
+    }
+    if (!validateAttachmentSize(imageFile)) return;
+
+    composerNotice = null;
+    try {
+      const dataUrl = await fileToDataUrl(imageFile);
+      const sent = await sendPayload({
+        contentType: 'image',
+        attachments: [
+          {
+            filename: imageFile.name,
+            mimeType: imageFile.type || 'image/png',
+            url: dataUrl,
+            size: imageFile.size,
+          },
+        ],
+      });
+      if (sent) {
+        composerNotice = 'Фото отправлено.';
+        resetImageSelection();
+      }
+    } catch {
+      composerError = 'Не удалось обработать изображение.';
+    }
+  };
+
+  const handleSendDocument = async () => {
+    if (!documentFile) {
+      composerError = 'Выберите документ.';
+      return;
+    }
+    if (!validateAttachmentSize(documentFile)) return;
+
+    const extension = getFileExtension(documentFile.name);
+    if (!ALLOWED_DOCUMENT_EXTENSIONS.includes(extension)) {
+      composerError = 'Допустимые форматы: .pptx, .pdf, .txt, .mvd.';
+      return;
+    }
+
+    composerNotice = null;
+    try {
+      const dataUrl = await fileToDataUrl(documentFile);
+      const sent = await sendPayload({
+        contentType: 'file',
+        attachments: [
+          {
+            filename: documentFile.name,
+            mimeType: documentFile.type || 'application/octet-stream',
+            url: dataUrl,
+            size: documentFile.size,
+          },
+        ],
+      });
+      if (sent) {
+        composerNotice = 'Документ отправлен.';
+        resetDocumentSelection();
+      }
+    } catch {
+      composerError = 'Не удалось обработать документ.';
+    }
+  };
+
+  const handleSendVideoLink = async () => {
+    const candidate = videoLink.trim();
+    if (!candidate) {
+      composerError = 'Укажите ссылку на видеовстречу.';
+      return;
+    }
+
+    try {
+      const parsed = new URL(candidate);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        composerError = 'Ссылка должна начинаться с http:// или https://.';
+        return;
+      }
+    } catch {
+      composerError = 'Некорректная ссылка на видеовстречу.';
+      return;
+    }
+
+    const sent = await sendPayload({ content: candidate, contentType: 'text' });
+    if (sent) {
+      videoLink = '';
+      composerNotice = 'Ссылка на видеовстречу отправлена в чат.';
+    }
+  };
+
+  const getFirstHttpLink = (content: string) => {
+    const match = content.match(/https?:\/\/[^\s]+/i);
+    return match ? match[0] : null;
   };
 
   const ensureSocket = () => {
@@ -82,9 +307,7 @@
         c.id === conversationId ? { ...c, lastMessage: message, unreadCount: c.unreadCount + 1 } : c,
       );
       if (conversationId === activeConversation) {
-        if (!messages.find((m) => m.id === message.id)) {
-          messages = [...messages, message];
-        }
+        pushMessageIfMissing(message);
         socket?.emit('mark_read', { conversationId });
         conversations = conversations.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c));
       }
@@ -170,7 +393,6 @@
   };
 
   $: activeConversationData = conversations.find((conv) => conv.id === activeConversation) || null;
-  $: remainingChars = 1000 - newMessage.length;
 </script>
 
 <div class="page">
@@ -195,6 +417,8 @@
                   on:click={() => {
                     activeConversation = conv.id;
                     typingUserId = null;
+                    composerError = null;
+                    composerNotice = null;
                     loadMessages();
                     ensureSocket();
                     socket?.emit('join_conversation', { conversationId: conv.id });
@@ -207,7 +431,7 @@
                     {/if}
                   </div>
                   <div class="muted" style="margin-top:4px;font-size:0.85rem;">
-                    {conv.lastMessage?.content || 'Без сообщений'}
+                    {getMessagePreview(conv.lastMessage)}
                   </div>
                 </button>
               {/each}
@@ -244,7 +468,53 @@
                 <div style={`display:flex;justify-content:${msg.senderId === $user?.id ? 'flex-end' : 'flex-start'};`}>
                   <div class="surface" style={`max-width:70%;${msg.senderId === $user?.id ? 'background:var(--accent);color:#fff;' : ''}`}
                     >
-                    <div>{msg.content}</div>
+                    {#if msg.contentType === 'image' && msg.attachments && msg.attachments.length > 0}
+                      <div class="stack-sm">
+                        {#each msg.attachments as attachment}
+                          <a href={attachment.url} target="_blank" rel="noreferrer">
+                            <img
+                              src={attachment.url}
+                              alt={attachment.filename}
+                              style="max-width:220px;max-height:220px;display:block;border-radius:8px;object-fit:cover;"
+                            />
+                          </a>
+                        {/each}
+                      </div>
+                      {#if msg.content}
+                        <div style="margin-top:6px;">{msg.content}</div>
+                      {/if}
+                    {:else if msg.contentType === 'file' && msg.attachments && msg.attachments.length > 0}
+                      {#if msg.content}
+                        <div>{msg.content}</div>
+                      {/if}
+                      <div class="stack-sm" style="margin-top:6px;">
+                        {#each msg.attachments as attachment}
+                          <a
+                            href={attachment.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            download={attachment.filename}
+                            style={`text-decoration:underline;word-break:break-all;${msg.senderId === $user?.id ? 'color:#fff;' : 'color:var(--accent);'}`}
+                          >
+                            {attachment.filename}
+                          </a>
+                        {/each}
+                      </div>
+                    {:else}
+                      <div style={msg.contentType === 'emoji' ? 'font-size:1.8rem;line-height:1.1;' : ''}>{msg.content}</div>
+                      {#if getFirstHttpLink(msg.content)}
+                        <div style="margin-top:6px;">
+                          <a
+                            href={getFirstHttpLink(msg.content)}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={`text-decoration:underline;word-break:break-all;${msg.senderId === $user?.id ? 'color:#fff;' : 'color:var(--accent);'}`}
+                          >
+                            Открыть ссылку
+                          </a>
+                        </div>
+                      {/if}
+                    {/if}
                     <div style="font-size:0.75rem;opacity:0.7;margin-top:4px;">
                       {new Date(msg.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                     </div>
@@ -272,8 +542,67 @@
             <div class="muted" style="font-size:0.8rem;margin-top:6px;text-align:right;">
               {newMessage.length}/1000
             </div>
-            {#if remainingChars < 0}
-              <div class="muted" style="font-size:0.8rem;color:#dc2626;">Превышен лимит 1000 символов.</div>
+            <details class="surface" style="margin-top:10px;">
+              <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;font-weight:600;">
+                Инструменты чата
+                <span class="muted" style="font-size:0.78rem;font-weight:500;">Эмодзи, фото, документы, ВКС</span>
+              </summary>
+
+              <div style="display:grid;gap:10px;margin-top:10px;">
+                <div>
+                  <div class="muted" style="font-size:0.8rem;margin-bottom:8px;">Эмодзи</div>
+                  <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                    {#each ALLOWED_CHAT_EMOJIS as emoji}
+                      <button class="btn btn-ghost btn-sm" on:click={() => handleSendEmoji(emoji)} disabled={isSending}>
+                        {emoji}
+                      </button>
+                    {/each}
+                  </div>
+                </div>
+
+                <div>
+                  <div class="muted" style="font-size:0.8rem;margin-bottom:8px;">Фото (JPG/PNG и другие image/*)</div>
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+                    <input bind:this={imageInput} type="file" accept="image/*" on:change={handleImageFileChange} />
+                    <button class="btn btn-outline btn-sm" on:click={handleSendImage} disabled={isSending || !imageFile}>
+                      Отправить фото
+                    </button>
+                    {#if imageFile}
+                      <span class="muted" style="font-size:0.8rem;word-break:break-all;">{imageFile.name}</span>
+                    {/if}
+                  </div>
+                </div>
+
+                <div>
+                  <div class="muted" style="font-size:0.8rem;margin-bottom:8px;">Документ (.pptx, .pdf, .txt, .mvd)</div>
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+                    <input bind:this={documentInput} type="file" accept=".pptx,.pdf,.txt,.mvd" on:change={handleDocumentFileChange} />
+                    <button class="btn btn-outline btn-sm" on:click={handleSendDocument} disabled={isSending || !documentFile}>
+                      Отправить документ
+                    </button>
+                    {#if documentFile}
+                      <span class="muted" style="font-size:0.8rem;word-break:break-all;">{documentFile.name}</span>
+                    {/if}
+                  </div>
+                </div>
+
+                <div>
+                  <div class="muted" style="font-size:0.8rem;margin-bottom:8px;">Ссылка на видеовстречу</div>
+                  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <input class="input" bind:value={videoLink} placeholder="https://zoom.us/..." />
+                    <button class="btn btn-outline btn-sm" on:click={handleSendVideoLink} disabled={isSending || !videoLink.trim()}>
+                      Отправить ссылку
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            {#if composerNotice}
+              <div class="muted" style="font-size:0.8rem;color:#166534;margin-top:8px;">{composerNotice}</div>
+            {/if}
+            {#if composerError}
+              <div class="muted" style="font-size:0.8rem;color:#dc2626;margin-top:8px;">{composerError}</div>
             {/if}
           {/if}
         </section>

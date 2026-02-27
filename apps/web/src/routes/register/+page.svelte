@@ -7,7 +7,8 @@
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
   import { registerSchema, type RegisterForm } from '$lib/validators/auth';
-  import { User, Mail, Lock, ArrowRight, Sparkles, Search, BookOpen } from 'lucide-svelte';
+  import BrandLogo from '$lib/components/BrandLogo.svelte';
+  import { User, Mail, Lock, ArrowRight, Search, BookOpen, AtSign } from 'lucide-svelte';
 
   export let data;
 
@@ -41,7 +42,14 @@
     }
     submitting = true;
     try {
-      const result = await register($formData.email, $formData.password, $formData.fullName, $formData.role);
+      const result = await register(
+        $formData.email,
+        $formData.username,
+        $formData.password,
+        $formData.fullName,
+        $formData.role,
+        $formData.termsAccepted,
+      );
 
       if (result.requiresEmailVerification) {
         goto(`/login?verifyEmail=${encodeURIComponent(result.user.email)}`);
@@ -66,7 +74,7 @@
     <div class="auth-card reveal">
       <div class="auth-header">
         <div class="auth-logo">
-          <Sparkles size={24} />
+          <BrandLogo href="/" height={34} />
         </div>
         <h1 class="auth-title">Создать аккаунт</h1>
         <p class="auth-subtitle">Начните свой путь к новым знаниям</p>
@@ -109,6 +117,22 @@
           </div>
           {#if $errors.email}
             <span class="form-error">{errorMessage($errors.email)}</span>
+          {/if}
+        </div>
+
+        <div class="form-group">
+          <label class="label" for="username">Логин</label>
+          <div class="input-with-icon">
+            <AtSign size={18} />
+            <input
+              id="username"
+              class="input"
+              bind:value={$formData.username}
+              placeholder="username"
+            />
+          </div>
+          {#if $errors.username}
+            <span class="form-error">{errorMessage($errors.username)}</span>
           {/if}
         </div>
 
@@ -178,10 +202,18 @@
           </div>
         </div>
 
-        <p class="terms-group muted">
-          Создавая аккаунт, вы автоматически соглашаетесь с{' '}
-          <a href="/terms" class="auth-link">пользовательским соглашением</a>.
-        </p>
+        <div class="terms-group">
+          <label class="terms-checkbox">
+            <input type="checkbox" bind:checked={$formData.termsAccepted} />
+            <span>
+              Я принимаю{' '}
+              <a href="/terms" class="auth-link">пользовательское соглашение</a>
+            </span>
+          </label>
+          {#if $errors.termsAccepted}
+            <span class="form-error">{errorMessage($errors.termsAccepted)}</span>
+          {/if}
+        </div>
 
         <button class="btn btn-primary btn-lg auth-submit" type="submit" disabled={submitting}>
           {submitting ? 'Регистрация...' : 'Создать аккаунт'}
@@ -223,15 +255,10 @@
   }
 
   .auth-logo {
-    width: 56px;
-    height: 56px;
-    background: linear-gradient(135deg, var(--accent) 0%, var(--violet) 100%);
-    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
-    margin: 0 auto 20px;
+    margin: 0 auto 14px;
   }
 
   .auth-title {
@@ -273,9 +300,28 @@
   }
 
   .terms-group {
-    margin-top: -4px;
+    margin-top: -2px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .terms-checkbox {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: var(--muted);
     font-size: 0.92rem;
-    line-height: 1.4;
+    line-height: 1.45;
+    cursor: pointer;
+  }
+
+  .terms-checkbox input {
+    margin-top: 2px;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--brand-primary);
+    cursor: pointer;
   }
 
   .role-selector {

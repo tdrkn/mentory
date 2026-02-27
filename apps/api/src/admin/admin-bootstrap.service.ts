@@ -44,6 +44,7 @@ export class AdminBootstrapService implements OnModuleInit {
     await this.prisma.user.create({
       data: {
         email,
+        username: 'admin',
         passwordHash,
         fullName: 'Admin',
         role: 'admin',

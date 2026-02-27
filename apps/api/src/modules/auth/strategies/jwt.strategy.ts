@@ -29,13 +29,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       select: {
         id: true,
         email: true,
+        username: true,
         fullName: true,
         role: true,
+        isBlocked: true,
       },
     });
 
     if (!user) {
       throw new UnauthorizedException();
+    }
+
+    if (user.isBlocked) {
+      throw new UnauthorizedException('Account is blocked');
     }
 
     return user;

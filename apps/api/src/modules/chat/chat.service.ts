@@ -20,6 +20,26 @@ const ALLOWED_CHAT_EMOJIS = new Set([
   '❤️',
 ]);
 
+type MessageWithAttachments = {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  content: string;
+  contentType: string;
+  isRead: boolean;
+  createdAt: Date;
+  readAt: Date | null;
+  sender?: { id: string; fullName: string; avatarUrl: string | null };
+  attachments?: Array<{
+    id: string;
+    messageId: string;
+    filename: string;
+    url: string;
+    mimeType: string;
+    sizeBytes: bigint | number;
+  }>;
+};
+
 @Injectable()
 export class ChatService {
   private chatGateway: ChatGateway | null = null;
@@ -185,7 +205,7 @@ export class ChatService {
       take: limit,
     });
 
-    return messages.reverse(); // Return in chronological order
+    return messages.reverse().map((message) => this.serializeMessageForClient(message));
   }
 
   async sendMessage(userId: string, conversationId: string, dto: SendMessageDto) {
@@ -238,19 +258,19 @@ export class ChatService {
       return msg;
     });
 
+    const fullMessage = await this.prisma.message.findUnique({
+      where: { id: message.id },
+      include: {
+        sender: { select: { id: true, fullName: true, avatarUrl: true } },
+        attachments: true,
+      },
+    });
+    const serializedMessage = fullMessage ? this.serializeMessageForClient(fullMessage) : null;
+
     // Push message via WebSocket
-    if (this.chatGateway) {
-      // Get full message with attachments
-      const fullMessage = await this.prisma.message.findUnique({
-        where: { id: message.id },
-        include: {
-          sender: { select: { id: true, fullName: true, avatarUrl: true } },
-          attachments: true,
-        },
-      });
-      
-      this.chatGateway.pushNewMessage(conversationId, fullMessage);
-      
+    if (this.chatGateway && serializedMessage) {
+      this.chatGateway.pushNewMessage(conversationId, serializedMessage);
+
       // Notify recipient if offline
       const recipientId = conversation.mentorId === userId 
         ? conversation.menteeId 
@@ -259,7 +279,18 @@ export class ChatService {
       // TODO: Queue notification for email if recipient is offline
     }
 
-    return message;
+    return serializedMessage ?? message;
+  }
+
+  private serializeMessageForClient(message: MessageWithAttachments) {
+    return {
+      ...message,
+      attachments: (message.attachments || []).map((attachment) => ({
+        ...attachment,
+        sizeBytes: Number(attachment.sizeBytes),
+        size: Number(attachment.sizeBytes),
+      })),
+    };
   }
 
   private validateAndNormalizeMessage(dto: SendMessageDto) {

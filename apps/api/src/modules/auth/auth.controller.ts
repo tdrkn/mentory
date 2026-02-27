@@ -27,14 +27,14 @@ export class AuthController {
 
   /**
    * POST /api/auth/login
-   * Login with email/password
+   * Login with username or email + password
    * Access: Public
    */
   @Public()
   @UseGuards(LocalAuthGuard)
   @Post('login')
   async login(@Body() dto: LoginDto, @Request() req: any) {
-    return this.authService.login(req.user);
+    return this.authService.login(req.user, req.ip);
   }
 
   /**

@@ -1,8 +1,26 @@
-import { IsEmail, IsString, MinLength, IsIn, IsOptional, Matches } from 'class-validator';
+import {
+  Equals,
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
   email: string;
+
+  @IsString()
+  @MinLength(3)
+  @MaxLength(40)
+  @Matches(/^[a-zA-Z]+$/, {
+    message: 'Username must contain only latin letters',
+  })
+  username: string;
 
   @IsString()
   @MinLength(8)
@@ -21,4 +39,10 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   timezone?: string;
+
+  @IsBoolean()
+  @Equals(true, {
+    message: 'Необходимо принять пользовательское соглашение',
+  })
+  termsAccepted: boolean;
 }

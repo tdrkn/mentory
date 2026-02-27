@@ -34,6 +34,14 @@ async function main() {
 
   // Clean existing data
   console.log('🧹 Cleaning existing data...');
+  await prisma.platformWithdrawal.deleteMany();
+  await prisma.adminAuditLog.deleteMany();
+  await prisma.userBlock.deleteMany();
+  await prisma.moderationAction.deleteMany();
+  await prisma.mentorRegalia.deleteMany();
+  await prisma.complaintMessage.deleteMany();
+  await prisma.complaint.deleteMany();
+  await prisma.userAgreement.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.review.deleteMany();
   await prisma.attachment.deleteMany();
@@ -79,6 +87,7 @@ async function main() {
   const mentor1 = await prisma.user.create({
     data: {
       email: 'alex.mentor@example.com',
+      username: 'alex_mentor',
       passwordHash,
       fullName: 'Алексей Петров',
       timezone: 'Europe/Moscow',
@@ -102,6 +111,7 @@ async function main() {
   const mentor2 = await prisma.user.create({
     data: {
       email: 'maria.mentor@example.com',
+      username: 'maria_mentor',
       passwordHash,
       fullName: 'Мария Иванова',
       timezone: 'Europe/Moscow',
@@ -132,6 +142,7 @@ async function main() {
   const mentee1 = await prisma.user.create({
     data: {
       email: 'ivan.mentee@example.com',
+      username: 'ivan_mentee',
       passwordHash,
       fullName: 'Иван Сидоров',
       timezone: 'Europe/Moscow',
@@ -151,6 +162,7 @@ async function main() {
   const mentee2 = await prisma.user.create({
     data: {
       email: 'anna.mentee@example.com',
+      username: 'anna_mentee',
       passwordHash,
       fullName: 'Анна Козлова',
       timezone: 'Europe/Moscow',
@@ -168,6 +180,14 @@ async function main() {
   });
 
   console.log(`   Created mentees: ${mentee1.fullName}, ${mentee2.fullName}`);
+
+  await prisma.userAgreement.createMany({
+    data: [mentor1.id, mentor2.id, mentee1.id, mentee2.id].map((userId) => ({
+      userId,
+      documentType: 'terms',
+      documentVersion: '1.0',
+    })),
+  });
 
   // ============================================
   // Assign Topics to Mentors

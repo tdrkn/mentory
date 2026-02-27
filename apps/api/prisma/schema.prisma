@@ -72,36 +72,56 @@ enum NotificationType {
 // ============================================
 
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  fullName     String   @map("full_name")
-  avatarUrl    String?  @map("avatar_url")
-  timezone     String   @default("UTC")
-  role         UserRole @default(mentee)
-  isEmailVerified Boolean @default(false) @map("is_email_verified")
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique
+  username        String?   @unique
+  passwordHash    String    @map("password_hash")
+  fullName        String    @map("full_name")
+  avatarUrl       String?   @map("avatar_url")
+  timezone        String    @default("UTC")
+  role            UserRole  @default(mentee)
+  isBlocked       Boolean   @default(false) @map("is_blocked")
+  blockedAt       DateTime? @map("blocked_at") @db.Timestamptz
+  blockedReason   String?   @map("blocked_reason")
+  isEmailVerified Boolean   @default(false) @map("is_email_verified")
   emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  failedLoginAttempts Int      @default(0) @map("failed_login_attempts")
+  loginLockedUntil    DateTime? @map("login_locked_until") @db.Timestamptz
+  lastLoginAt         DateTime? @map("last_login_at") @db.Timestamptz
+  lastLoginIp         String?   @map("last_login_ip")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
-  mentorProfile   MentorProfile?
-  menteeProfile   MenteeProfile?
-  mentorServices  MentorService[]
-  availabilityRules AvailabilityRule[]
+  mentorProfile          MentorProfile?
+  menteeProfile          MenteeProfile?
+  mentorServices         MentorService[]
+  availabilityRules      AvailabilityRule[]
   availabilityExceptions AvailabilityException[]
-  slots           Slot[]
-  sessionsAsMentor Session[] @relation("MentorSessions")
-  sessionsAsMentee Session[] @relation("MenteeSessions")
-  payouts         Payout[]   @relation("MentorPayouts")
-  paymentsAsMentor Payment[] @relation("MentorPayments")
-  paymentsAsMentee Payment[] @relation("MenteePayments")
-  sessionNotes    SessionNote[]
-  reviewsGiven    Review[] @relation("ReviewsByMentee")
-  reviewsReceived Review[] @relation("ReviewsForMentor")
-  conversationsAsMentor Conversation[] @relation("MentorConversations")
-  conversationsAsMentee Conversation[] @relation("MenteeConversations")
-  messages        Message[]
-  notifications   Notification[]
+  slots                  Slot[]
+  sessionsAsMentor       Session[]               @relation("MentorSessions")
+  sessionsAsMentee       Session[]               @relation("MenteeSessions")
+  payouts                Payout[]                @relation("MentorPayouts")
+  paymentsAsMentor       Payment[]               @relation("MentorPayments")
+  paymentsAsMentee       Payment[]               @relation("MenteePayments")
+  sessionNotes           SessionNote[]
+  reviewsGiven           Review[]                @relation("ReviewsByMentee")
+  reviewsReceived        Review[]                @relation("ReviewsForMentor")
+  conversationsAsMentor  Conversation[]          @relation("MentorConversations")
+  conversationsAsMentee  Conversation[]          @relation("MenteeConversations")
+  messages               Message[]
+  notifications          Notification[]
+  agreements             UserAgreement[]
+  complaintsAuthored     Complaint[]             @relation("ComplaintAuthor")
+  complaintsTargeted     Complaint[]             @relation("ComplaintTargetUser")
+  complaintsAssigned     Complaint[]             @relation("ComplaintAssignedAdmin")
+  complaintMessages      ComplaintMessage[]
+  regaliaUploaded        MentorRegalia[]         @relation("RegaliaUploadedByMentor")
+  regaliaReviewed        MentorRegalia[]         @relation("RegaliaReviewedByAdmin")
+  moderationActions      ModerationAction[]      @relation("ModerationActionsByAdmin")
+  userBlocksTarget       UserBlock[]             @relation("BlockedUser")
+  userBlocksByAdmin      UserBlock[]             @relation("BlockedByAdmin")
+  adminAuditLogs         AdminAuditLog[]         @relation("AdminAuditBy")
+  platformWithdrawals    PlatformWithdrawal[]    @relation("PlatformWithdrawnBy")
 
   @@map("users")
 }
@@ -119,6 +139,7 @@ model MentorProfile {
   bio             String?
   languages       String[] @default([])
   timezone        String   @default("UTC")
+  verificationStatus String @default("unverified") @map("verification_status")
   isActive        Boolean  @default(false) @map("is_active")
   ratingAvg       Decimal  @default(0) @map("rating_avg") @db.Decimal(3, 2)
   ratingCount     Int      @default(0) @map("rating_count")
@@ -132,16 +153,16 @@ model MentorProfile {
 }
 
 model MenteeProfile {
-  userId     String   @id @map("user_id") @db.Uuid
-  age        Int?
-  education  String?
-  workplace  String?
-  background String?
-  goals      String[] @default([])
-  hobbies    String[] @default([])
+  userId       String   @id @map("user_id") @db.Uuid
+  age          Int?
+  education    String?
+  workplace    String?
+  background   String?
+  goals        String[] @default([])
+  hobbies      String[] @default([])
   certificates String[] @default([])
-  skills     String[] @default([])
-  interests  String[] @default([])
+  skills       String[] @default([])
+  interests    String[] @default([])
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -214,10 +235,10 @@ model AvailabilityRule {
 }
 
 model AvailabilityException {
-  id          String  @id @default(uuid()) @db.Uuid
-  mentorId    String  @map("mentor_id") @db.Uuid
+  id          String   @id @default(uuid()) @db.Uuid
+  mentorId    String   @map("mentor_id") @db.Uuid
   date        DateTime @db.Date
-  isAvailable Boolean @default(false) @map("is_available")
+  isAvailable Boolean  @default(false) @map("is_available")
   note        String?
 
   // Relations
@@ -275,6 +296,7 @@ model Session {
   notes        SessionNote[]
   review       Review?
   conversation Conversation?
+  complaints   Complaint[]
 
   @@index([mentorId])
   @@index([menteeId])
@@ -295,7 +317,7 @@ model Payment {
   menteeId          String?       @map("mentee_id") @db.Uuid
   mentorId          String?       @map("mentor_id") @db.Uuid
   provider          String        @default("stripe")
-  amount            Int           // Amount in cents
+  amount            Int // Amount in cents
   platformFee       Int?          @map("platform_fee")
   mentorAmount      Int?          @map("mentor_amount")
   currency          String        @db.VarChar(3)
@@ -375,14 +397,14 @@ model SessionNote {
 // ============================================
 
 model Conversation {
-  id              String    @id @default(uuid()) @db.Uuid
-  mentorId        String    @map("mentor_id") @db.Uuid
-  menteeId        String    @map("mentee_id") @db.Uuid
-  sessionId       String?   @unique @map("session_id") @db.Uuid
-  lastReadMentor  DateTime? @map("last_read_mentor") @db.Timestamptz
-  lastReadMentee  DateTime? @map("last_read_mentee") @db.Timestamptz
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  id             String    @id @default(uuid()) @db.Uuid
+  mentorId       String    @map("mentor_id") @db.Uuid
+  menteeId       String    @map("mentee_id") @db.Uuid
+  sessionId      String?   @unique @map("session_id") @db.Uuid
+  lastReadMentor DateTime? @map("last_read_mentor") @db.Timestamptz
+  lastReadMentee DateTime? @map("last_read_mentee") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   mentor   User      @relation("MentorConversations", fields: [mentorId], references: [id], onDelete: Cascade)
@@ -450,10 +472,10 @@ model Review {
   mentee  User    @relation("ReviewsByMentee", fields: [menteeId], references: [id], onDelete: Cascade)
   mentor  User    @relation("ReviewsForMentor", fields: [mentorId], references: [id], onDelete: Cascade)
 
+  @@unique([menteeId, mentorId])
   @@index([mentorId])
   @@index([menteeId])
   @@index([rating])
-  @@unique([menteeId, mentorId])
   @@map("reviews")
 }
 
@@ -475,4 +497,172 @@ model Notification {
   @@index([userId, readAt])
   @@index([createdAt])
   @@map("notifications")
+}
+
+model UserAgreement {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  documentType    String   @map("document_type")
+  documentVersion String   @default("1.0") @map("document_version")
+  acceptedAt      DateTime @default(now()) @map("accepted_at") @db.Timestamptz
+  ipAddress       String?  @map("ip_address")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([documentType])
+  @@map("user_agreements")
+}
+
+model Complaint {
+  id                String    @id @default(uuid()) @db.Uuid
+  authorId          String    @map("author_id") @db.Uuid
+  targetUserId      String?   @map("target_user_id") @db.Uuid
+  targetSessionId   String?   @map("target_session_id") @db.Uuid
+  assignedAdminId   String?   @map("assigned_admin_id") @db.Uuid
+  category          String
+  occurredAt        DateTime? @map("occurred_at") @db.Timestamptz
+  description       String
+  status            String    @default("new")
+  resolutionComment String?   @map("resolution_comment")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  closedAt          DateTime? @map("closed_at") @db.Timestamptz
+
+  // Relations
+  author        User               @relation("ComplaintAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  targetUser    User?              @relation("ComplaintTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  targetSession Session?           @relation(fields: [targetSessionId], references: [id], onDelete: SetNull)
+  assignedAdmin User?              @relation("ComplaintAssignedAdmin", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  messages      ComplaintMessage[]
+  attachments   ComplaintAttachment[]
+
+  @@index([authorId])
+  @@index([targetUserId])
+  @@index([targetSessionId])
+  @@index([assignedAdminId])
+  @@index([status])
+  @@map("complaints")
+}
+
+model ComplaintMessage {
+  id          String   @id @default(uuid()) @db.Uuid
+  complaintId String   @map("complaint_id") @db.Uuid
+  senderId    String   @map("sender_id") @db.Uuid
+  body        String
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  sender    User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([complaintId, createdAt])
+  @@index([senderId])
+  @@map("complaint_messages")
+}
+
+model ComplaintAttachment {
+  id          String   @id @default(uuid()) @db.Uuid
+  complaintId String   @map("complaint_id") @db.Uuid
+  fileName    String   @map("file_name")
+  fileUrl     String   @map("file_url")
+  mimeType    String   @map("mime_type")
+  sizeBytes   BigInt   @map("size_bytes")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+
+  @@index([complaintId])
+  @@map("complaint_attachments")
+}
+
+model MentorRegalia {
+  id              String    @id @default(uuid()) @db.Uuid
+  mentorId        String    @map("mentor_id") @db.Uuid
+  fileUrl         String    @map("file_url")
+  fileName        String    @map("file_name")
+  mimeType        String?   @map("mime_type")
+  sizeBytes       BigInt?   @map("size_bytes")
+  status          String    @default("pending")
+  rejectionReason String?   @map("rejection_reason")
+  reviewedById    String?   @map("reviewed_by") @db.Uuid
+  reviewedAt      DateTime? @map("reviewed_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  mentor     User  @relation("RegaliaUploadedByMentor", fields: [mentorId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("RegaliaReviewedByAdmin", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([mentorId])
+  @@index([status])
+  @@index([reviewedById])
+  @@map("mentor_regalia")
+}
+
+model ModerationAction {
+  id         String   @id @default(uuid()) @db.Uuid
+  adminId    String   @map("admin_id") @db.Uuid
+  targetType String   @map("target_type")
+  targetId   String   @map("target_id") @db.Uuid
+  action     String
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  admin User @relation("ModerationActionsByAdmin", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId, createdAt])
+  @@index([targetType, targetId])
+  @@map("moderation_actions")
+}
+
+model UserBlock {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  adminId   String   @map("admin_id") @db.Uuid
+  status    String   @default("blocked")
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  user  User @relation("BlockedUser", fields: [userId], references: [id], onDelete: Cascade)
+  admin User @relation("BlockedByAdmin", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([adminId, createdAt])
+  @@map("user_blocks")
+}
+
+model AdminAuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  adminId     String   @map("admin_id") @db.Uuid
+  action      String
+  targetType  String   @map("target_type")
+  targetId    String?  @map("target_id") @db.Uuid
+  payloadJson Json?    @map("payload_json")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  admin User @relation("AdminAuditBy", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId, createdAt])
+  @@index([targetType, targetId])
+  @@map("admin_audit_logs")
+}
+
+model PlatformWithdrawal {
+  id        String   @id @default(uuid()) @db.Uuid
+  adminId   String   @map("admin_id") @db.Uuid
+  amount    Int
+  currency  String   @db.VarChar(3)
+  provider  String
+  status    String   @default("pending")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  admin User @relation("PlatformWithdrawnBy", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId, createdAt])
+  @@map("platform_withdrawals")
 }

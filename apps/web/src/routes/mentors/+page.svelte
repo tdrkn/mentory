@@ -129,7 +129,7 @@
     <!-- Hero section -->
     <div class="mentors-hero reveal">
       <h1 class="section-title" style="font-size:2.25rem;">Найдите идеального ментора</h1>
-      <p class="section-subtitle" style="max-width:560px;">
+      <p class="section-subtitle" style="max-width:560px;margin:0 auto 32px;">
         Более {total > 0 ? total : '100'} экспертов готовы помочь вам с карьерой, навыками и профессиональным ростом.
       </p>
 
@@ -329,6 +329,12 @@
 
 <style>
   .mentors-hero {
+    width: 100%;
+    max-width: 920px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
     padding: 40px 0 32px;
   }

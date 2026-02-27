@@ -7,3 +7,4 @@ export * from './sessions';
 export * from './payments';
 export * from './chat';
 export * from './notifications';
+export * from './trust';

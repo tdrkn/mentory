@@ -3,9 +3,11 @@ export type UserRole = 'mentee' | 'mentor' | 'both' | 'admin';
 export interface User {
   id: string;
   email: string;
+  username?: string | null;
   fullName: string;
   timezone: string;
   role: UserRole;
+  isBlocked?: boolean;
   isEmailVerified?: boolean;
   emailVerifiedAt?: Date | null;
   createdAt: Date;

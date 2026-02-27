@@ -12,11 +12,12 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { loginSchema } from '$lib/validators/auth';
-  import { Mail, Lock, ArrowRight, Sparkles } from 'lucide-svelte';
+  import BrandLogo from '$lib/components/BrandLogo.svelte';
+  import { User, Lock, ArrowRight } from 'lucide-svelte';
 
-  let email = '';
+  let loginValue = '';
   let password = '';
-  let fieldErrors: { email?: string; password?: string } = {};
+  let fieldErrors: { login?: string; password?: string } = {};
   let submitting = false;
   let pendingVerificationEmail = '';
   let verificationInfo: string | null = null;
@@ -52,17 +53,17 @@
   $: showErrorModal = !!$error;
 
   const fillTestAccount = (e: string, p: string) => {
-    email = e;
+    loginValue = e;
     password = p;
   };
 
   const handleSubmit = async () => {
     // Validate with zod
     fieldErrors = {};
-    const result = loginSchema.safeParse({ email, password });
+    const result = loginSchema.safeParse({ login: loginValue, password });
     if (!result.success) {
       for (const issue of result.error.issues) {
-        const key = issue.path[0] as 'email' | 'password';
+        const key = issue.path[0] as 'login' | 'password';
         if (!fieldErrors[key]) fieldErrors[key] = issue.message;
       }
       return;
@@ -70,14 +71,19 @@
 
     submitting = true;
     try {
-      const u = await login(email, password);
+      const u = await login(loginValue, password);
       if (u.role === 'mentor' || u.role === 'both') {
         await goto('/dashboard');
       } else {
         await goto('/mentors');
       }
     } catch {
-      // error is already set in the auth store by login()
+      const authError = ($error || '').toLowerCase();
+      const emailCandidate = loginValue.trim();
+      if (authError.includes('email не подтвержден') && emailCandidate.includes('@')) {
+        pendingVerificationEmail = emailCandidate;
+        verificationInfo = `Ваш email ${emailCandidate} не подтвержден. Отправьте письмо повторно.`;
+      }
     } finally {
       submitting = false;
     }
@@ -105,7 +111,7 @@
     <div class="auth-card reveal">
       <div class="auth-header">
         <div class="auth-logo">
-          <Sparkles size={24} />
+          <BrandLogo href="/" height={34} />
         </div>
         <h1 class="auth-title">С возвращением!</h1>
         <p class="auth-subtitle">Войдите, чтобы продолжить обучение</p>
@@ -135,19 +141,19 @@
 
       <form class="auth-form" on:submit|preventDefault={handleSubmit}>
         <div class="form-group">
-          <label class="label" for="email">Email</label>
+          <label class="label" for="login">Логин или email</label>
           <div class="input-with-icon">
-            <Mail size={18} />
+            <User size={18} />
             <input 
-              id="email"
+              id="login"
               class="input" 
-              type="email" 
-              bind:value={email} 
-              placeholder="you@example.com" 
+              type="text" 
+              bind:value={loginValue} 
+              placeholder="username или you@example.com" 
             />
           </div>
-          {#if fieldErrors.email}
-            <span class="form-error">{fieldErrors.email}</span>
+          {#if fieldErrors.login}
+            <span class="form-error">{fieldErrors.login}</span>
           {/if}
         </div>
 
@@ -243,15 +249,10 @@
   }
 
   .auth-logo {
-    width: 56px;
-    height: 56px;
-    background: linear-gradient(135deg, var(--accent) 0%, var(--violet) 100%);
-    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
-    margin: 0 auto 20px;
+    margin: 0 auto 14px;
   }
 
   .auth-title {

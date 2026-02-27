@@ -14,8 +14,11 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
-import { User, UserRole } from '@prisma/client';
+import { Prisma, User, UserRole } from '@prisma/client';
 import { EmailService } from '../notifications/email.service';
+
+const LOGIN_ATTEMPT_LIMIT = 5;
+const LOGIN_LOCK_MINUTES = 15;
 
 @Injectable()
 export class AuthService {
@@ -29,76 +32,166 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    // Check if user exists
-    const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+    if (!dto.termsAccepted) {
+      throw new BadRequestException('Необходимо принять пользовательское соглашение');
+    }
+
+    // Check if user exists by email or username
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ email: dto.email }, { username: dto.username }],
+      },
+      select: { email: true, username: true },
     });
 
-    if (existing) {
+    if (existing?.email === dto.email) {
       throw new ConflictException('Email already registered');
+    }
+    if (existing?.username === dto.username) {
+      throw new ConflictException('Username already taken');
     }
 
     // Hash password
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    // Create user with profile
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        passwordHash,
-        fullName: dto.fullName,
-        timezone: dto.timezone || 'UTC',
-        role: dto.role as UserRole,
-        isEmailVerified: true,
-        emailVerifiedAt: new Date(),
-        ...(dto.role === 'mentor' && {
-          mentorProfile: { create: {} },
-        }),
-        ...(dto.role === 'mentee' && {
-          menteeProfile: { create: {} },
-        }),
-      },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        role: true,
-        createdAt: true,
-      },
+    // Create user + profile + agreement in one transaction
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email: dto.email,
+          username: dto.username,
+          passwordHash,
+          fullName: dto.fullName,
+          timezone: dto.timezone || 'UTC',
+          role: dto.role as UserRole,
+          isEmailVerified: false,
+          emailVerifiedAt: null,
+          ...(dto.role === 'mentor' && {
+            mentorProfile: { create: {} },
+          }),
+          ...(dto.role === 'mentee' && {
+            menteeProfile: { create: {} },
+          }),
+        },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          fullName: true,
+          role: true,
+          createdAt: true,
+        },
+      });
+
+      await tx.userAgreement.create({
+        data: {
+          userId: created.id,
+          documentType: 'terms',
+          documentVersion: '1.0',
+        },
+      });
+
+      return created;
     });
 
-    const tokens = await this.generateTokens(user);
+    let verificationEmailSent = true;
+    try {
+      await this.sendEmailVerification(user);
+    } catch (error) {
+      verificationEmailSent = false;
+      const message = error instanceof Error ? error.message : 'unknown error';
+      this.logger.warn(`User ${user.id} created but verification email failed: ${message}`);
+    }
 
     return {
       user,
-      ...tokens,
+      requiresEmailVerification: true,
+      verificationEmailSent,
     };
   }
 
-  async validateUser(email: string, password: string): Promise<User | null> {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
+  async validateUser(login: string, password: string): Promise<User> {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ email: login }, { username: login }],
+      },
     });
 
     if (!user) {
-      return null;
+      throw new UnauthorizedException('Неверный логин или пароль');
+    }
+
+    const now = new Date();
+    if (user.loginLockedUntil && user.loginLockedUntil > now) {
+      const minutesLeft = Math.max(
+        1,
+        Math.ceil((user.loginLockedUntil.getTime() - now.getTime()) / 60000),
+      );
+      throw new UnauthorizedException(
+        `Слишком много неудачных попыток входа. Повторите через ${minutesLeft} мин.`,
+      );
+    }
+
+    if (user.isBlocked) {
+      throw new UnauthorizedException(
+        'Ваш аккаунт заблокирован. Обратитесь в службу поддержки support@mentory.local',
+      );
+    }
+
+    if (!user.isEmailVerified) {
+      throw new UnauthorizedException(
+        'Ваш email не подтвержден. Подтвердите регистрацию по ссылке в письме',
+      );
     }
 
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
-      return null;
+      const isLockTriggered = await this.registerFailedLoginAttempt(
+        user.id,
+        user.failedLoginAttempts,
+      );
+      if (isLockTriggered) {
+        throw new UnauthorizedException(
+          'Превышен лимит попыток входа. Форма входа заблокирована на 15 минут.',
+        );
+      }
+      throw new UnauthorizedException('Неверный логин или пароль');
+    }
+
+    if (user.failedLoginAttempts > 0 || user.loginLockedUntil) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts: 0,
+          loginLockedUntil: null,
+        },
+      });
     }
 
     return user;
   }
 
-  async login(user: User) {
+  async login(user: User, ip?: string) {
+    const updateData: Prisma.UserUpdateInput = {
+      lastLoginAt: new Date(),
+    };
+    const normalizedIp = this.normalizeIp(ip);
+    if (normalizedIp) {
+      updateData.lastLoginIp = normalizedIp;
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: updateData,
+    });
+
     const tokens = await this.generateTokens(user);
 
     return {
       user: {
         id: user.id,
         email: user.email,
+        username: user.username,
         fullName: user.fullName,
         role: user.role,
       },
@@ -116,6 +209,7 @@ export class AuthService {
       select: {
         id: true,
         email: true,
+        username: true,
         fullName: true,
         timezone: true,
         role: true,
@@ -357,5 +451,34 @@ export class AuthService {
       this.logger.error(`Failed to send verification email to ${user.email}: ${message}`);
       throw new BadRequestException('Could not send verification email. Please try again later.');
     }
+  }
+
+  private async registerFailedLoginAttempt(userId: string, currentAttempts: number): Promise<boolean> {
+    const nextAttempts = currentAttempts + 1;
+    if (nextAttempts >= LOGIN_ATTEMPT_LIMIT) {
+      const loginLockedUntil = new Date(Date.now() + LOGIN_LOCK_MINUTES * 60 * 1000);
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          failedLoginAttempts: 0,
+          loginLockedUntil,
+        },
+      });
+      return true;
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        failedLoginAttempts: nextAttempts,
+        loginLockedUntil: null,
+      },
+    });
+    return false;
+  }
+
+  private normalizeIp(ip?: string): string | null {
+    if (!ip) return null;
+    return ip.replace(/^::ffff:/, '').slice(0, 64);
   }
 }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import AppHeader from '$lib/components/AppHeader.svelte';
+  import BrandLogo from '$lib/components/BrandLogo.svelte';
   import { Search, CalendarDays, MessageCircle, CheckCircle2, Sparkles, Star, Clock, ArrowUpRight } from 'lucide-svelte';
 </script>
 
@@ -190,7 +191,7 @@
     <div class="container">
       <div class="grid cols-3" style="align-items:start;">
         <div>
-          <div class="footer-brand">Mentory</div>
+          <BrandLogo href="/" height={28} scheme="dark" className="footer-brand-logo" />
           <div class="footer-desc">Менторы, расписание, чат и оплата — единая платформа, чтобы расти быстрее.</div>
         </div>
         <div>

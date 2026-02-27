@@ -36,6 +36,7 @@
   let timer: any;
   let paymentIntentId: string | null = null;
   let checkoutUrl: string | null = null;
+  let mockAcquiringUrl: string | null = null;
   let paymentMethods: string[] = [];
   let paymentRequested = false;
 
@@ -78,6 +79,22 @@
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const buildMockAcquiringUrl = () => {
+    if (!session || !paymentIntentId) return null;
+
+    const params = new URLSearchParams({
+      sessionId: session.id,
+      paymentIntentId,
+      amount: session.service.priceAmount,
+      currency: session.service.currency,
+      mentor: session.mentor.fullName,
+      service: session.service.title,
+      returnUrl: `/checkout/${session.id}`,
+    });
+
+    return `/acquiring/mock?${params.toString()}`;
+  };
+
   const handlePayment = async () => {
     if (!session || paymentRequested) return;
     isProcessing = true;
@@ -92,9 +109,9 @@
       checkoutUrl = paymentIntent.checkoutUrl || null;
       paymentMethods = paymentIntent.paymentMethods || [];
       paymentRequested = true;
-
-      if (checkoutUrl) {
-        window.open(checkoutUrl, '_blank', 'noopener,noreferrer');
+      mockAcquiringUrl = buildMockAcquiringUrl();
+      if (mockAcquiringUrl) {
+        goto(mockAcquiringUrl);
       }
     } catch (err) {
       if (err instanceof ApiError && err.status === 410) {
@@ -118,7 +135,24 @@
         type: 'payment_intent.succeeded',
         data: { object: { id: paymentIntentId } },
       });
-      await api.post('/booking/confirm', { sessionId: session.id, paymentIntentId });
+
+      const refreshedSession = await api.get<SessionDetail>(`/booking/${session.id}`);
+      if (refreshedSession.status !== 'paid') {
+        try {
+          await api.post('/booking/confirm', { sessionId: session.id, paymentIntentId });
+        } catch (confirmErr) {
+          if (confirmErr instanceof ApiError) {
+            const message = String(confirmErr.data?.message ?? '').toLowerCase();
+            const alreadyConfirmed = message.includes('status: paid') || message.includes('already paid');
+            if (!alreadyConfirmed) {
+              throw confirmErr;
+            }
+          } else {
+            throw confirmErr;
+          }
+        }
+      }
+
       goto('/sessions?success=1');
     } catch (err) {
       if (err instanceof ApiError && err.status === 410) {
@@ -134,6 +168,29 @@
     }
   };
 
+  const handleReturnFromMock = async () => {
+    const mockPaid = $page.url.searchParams.get('mockPaid');
+    const mockCanceled = $page.url.searchParams.get('mockCanceled');
+    const queryPaymentIntentId = $page.url.searchParams.get('paymentIntentId');
+
+    if (mockCanceled === '1') {
+      error = 'Оплата отменена на странице эквайринга.';
+      return;
+    }
+
+    if (mockPaid !== '1') return;
+
+    if (!queryPaymentIntentId) {
+      error = 'Не удалось подтвердить оплату: отсутствует идентификатор платежа.';
+      return;
+    }
+
+    paymentIntentId = queryPaymentIntentId;
+    paymentRequested = true;
+    mockAcquiringUrl = buildMockAcquiringUrl();
+    await handleConfirmPayment();
+  };
+
   onMount(async () => {
     if (!$isAuthenticated && !$authLoading) {
       goto('/login');
@@ -141,6 +198,7 @@
     }
     await loadSession();
     startTimer();
+    await handleReturnFromMock();
   });
 
   onDestroy(() => {
@@ -217,7 +275,7 @@
           on:click={handlePayment}
           disabled={isProcessing || timeLeft <= 0 || paymentRequested}
         >
-          {isProcessing ? 'Обработка...' : 'Перейти к оплате'}
+          {isProcessing ? 'Обработка...' : 'Перейти к эквайрингу'}
         </button>
 
         {#if paymentRequested}
@@ -233,19 +291,24 @@
                 Открыть страницу оплаты
               </a>
             {/if}
+            {#if mockAcquiringUrl}
+              <a class="btn btn-ghost btn-sm" style="margin-top:10px;" href={mockAcquiringUrl}>
+                Открыть страницу эквайринга
+              </a>
+            {/if}
             <button
               class="btn btn-primary"
               style="width:100%;margin-top:12px;"
               on:click={handleConfirmPayment}
               disabled={isProcessing || timeLeft <= 0}
             >
-              {isProcessing ? 'Проверка...' : 'Я оплатил'}
+              {isProcessing ? 'Проверка...' : 'Подтвердить оплату вручную'}
             </button>
           </div>
         {/if}
 
         <p class="muted" style="margin-top:10px;font-size:0.85rem;text-align:center;">
-          Оплата проходит на стороне внешнего эквайринга. Реквизиты карты не сохраняются в Mentory.
+          Для демо используется имитация эквайринга. Реальные реквизиты карты не обрабатываются.
         </p>
       </div>
     </main>

@@ -2,6 +2,7 @@
   import { page } from '$app/stores';
   import { user, isMentor, isAdmin } from '$lib/stores/auth';
   import { logout } from '$lib/stores/auth';
+  import BrandLogo from '$lib/components/BrandLogo.svelte';
   import { Menu, X, User, LogOut, LayoutDashboard, Calendar, Wallet, MessageCircle, Video, Settings } from 'lucide-svelte';
 
   let mobileMenuOpen = false;
@@ -14,10 +15,7 @@
 
 <header class="header">
   <div class="container header-inner">
-    <a class="logo" href="/" on:click={closeMenu}>
-      <span class="logo-icon">M</span>
-      <span class="logo-text">Mentory</span>
-    </a>
+    <BrandLogo href="/" height={30} hideTextOnMobile className="logo" />
 
     <nav class="nav-desktop">
       <a class="nav-link {isActive('/mentors') ? 'active' : ''}" href="/mentors">Найти ментора</a>
@@ -60,8 +58,11 @@
             <a class="user-dropdown-item" href="/profile/edit">
               <Settings size={16} /> Настройки профиля
             </a>
+            <a class="user-dropdown-item" href="/trust">
+              <LayoutDashboard size={16} /> Траст-центр
+            </a>
             {#if $isAdmin}
-              <a class="user-dropdown-item" href="/admin" target="_blank">
+              <a class="user-dropdown-item" href="/admin/trust">
                 <LayoutDashboard size={16} /> Админ-панель
               </a>
             {/if}
@@ -117,8 +118,11 @@
           <a class="mobile-nav-link" href="/profile/edit" on:click={closeMenu}>
             <Settings size={18} /> Настройки
           </a>
+          <a class="mobile-nav-link" href="/trust" on:click={closeMenu}>
+            Траст-центр
+          </a>
           {#if $isAdmin}
-            <a class="mobile-nav-link" href="/admin" target="_blank" on:click={closeMenu}>
+            <a class="mobile-nav-link" href="/admin/trust" on:click={closeMenu}>
               Админ-панель
             </a>
           {/if}
@@ -140,7 +144,7 @@
     position: sticky;
     top: 0;
     z-index: 100;
-    background: rgba(255, 255, 255, 0.92);
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
   }
@@ -151,33 +155,6 @@
     justify-content: space-between;
     padding: 12px 24px;
     gap: 24px;
-  }
-
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    text-decoration: none;
-    font-weight: 700;
-    color: var(--ink);
-  }
-
-  .logo-icon {
-    width: 36px;
-    height: 36px;
-    background: linear-gradient(135deg, var(--accent) 0%, var(--violet) 100%);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-size: 1.2rem;
-    font-family: var(--font-display);
-  }
-
-  .logo-text {
-    font-size: 1.25rem;
-    font-family: var(--font-display);
   }
 
   .nav-desktop {
@@ -191,6 +168,7 @@
     align-items: center;
     gap: 6px;
     padding: 8px 14px;
+    white-space: nowrap;
     border-radius: var(--radius-md);
     font-size: 0.9rem;
     font-weight: 500;
@@ -427,12 +405,6 @@
 
     .header-inner {
       padding: 12px 16px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .logo-text {
-      display: none;
     }
   }
 </style>

@@ -5,6 +5,8 @@
 @tailwind utilities;
 
 :root {
+  --brand-primary: #0044FF;
+
   /* Modern neutral palette */
   --bg: #fafafa;
   --bg-alt: #f4f4f5;
@@ -15,11 +17,11 @@
   --muted: #71717a;
   --muted-light: #a1a1aa;
 
-  /* Primary accent - vibrant teal/green */
-  --accent: #0d9488;
-  --accent-strong: #0f766e;
-  --accent-soft: #ccfbf1;
-  --accent-muted: rgba(13, 148, 136, 0.08);
+  /* Primary accent */
+  --accent: var(--brand-primary);
+  --accent-strong: var(--brand-primary);
+  --accent-soft: color-mix(in srgb, var(--brand-primary) 12%, #ffffff);
+  --accent-muted: color-mix(in srgb, var(--brand-primary) 10%, transparent);
 
   /* Secondary colors */
   --violet: #7c3aed;
@@ -38,7 +40,7 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-  --shadow-glow: 0 0 40px rgba(13, 148, 136, 0.15);
+  --shadow-glow: 0 0 40px color-mix(in srgb, var(--brand-primary) 24%, transparent);
 
   /* Spacing and sizing */
   --radius-xs: 6px;
@@ -51,6 +53,23 @@
   /* Typography */
   --font-display: 'Fraunces', Georgia, serif;
   --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c111d;
+    --bg-alt: #161f31;
+    --surface: #111a2d;
+    --surface-elevated: #17233a;
+    --ink: #f4f7ff;
+    --ink-secondary: #d0d8eb;
+    --muted: #95a3bf;
+    --muted-light: #71829f;
+    --border: #24324c;
+    --border-light: #1a2740;
+    --accent-soft: color-mix(in srgb, var(--brand-primary) 24%, #111a2d);
+    --accent-muted: color-mix(in srgb, var(--brand-primary) 18%, transparent);
+  }
 }
 
 [data-theme='skeleton'] {
@@ -67,6 +86,7 @@
 
 html {
   scroll-behavior: smooth;
+  color-scheme: light dark;
 }
 
 body {
@@ -109,7 +129,7 @@ img {
   right: 0;
   height: 600px;
   background: 
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(13, 148, 136, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse 80% 50% at 50% -20%, color-mix(in srgb, var(--brand-primary) 14%, transparent) 0%, transparent 50%),
     radial-gradient(ellipse 60% 40% at 80% 10%, rgba(124, 58, 237, 0.05) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
@@ -968,7 +988,7 @@ button:disabled,
 
 /* ===== Footer ===== */
 .footer {
-  background: var(--ink);
+  background: #0b1324;
   color: #fff;
   padding: 64px 0 32px;
   margin-top: 80px;
@@ -983,10 +1003,8 @@ button:disabled,
   color: #fff;
 }
 
-.footer-brand {
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  font-weight: 700;
+.footer-brand-logo {
+  display: inline-flex;
   margin-bottom: 16px;
 }
 

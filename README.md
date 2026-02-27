@@ -53,7 +53,8 @@ mentory/
 │   └── Caddyfile
 ├── product/
 │   ├── usm.txt              # User Story Map
-│   ├── er.puml              # ER-диаграмма базы данных
+│   ├── er.puml              # ER-диаграмма (core product flow)
+│   ├── er-admin.puml        # ER-диаграмма (admin/trust operations)
 │   └── requirements-gap.md  # Gap-анализ FR/NFR/US против текущей реализации
 ├── .env.example
 ├── package.json
@@ -290,7 +291,9 @@ packages/shared/
 
 ## 🗄️ База данных
 
-ER-диаграмма находится в [product/er.puml](product/er.puml).
+ER-диаграммы:
+- core: [product/er.puml](product/er.puml)
+- admin/trust: [product/er-admin.puml](product/er-admin.puml)
 
 ![ER-диаграмма](product/er.png)
 

@@ -5,6 +5,7 @@ import { AppModule } from './app.module';
 import { StructuredLogger } from './common/logger';
 import * as prismaModule from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
   const logger = new StructuredLogger();
@@ -18,6 +19,10 @@ async function bootstrap() {
     origin: true, // reflect request origin — works from any IP/domain
     credentials: true,
   });
+
+  // Base64 attachments in chat/trust can exceed default 100kb parser limit.
+  app.use(json({ limit: '130mb' }));
+  app.use(urlencoded({ extended: true, limit: '130mb' }));
 
   app.useGlobalPipes(
     new ValidationPipe({

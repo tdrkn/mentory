@@ -46,11 +46,11 @@ export async function initAuth() {
   }
 }
 
-export async function login(email: string, password: string) {
+export async function login(login: string, password: string) {
   setState({ error: null, isLoading: true });
   try {
     const response = await api.post<{ accessToken: string; user: User }>('/auth/login', {
-      email,
+      login,
       password,
     });
     localStorage.setItem('accessToken', response.accessToken);
@@ -58,7 +58,7 @@ export async function login(email: string, password: string) {
     return response.user;
   } catch (err) {
     if (err instanceof ApiError) {
-      setState({ error: err.data?.message || 'Неверный email или пароль', isLoading: false });
+      setState({ error: err.data?.message || 'Неверный логин или пароль', isLoading: false });
     } else {
       setState({ error: 'Ошибка подключения к серверу', isLoading: false });
     }
@@ -66,17 +66,26 @@ export async function login(email: string, password: string) {
   }
 }
 
-export async function register(email: string, password: string, fullName: string, role: 'mentor' | 'mentee') {
+export async function register(
+  email: string,
+  username: string,
+  password: string,
+  fullName: string,
+  role: 'mentor' | 'mentee',
+  termsAccepted: boolean,
+) {
   setState({ error: null, isLoading: true });
   try {
     const response = await api.post<{ accessToken?: string; user: User; requiresEmailVerification?: boolean }>(
       '/auth/register',
       {
-      email,
-      password,
-      fullName,
-      role,
-    },
+        email,
+        username,
+        password,
+        fullName,
+        role,
+        termsAccepted,
+      },
     );
 
     if (response.accessToken) {
