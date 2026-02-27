@@ -1,0 +1,97 @@
+@startuml
+
+skinparam linetype ortho
+
+
+title Mentory ER (Admin/Trust MVP, Must Have)
+
+entity "users" as users {
+  * id : string <<PK>>
+  --
+  role : string
+  status : string
+  email : string
+}
+
+entity "sessions (ref)" as sessions_ref {
+  * id : string <<PK>>
+  --
+  status : string
+}
+
+entity "mentor_regalia" as mentor_regalia {
+  * id : string <<PK>>
+  --
+  mentor_id : string <<FK>>
+  file_url : string
+  status : string
+  reviewed_by : string <<FK>>
+  reviewed_at : date
+  created_at : date
+}
+
+entity "complaints" as complaints {
+  * id : string <<PK>>
+  --
+  author_id : string <<FK>>
+  target_user_id : string <<FK>>
+  target_session_id : string <<FK>>
+  assigned_admin_id : string <<FK>>
+  category : string
+  status : string
+  resolution_comment : string
+  created_at : date
+  closed_at : date
+}
+
+entity "complaint_messages" as complaint_messages {
+  * id : string <<PK>>
+  --
+  complaint_id : string <<FK>>
+  sender_id : string <<FK>>
+  body : string
+  created_at : date
+}
+
+entity "moderation_actions" as moderation_actions {
+  * id : string <<PK>>
+  --
+  admin_id : string <<FK>>
+  target_type : string
+  target_id : string
+  action : string
+  reason : string
+  created_at : date
+}
+
+entity "admin_audit_logs" as admin_audit_logs {
+  * id : string <<PK>>
+  --
+  admin_id : string <<FK>>
+  action : string
+  target_type : string
+  target_id : string
+  created_at : date
+}
+
+' Layout anchors
+users -[hidden]down- mentor_regalia
+mentor_regalia -[hidden]down- complaints
+complaints -[hidden]down- moderation_actions
+moderation_actions -[hidden]down- admin_audit_logs
+
+' Relationships
+users ||--o{ mentor_regalia : загружает
+users ||--o{ mentor_regalia : проверяет
+
+users ||--o{ complaints : создает
+users ||--o{ complaints : цель
+users ||--o{ complaints : назначен
+sessions_ref ||--o{ complaints : связанная_сессия
+complaints ||--o{ complaint_messages : ветка
+users ||--o{ complaint_messages : пишет
+
+users ||--o{ moderation_actions : выполняет
+users ||--o{ admin_audit_logs : логирует
+
+@enduml
