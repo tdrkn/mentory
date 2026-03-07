@@ -1,18 +1,21 @@
 @startuml
 
-
 skinparam linetype ortho
 
-title Mentory ER (Core MVP, Must Have)
+left to right direction
+
+title Mentory ER (Core + Subscriptions Fast Track)
 
 entity "users" as users {
   * id : uuid <<PK>>
   --
   email : text <<UQ>>
+  username : text <<UQ, nullable>>
   password_hash : text
   full_name : text
-  role : text
-  status : text
+  role : enum(user_role)
+  timezone : text
+  is_email_verified : bool
   created_at : timestamptz
 }
 
@@ -21,8 +24,9 @@ entity "mentor_profiles" as mentor_profiles {
   --
   headline : text
   bio : text
+  verification_status : text
   is_active : bool
-  rating_avg : numeric
+  rating_avg : numeric(3,2)
   rating_count : int
 }
 
@@ -31,17 +35,7 @@ entity "mentee_profiles" as mentee_profiles {
   --
   background : text
   goals : text[]
-}
-
-entity "topics" as topics {
-  * id : uuid <<PK>>
-  --
-  name : text <<UQ>>
-}
-
-entity "mentor_topics" as mentor_topics {
-  * mentor_id : uuid <<PK, FK>>
-  * topic_id : uuid <<PK, FK>>
+  interests : text[]
 }
 
 entity "mentor_services" as mentor_services {
@@ -50,8 +44,8 @@ entity "mentor_services" as mentor_services {
   mentor_id : uuid <<FK>>
   title : text
   duration_min : int
-  price_amount : numeric
-  currency : text
+  price_amount : decimal(10,2)
+  currency : varchar(3)
   is_active : bool
 }
 
@@ -61,7 +55,8 @@ entity "slots" as slots {
   mentor_id : uuid <<FK>>
   start_at : timestamptz
   end_at : timestamptz
-  status : text
+  status : enum(slot_status)
+  held_until : timestamptz
 }
 
 entity "sessions" as sessions {
@@ -71,19 +66,10 @@ entity "sessions" as sessions {
   mentee_id : uuid <<FK>>
   service_id : uuid <<FK>>
   slot_id : uuid <<FK>>
-  status : text
+  status : enum(session_status)
   start_at : timestamptz
   end_at : timestamptz
   created_at : timestamptz
-  canceled_at : timestamptz
-  cancel_reason : text
-}
-
-entity "video_rooms" as video_rooms {
-  * id : uuid <<PK>>
-  --
-  session_id : uuid <<FK>>
-  meeting_url : text
 }
 
 entity "conversations" as conversations {
@@ -91,8 +77,11 @@ entity "conversations" as conversations {
   --
   mentor_id : uuid <<FK>>
   mentee_id : uuid <<FK>>
-  session_id : uuid <<FK>>
+  session_id : uuid <<FK, nullable>>
+  last_read_mentor : timestamptz
+  last_read_mentee : timestamptz
   created_at : timestamptz
+  updated_at : timestamptz
 }
 
 entity "messages" as messages {
@@ -101,8 +90,43 @@ entity "messages" as messages {
   conversation_id : uuid <<FK>>
   sender_id : uuid <<FK>>
   content : text
+  content_type : text
+  is_read : bool
   created_at : timestamptz
-  read_at : timestamptz
+}
+
+entity "attachments" as attachments {
+  * id : uuid <<PK>>
+  --
+  message_id : uuid <<FK>>
+  filename : text
+  url : text
+  mime_type : text
+  size_bytes : bigint
+}
+
+entity "payments" as payments {
+  * id : uuid <<PK>>
+  --
+  session_id : uuid <<FK>>
+  mentee_id : uuid <<FK, nullable>>
+  mentor_id : uuid <<FK, nullable>>
+  amount : int
+  platform_fee : int
+  mentor_amount : int
+  currency : varchar(3)
+  status : enum(payment_status)
+  created_at : timestamptz
+}
+
+entity "payouts" as payouts {
+  * id : uuid <<PK>>
+  --
+  mentor_id : uuid <<FK>>
+  amount : decimal(10,2)
+  currency : varchar(3)
+  status : enum(payout_status)
+  created_at : timestamptz
 }
 
 entity "reviews" as reviews {
@@ -116,54 +140,104 @@ entity "reviews" as reviews {
   created_at : timestamptz
 }
 
-entity "payments" as payments {
-  * id : uuid <<PK>>
-  --
-  session_id : uuid <<FK>>
-  amount_cents : int
-  currency : text
-  status : text
-  provider_payment_id : text
-  created_at : timestamptz
-}
-
-entity "payouts" as payouts {
-  * id : uuid <<PK>>
-  --
-  mentor_id : uuid <<FK>>
-  amount_cents : int
-  currency : text
-  status : text
-  created_at : timestamptz
-}
-
 entity "notifications" as notifications {
   * id : uuid <<PK>>
   --
   user_id : uuid <<FK>>
-  type : text
+  type : enum(notification_type)
+  title : text
+  body : text
+  is_read : bool
   created_at : timestamptz
-  read_at : timestamptz
 }
 
-' Layout anchors
-users -[hidden]down- mentor_profiles
-mentor_profiles -[hidden]down- mentor_services
-mentor_services -[hidden]down- slots
-slots -[hidden]down- sessions
-sessions -[hidden]down- conversations
-conversations -[hidden]down- reviews
-reviews -[hidden]down- payments
-payments -[hidden]down- payouts
-payouts -[hidden]down- notifications
+entity "mentorship_plans" as mentorship_plans {
+  * id : uuid <<PK>>
+  --
+  mentor_id : uuid <<FK>>
+  title : text
+  description : text
+  kind : enum(mentorship_plan_kind)
+  price_amount : decimal(10,2)
+  currency : varchar(3)
+  billing_interval_months : int
+  calls_per_month : int
+  session_duration_min : int
+  response_time_hours : int
+  includes_unlimited_chat : bool
+  is_active : bool
+  created_at : timestamptz
+}
 
-' Relationships
+entity "mentorship_subscriptions" as mentorship_subscriptions {
+  * id : uuid <<PK>>
+  --
+  mentor_id : uuid <<FK>>
+  mentee_id : uuid <<FK>>
+  plan_id : uuid <<FK>>
+  status : enum(mentorship_subscription_status)
+  started_at : timestamptz
+  paused_at : timestamptz
+  ended_at : timestamptz
+  next_billing_at : timestamptz
+  current_period_start : timestamptz
+  current_period_end : timestamptz
+  monthly_price : decimal(10,2)
+  currency : varchar(3)
+  notes : text
+}
+
+entity "mentorship_tasks" as mentorship_tasks {
+  * id : uuid <<PK>>
+  --
+  subscription_id : uuid <<FK>>
+  created_by_id : uuid <<FK>>
+  assignee_id : uuid <<FK>>
+  title : text
+  description : text
+  status : enum(mentorship_task_status)
+  start_date : date
+  due_date : date
+  completed_at : timestamptz
+}
+
+entity "mentorship_bookmarks" as mentorship_bookmarks {
+  * id : uuid <<PK>>
+  --
+  subscription_id : uuid <<FK>>
+  created_by_id : uuid <<FK>>
+  title : text
+  description : text
+  url : text
+  created_at : timestamptz
+}
+
+entity "mentee_credit_balances" as mentee_credit_balances {
+  * mentee_id : uuid <<PK, FK>>
+  --
+  amount_cents : int
+  currency : varchar(3)
+  expires_at : timestamptz
+  updated_at : timestamptz
+}
+
+entity "mentee_credit_transactions" as mentee_credit_transactions {
+  * id : uuid <<PK>>
+  --
+  mentee_id : uuid <<FK>>
+  type : enum(credit_transaction_type)
+  status : enum(credit_transaction_status)
+  amount_cents : int
+  currency : varchar(3)
+  description : text
+  external_ref : text
+  expires_at : timestamptz
+  created_at : timestamptz
+}
+
+' Core relationships
 users ||--o| mentor_profiles : has
 users ||--o| mentee_profiles : has
-
-mentor_profiles ||--o{ mentor_topics : tags
-topics ||--o{ mentor_topics : catalog
-
 users ||--o{ mentor_services : offers
 users ||--o{ slots : owns
 mentor_services ||--o{ sessions : service
@@ -171,9 +245,9 @@ slots ||--o| sessions : slot
 users ||--o{ sessions : mentor
 users ||--o{ sessions : mentee
 
-sessions ||--o| video_rooms : video
 sessions ||--o| conversations : chat
 conversations ||--o{ messages : messages
+messages ||--o{ attachments : files
 users ||--o{ messages : sends
 
 sessions ||--o| reviews : review
@@ -183,5 +257,29 @@ users ||--o{ reviews : receives
 sessions ||--o| payments : payment
 users ||--o{ payouts : receives
 users ||--o{ notifications : gets
+
+' Subscriptions and workspace relationships
+users ||--o{ mentorship_plans : mentor owns plans
+mentorship_plans ||--o{ mentorship_subscriptions : subscribed by
+users ||--o{ mentorship_subscriptions : mentor side
+users ||--o{ mentorship_subscriptions : mentee side
+
+mentorship_subscriptions ||--o{ mentorship_tasks : has tasks
+mentorship_subscriptions ||--o{ mentorship_bookmarks : has bookmarks
+users ||--o{ mentorship_tasks : creates
+users ||--o{ mentorship_tasks : assigned to
+users ||--o{ mentorship_bookmarks : creates
+
+users ||--o| mentee_credit_balances : has balance
+users ||--o{ mentee_credit_transactions : has transactions
+
+' Optional visual grouping anchors
+mentor_services -[hidden]down- sessions
+sessions -[hidden]down- conversations
+conversations -[hidden]down- messages
+mentorship_plans -[hidden]down- mentorship_subscriptions
+mentorship_subscriptions -[hidden]down- mentorship_tasks
+mentorship_tasks -[hidden]down- mentorship_bookmarks
+mentee_credit_balances -[hidden]down- mentee_credit_transactions
 
 @enduml

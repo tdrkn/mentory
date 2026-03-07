@@ -20,6 +20,9 @@
     <nav class="nav-desktop">
       <a class="nav-link {isActive('/mentors') ? 'active' : ''}" href="/mentors">Найти ментора</a>
       {#if $user}
+        <a class="nav-link {isActive('/subscriptions') ? 'active' : ''}" href="/subscriptions">
+          Подписки
+        </a>
         <a class="nav-link {isActive('/sessions') ? 'active' : ''}" href="/sessions">
           <Video size={16} /> Сессии
         </a>
@@ -95,6 +98,9 @@
           Найти ментора
         </a>
         {#if $user}
+          <a class="mobile-nav-link {isActive('/subscriptions') ? 'active' : ''}" href="/subscriptions" on:click={closeMenu}>
+            Подписки
+          </a>
           <a class="mobile-nav-link {isActive('/sessions') ? 'active' : ''}" href="/sessions" on:click={closeMenu}>
             <Video size={18} /> Сессии
           </a>
