@@ -575,141 +575,144 @@
         </div>
       </section>
 
-      <div class="grid cols-2 top-grid">
-        <section class="card">
-          <h2 class="section-title">Мои подписки</h2>
+      <section class="card">
+        <h2 class="section-title">Мои подписки</h2>
+        <p class="muted">
+          Подписка — это активная работа с ментором по выбранной программе.
+          Нажмите на карточку подписки, чтобы открыть рабочее пространство ниже.
+        </p>
 
-          {#if subscriptions.length === 0}
-            <p class="muted">Подписок пока нет.</p>
-          {:else}
-            <div class="stack">
-              {#each subscriptions as item}
-                <div class="surface subscription-row {selectedSubscriptionId === item.id ? 'active-subscription' : ''}">
-                  <button class="subscription-select" on:click={() => selectSubscription(item.id)} disabled={isBusy}>
-                    <div class="subscription-main">
-                      <strong>{item.plan?.title || 'Программа менторства'}</strong>
-                      <span class="badge {item.status === 'active' ? 'success' : item.status === 'paused' ? 'warning' : 'error'}">{formatSubscriptionStatus(item.status)}</span>
-                    </div>
-                    <div class="muted">
-                      Ментор: {item.mentor?.fullName || item.mentorId}
-                    </div>
-                    <div class="muted">
-                      Старт: {formatDate(item.startedAt)} · Следующее списание: {formatDate(item.nextBillingAt)}
-                    </div>
-                    <div class="muted">
-                      Цена: {formatMoney(item.monthlyPrice ?? item.plan?.priceAmount, item.currency || item.plan?.currency || 'USD')}
-                    </div>
-                  </button>
-                  <div class="subscription-actions">
-                    {#if item.status === 'active'}
-                      <button class="btn btn-sm btn-ghost" on:click={() => changeSubscriptionStatus(item.id, 'paused')} disabled={isBusy}>Пауза</button>
-                      <button class="btn btn-sm btn-outline" on:click={() => changeSubscriptionStatus(item.id, 'ended')} disabled={isBusy}>Завершить</button>
-                    {:else if item.status === 'paused'}
-                      <button class="btn btn-sm btn-primary" on:click={() => changeSubscriptionStatus(item.id, 'active')} disabled={isBusy}>Активировать</button>
-                      <button class="btn btn-sm btn-outline" on:click={() => changeSubscriptionStatus(item.id, 'ended')} disabled={isBusy}>Завершить</button>
+        {#if subscriptions.length === 0}
+          <p class="muted">Подписок пока нет.</p>
+        {:else}
+          <div class="stack">
+            {#each subscriptions as item}
+              <div class="surface subscription-row {selectedSubscriptionId === item.id ? 'active-subscription' : ''}">
+                <button class="subscription-select" on:click={() => selectSubscription(item.id)} disabled={isBusy}>
+                  <div class="subscription-main">
+                    <strong>{item.plan?.title || 'Программа менторства'}</strong>
+                    <span class="badge {item.status === 'active' ? 'success' : item.status === 'paused' ? 'warning' : 'error'}">{formatSubscriptionStatus(item.status)}</span>
+                  </div>
+                  <div class="muted">
+                    Ментор: {item.mentor?.fullName || item.mentorId}
+                  </div>
+                  <div class="muted">
+                    Старт: {formatDate(item.startedAt)} · Следующее списание: {formatDate(item.nextBillingAt)}
+                  </div>
+                  <div class="muted">
+                    Цена: {formatMoney(item.monthlyPrice ?? item.plan?.priceAmount, item.currency || item.plan?.currency || 'USD')}
+                  </div>
+                </button>
+                <div class="subscription-actions">
+                  {#if item.status === 'active'}
+                    <button class="btn btn-sm btn-ghost" on:click={() => changeSubscriptionStatus(item.id, 'paused')} disabled={isBusy}>Пауза</button>
+                    <button class="btn btn-sm btn-outline" on:click={() => changeSubscriptionStatus(item.id, 'ended')} disabled={isBusy}>Завершить</button>
+                  {:else if item.status === 'paused'}
+                    <button class="btn btn-sm btn-primary" on:click={() => changeSubscriptionStatus(item.id, 'active')} disabled={isBusy}>Активировать</button>
+                    <button class="btn btn-sm btn-outline" on:click={() => changeSubscriptionStatus(item.id, 'ended')} disabled={isBusy}>Завершить</button>
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </section>
+
+      <section class="card bottom-card">
+        <h2 class="section-title">Рабочее пространство по подписке</h2>
+        <p class="muted workspace-description">
+          Рабочее пространство появляется после подключения к программе менторства.
+          Это совместная область ментора и менти: задачи, дедлайны и полезные материалы.
+        </p>
+
+        {#if !selectedSubscription || !workspace}
+          <p class="muted">Когда у вас будет подписка, здесь появится ваш рабочий план.</p>
+        {:else}
+          <div class="workspace-meta">
+            <div class="muted">Программа: <strong>{selectedSubscription.plan?.title || selectedSubscription.planId}</strong></div>
+            <div class="muted">Менти: {selectedSubscription.mentee?.fullName || selectedSubscription.menteeId}</div>
+            <div class="muted">Ментор: {selectedSubscription.mentor?.fullName || selectedSubscription.mentorId}</div>
+          </div>
+
+          <div class="divider"></div>
+
+          <h3 class="section-subtitle">Задачи</h3>
+          <form class="stack-sm" on:submit|preventDefault={createTask}>
+            <input class="input" placeholder="Название задачи" bind:value={taskForm.title} />
+            <textarea class="textarea" placeholder="Описание (опционально)" bind:value={taskForm.description}></textarea>
+            <div class="grid cols-2 compact-grid">
+              <select class="select" bind:value={taskForm.assigneeId}>
+                <option value="">Кому назначить</option>
+                <option value={workspace.subscription.mentorId}>Ментор</option>
+                <option value={workspace.subscription.menteeId}>Менти</option>
+              </select>
+              <div class="grid cols-2 compact-grid">
+                <input class="input" type="date" bind:value={taskForm.startDate} />
+                <input class="input" type="date" bind:value={taskForm.dueDate} />
+              </div>
+            </div>
+            <button class="btn btn-primary" type="submit" disabled={isBusy}>Добавить задачу</button>
+          </form>
+
+          <div class="stack task-list">
+            {#if workspace.tasks.length === 0}
+              <p class="muted">Задач пока нет.</p>
+            {:else}
+              {#each workspace.tasks as task}
+                <div class="surface task-row">
+                  <div>
+                    <strong>{task.title}</strong>
+                    {#if task.description}
+                      <div class="muted">{task.description}</div>
+                    {/if}
+                    <div class="muted">Срок: {formatDate(task.dueDate)} · Исполнитель: {formatAssigneeLabel(task.assigneeId)}</div>
+                  </div>
+                  <div class="task-actions">
+                    <span class="badge {task.status === 'done' ? 'success' : task.status === 'in_progress' ? 'info' : ''}">{formatTaskStatus(task.status)}</span>
+                    {#if task.status !== 'todo'}
+                      <button class="btn btn-sm btn-outline" on:click={() => setTaskStatus(task, 'todo')} disabled={isBusy}>К выполнению</button>
+                    {/if}
+                    {#if task.status !== 'in_progress'}
+                      <button class="btn btn-sm btn-outline" on:click={() => setTaskStatus(task, 'in_progress')} disabled={isBusy}>В работу</button>
+                    {/if}
+                    {#if task.status !== 'done'}
+                      <button class="btn btn-sm btn-primary" on:click={() => setTaskStatus(task, 'done')} disabled={isBusy}>Готово</button>
                     {/if}
                   </div>
                 </div>
               {/each}
-            </div>
-          {/if}
-        </section>
+            {/if}
+          </div>
 
-        <section class="card">
-          <h2 class="section-title">Рабочее пространство</h2>
-          <p class="muted workspace-description">
-            Это общий рабочий блок ментора и менти: здесь фиксируются задачи, дедлайны и полезные ссылки.
-          </p>
+          <div class="divider"></div>
 
-          {#if !selectedSubscription || !workspace}
-            <p class="muted">Выберите подписку слева, чтобы открыть задачи и материалы.</p>
-          {:else}
-            <div class="workspace-meta">
-              <div class="muted">Программа: <strong>{selectedSubscription.plan?.title || selectedSubscription.planId}</strong></div>
-              <div class="muted">Менти: {selectedSubscription.mentee?.fullName || selectedSubscription.menteeId}</div>
-              <div class="muted">Ментор: {selectedSubscription.mentor?.fullName || selectedSubscription.mentorId}</div>
-            </div>
+          <h3 class="section-subtitle">Материалы и ссылки</h3>
+          <form class="stack-sm" on:submit|preventDefault={createBookmark}>
+            <input class="input" placeholder="Название" bind:value={bookmarkForm.title} />
+            <input class="input" placeholder="https://..." bind:value={bookmarkForm.url} />
+            <textarea class="textarea" placeholder="Описание (опционально)" bind:value={bookmarkForm.description}></textarea>
+            <button class="btn btn-primary" type="submit" disabled={isBusy}>Добавить закладку</button>
+          </form>
 
-            <div class="divider"></div>
-
-            <h3 class="section-subtitle">Задачи</h3>
-            <form class="stack-sm" on:submit|preventDefault={createTask}>
-              <input class="input" placeholder="Название задачи" bind:value={taskForm.title} />
-              <textarea class="textarea" placeholder="Описание (опционально)" bind:value={taskForm.description}></textarea>
-              <div class="grid cols-2 compact-grid">
-                <select class="select" bind:value={taskForm.assigneeId}>
-                  <option value="">Кому назначить</option>
-                  <option value={workspace.subscription.mentorId}>Ментор</option>
-                  <option value={workspace.subscription.menteeId}>Менти</option>
-                </select>
-                <div class="grid cols-2 compact-grid">
-                  <input class="input" type="date" bind:value={taskForm.startDate} />
-                  <input class="input" type="date" bind:value={taskForm.dueDate} />
+          <div class="stack bookmark-list">
+            {#if workspace.bookmarks.length === 0}
+              <p class="muted">Закладок пока нет.</p>
+            {:else}
+              {#each workspace.bookmarks as bookmark}
+                <div class="surface bookmark-row">
+                  <div>
+                    <a href={bookmark.url} target="_blank" rel="noreferrer" class="bookmark-link">{bookmark.title}</a>
+                    {#if bookmark.description}
+                      <div class="muted">{bookmark.description}</div>
+                    {/if}
+                  </div>
+                  <button class="btn btn-sm btn-ghost" on:click={() => deleteBookmark(bookmark.id)} disabled={isBusy}>Удалить</button>
                 </div>
-              </div>
-              <button class="btn btn-primary" type="submit" disabled={isBusy}>Добавить задачу</button>
-            </form>
-
-            <div class="stack task-list">
-              {#if workspace.tasks.length === 0}
-                <p class="muted">Задач пока нет.</p>
-              {:else}
-                {#each workspace.tasks as task}
-                  <div class="surface task-row">
-                    <div>
-                      <strong>{task.title}</strong>
-                      {#if task.description}
-                        <div class="muted">{task.description}</div>
-                      {/if}
-                      <div class="muted">Срок: {formatDate(task.dueDate)} · Исполнитель: {formatAssigneeLabel(task.assigneeId)}</div>
-                    </div>
-                    <div class="task-actions">
-                      <span class="badge {task.status === 'done' ? 'success' : task.status === 'in_progress' ? 'info' : ''}">{formatTaskStatus(task.status)}</span>
-                      {#if task.status !== 'todo'}
-                        <button class="btn btn-sm btn-outline" on:click={() => setTaskStatus(task, 'todo')} disabled={isBusy}>К выполнению</button>
-                      {/if}
-                      {#if task.status !== 'in_progress'}
-                        <button class="btn btn-sm btn-outline" on:click={() => setTaskStatus(task, 'in_progress')} disabled={isBusy}>В работу</button>
-                      {/if}
-                      {#if task.status !== 'done'}
-                        <button class="btn btn-sm btn-primary" on:click={() => setTaskStatus(task, 'done')} disabled={isBusy}>Готово</button>
-                      {/if}
-                    </div>
-                  </div>
-                {/each}
-              {/if}
-            </div>
-
-            <div class="divider"></div>
-
-            <h3 class="section-subtitle">Материалы и ссылки</h3>
-            <form class="stack-sm" on:submit|preventDefault={createBookmark}>
-              <input class="input" placeholder="Название" bind:value={bookmarkForm.title} />
-              <input class="input" placeholder="https://..." bind:value={bookmarkForm.url} />
-              <textarea class="textarea" placeholder="Описание (опционально)" bind:value={bookmarkForm.description}></textarea>
-              <button class="btn btn-primary" type="submit" disabled={isBusy}>Добавить закладку</button>
-            </form>
-
-            <div class="stack bookmark-list">
-              {#if workspace.bookmarks.length === 0}
-                <p class="muted">Закладок пока нет.</p>
-              {:else}
-                {#each workspace.bookmarks as bookmark}
-                  <div class="surface bookmark-row">
-                    <div>
-                      <a href={bookmark.url} target="_blank" rel="noreferrer" class="bookmark-link">{bookmark.title}</a>
-                      {#if bookmark.description}
-                        <div class="muted">{bookmark.description}</div>
-                      {/if}
-                    </div>
-                    <button class="btn btn-sm btn-ghost" on:click={() => deleteBookmark(bookmark.id)} disabled={isBusy}>Удалить</button>
-                  </div>
-                {/each}
-              {/if}
-            </div>
-          {/if}
-        </section>
-      </div>
+              {/each}
+            {/if}
+          </div>
+        {/if}
+      </section>
 
       {#if canManagePlans}
         <section class="card bottom-card">
@@ -930,10 +933,6 @@
 
   .kpi-warn {
     color: var(--status-warning-ink);
-  }
-
-  .top-grid {
-    align-items: start;
   }
 
   .bottom-card {
