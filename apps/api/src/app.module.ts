@@ -15,6 +15,7 @@ import { PaymentsModule } from './modules/payments';
 import { ChatModule } from './modules/chat';
 import { NotificationsModule } from './modules/notifications';
 import { TrustModule } from './modules/trust';
+import { SubscriptionsModule } from './modules/subscriptions';
 import { AdminBootstrapService } from './admin/admin-bootstrap.service';
 
 @Module({
@@ -38,6 +39,7 @@ import { AdminBootstrapService } from './admin/admin-bootstrap.service';
     ChatModule,
     NotificationsModule,
     TrustModule,
+    SubscriptionsModule,
   ],
   controllers: [HealthController],
   providers: [AdminBootstrapService],

@@ -8,3 +8,4 @@ export * from './payments';
 export * from './chat';
 export * from './notifications';
 export * from './trust';
+export * from './subscriptions';

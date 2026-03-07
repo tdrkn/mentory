@@ -67,6 +67,37 @@ enum NotificationType {
   new_review
 }
 
+enum MentorshipPlanKind {
+  subscription
+  one_off
+}
+
+enum MentorshipSubscriptionStatus {
+  active
+  paused
+  ended
+}
+
+enum MentorshipTaskStatus {
+  todo
+  in_progress
+  done
+}
+
+enum CreditTransactionType {
+  topup
+  redeem
+  spend
+  refund
+}
+
+enum CreditTransactionStatus {
+  pending
+  succeeded
+  failed
+  canceled
+}
+
 // ============================================
 // Users & Profiles
 // ============================================
@@ -109,6 +140,14 @@ model User {
   conversationsAsMentor  Conversation[]          @relation("MentorConversations")
   conversationsAsMentee  Conversation[]          @relation("MenteeConversations")
   messages               Message[]
+  mentorPlans            MentorshipPlan[]        @relation("MentorPlans")
+  mentorshipsAsMentor    MentorshipSubscription[] @relation("MentorSubscriptions")
+  mentorshipsAsMentee    MentorshipSubscription[] @relation("MenteeSubscriptions")
+  mentorshipTasksCreated MentorshipTask[]        @relation("MentorshipTasksCreatedBy")
+  mentorshipTasksAssigned MentorshipTask[]       @relation("MentorshipTasksAssignedTo")
+  mentorshipBookmarksCreated MentorshipBookmark[] @relation("MentorshipBookmarksCreatedBy")
+  creditBalance          MenteeCreditBalance?
+  creditTransactions     MenteeCreditTransaction[]
   notifications          Notification[]
   agreements             UserAgreement[]
   complaintsAuthored     Complaint[]             @relation("ComplaintAuthor")
@@ -452,6 +491,148 @@ model Attachment {
 
   @@index([messageId])
   @@map("attachments")
+}
+
+// ============================================
+// Mentorship Subscriptions & Workspace
+// ============================================
+
+model MentorshipPlan {
+  id                     String            @id @default(uuid()) @db.Uuid
+  mentorId               String            @map("mentor_id") @db.Uuid
+  title                  String
+  description            String?
+  kind                   MentorshipPlanKind @default(subscription)
+  priceAmount            Decimal           @map("price_amount") @db.Decimal(10, 2)
+  currency               String            @default("USD") @db.VarChar(3)
+  billingIntervalMonths  Int               @default(1) @map("billing_interval_months")
+  callsPerMonth          Int?              @map("calls_per_month")
+  sessionDurationMin     Int?              @map("session_duration_min")
+  responseTimeHours      Int?              @map("response_time_hours")
+  includesUnlimitedChat  Boolean           @default(true) @map("includes_unlimited_chat")
+  isActive               Boolean           @default(true) @map("is_active")
+  createdAt              DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  mentor        User                     @relation("MentorPlans", fields: [mentorId], references: [id], onDelete: Cascade)
+  subscriptions MentorshipSubscription[]
+
+  @@index([mentorId])
+  @@index([kind])
+  @@index([isActive])
+  @@map("mentorship_plans")
+}
+
+model MentorshipSubscription {
+  id                 String                      @id @default(uuid()) @db.Uuid
+  mentorId           String                      @map("mentor_id") @db.Uuid
+  menteeId           String                      @map("mentee_id") @db.Uuid
+  planId             String                      @map("plan_id") @db.Uuid
+  status             MentorshipSubscriptionStatus @default(active)
+  startedAt          DateTime                    @default(now()) @map("started_at") @db.Timestamptz
+  pausedAt           DateTime?                   @map("paused_at") @db.Timestamptz
+  endedAt            DateTime?                   @map("ended_at") @db.Timestamptz
+  nextBillingAt      DateTime?                   @map("next_billing_at") @db.Timestamptz
+  currentPeriodStart DateTime?                   @map("current_period_start") @db.Timestamptz
+  currentPeriodEnd   DateTime?                   @map("current_period_end") @db.Timestamptz
+  monthlyPrice       Decimal?                    @map("monthly_price") @db.Decimal(10, 2)
+  currency           String                      @default("USD") @db.VarChar(3)
+  notes              String?
+  createdAt          DateTime                    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime                    @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  mentor    User                @relation("MentorSubscriptions", fields: [mentorId], references: [id], onDelete: Cascade)
+  mentee    User                @relation("MenteeSubscriptions", fields: [menteeId], references: [id], onDelete: Cascade)
+  plan      MentorshipPlan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  tasks     MentorshipTask[]
+  bookmarks MentorshipBookmark[]
+
+  @@index([mentorId])
+  @@index([menteeId])
+  @@index([planId])
+  @@index([status])
+  @@index([nextBillingAt])
+  @@map("mentorship_subscriptions")
+}
+
+model MentorshipTask {
+  id             String              @id @default(uuid()) @db.Uuid
+  subscriptionId String              @map("subscription_id") @db.Uuid
+  createdById    String              @map("created_by_id") @db.Uuid
+  assigneeId     String              @map("assignee_id") @db.Uuid
+  title          String
+  description    String?
+  status         MentorshipTaskStatus @default(todo)
+  startDate      DateTime?           @map("start_date") @db.Date
+  dueDate        DateTime?           @map("due_date") @db.Date
+  completedAt    DateTime?           @map("completed_at") @db.Timestamptz
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  subscription MentorshipSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  createdBy    User                  @relation("MentorshipTasksCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  assignee     User                  @relation("MentorshipTasksAssignedTo", fields: [assigneeId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([assigneeId])
+  @@index([status])
+  @@map("mentorship_tasks")
+}
+
+model MentorshipBookmark {
+  id             String                @id @default(uuid()) @db.Uuid
+  subscriptionId String                @map("subscription_id") @db.Uuid
+  createdById    String                @map("created_by_id") @db.Uuid
+  title          String
+  description    String?
+  url            String
+  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  subscription MentorshipSubscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  createdBy    User                    @relation("MentorshipBookmarksCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([createdById])
+  @@map("mentorship_bookmarks")
+}
+
+model MenteeCreditBalance {
+  menteeId     String    @id @map("mentee_id") @db.Uuid
+  amountCents  Int       @default(0) @map("amount_cents")
+  currency     String    @default("USD") @db.VarChar(3)
+  expiresAt    DateTime? @map("expires_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  mentee User @relation(fields: [menteeId], references: [id], onDelete: Cascade)
+
+  @@map("mentee_credit_balances")
+}
+
+model MenteeCreditTransaction {
+  id           String                  @id @default(uuid()) @db.Uuid
+  menteeId     String                  @map("mentee_id") @db.Uuid
+  type         CreditTransactionType
+  status       CreditTransactionStatus @default(succeeded)
+  amountCents  Int                     @map("amount_cents")
+  currency     String                  @default("USD") @db.VarChar(3)
+  description  String?
+  externalRef  String?                 @map("external_ref")
+  expiresAt    DateTime?               @map("expires_at") @db.Timestamptz
+  createdAt    DateTime                @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  mentee User @relation(fields: [menteeId], references: [id], onDelete: Cascade)
+
+  @@index([menteeId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("mentee_credit_transactions")
 }
 
 // ============================================
