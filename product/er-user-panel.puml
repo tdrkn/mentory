@@ -1,0 +1,163 @@
+@startuml
+
+skinparam linetype ortho
+top to bottom direction
+skinparam defaultFontSize 12
+skinparam ArrowFontSize 11
+skinparam nodesep 70
+skinparam ranksep 95
+
+title Mentory ER (Юзер-панель / Core)
+
+entity "users" as users {
+  * id : uuid <<PK>>
+  --
+  email : text <<UQ>>
+  username : text <<UQ, nullable>>
+  full_name : text
+  role : enum(user_role)
+  timezone : text
+  is_blocked : bool
+  is_email_verified : bool
+  created_at : timestamptz
+}
+
+entity "mentor_profiles" as mentor_profiles {
+  * user_id : uuid <<PK, FK>>
+  --
+  headline : text
+  verification_status : text
+  is_active : bool
+  rating_avg : numeric(3,2)
+  rating_count : int
+}
+
+entity "mentee_profiles" as mentee_profiles {
+  * user_id : uuid <<PK, FK>>
+  --
+  background : text
+}
+
+entity "topics" as topics {
+  * id : uuid <<PK>>
+  --
+  name : text
+}
+
+entity "mentor_topics" as mentor_topics {
+  * mentor_id : uuid <<PK, FK>>
+  * topic_id : uuid <<PK, FK>>
+}
+
+entity "mentor_services" as mentor_services {
+  * id : uuid <<PK>>
+  --
+  mentor_id : uuid <<FK>>
+  title : text
+  duration_min : int
+  price_amount : decimal(10,2)
+  currency : varchar(3)
+  is_active : bool
+}
+
+entity "slots" as slots {
+  * id : uuid <<PK>>
+  --
+  mentor_id : uuid <<FK>>
+  start_at : timestamptz
+  end_at : timestamptz
+  status : enum(slot_status)
+  held_until : timestamptz
+}
+
+entity "sessions" as sessions {
+  * id : uuid <<PK>>
+  --
+  mentor_id : uuid <<FK>>
+  mentee_id : uuid <<FK>>
+  service_id : uuid <<FK>>
+  slot_id : uuid <<FK>>
+  status : enum(session_status)
+  start_at : timestamptz
+  end_at : timestamptz
+}
+
+entity "conversations" as conversations {
+  * id : uuid <<PK>>
+  --
+  mentor_id : uuid <<FK>>
+  mentee_id : uuid <<FK>>
+  session_id : uuid <<FK, nullable>>
+  updated_at : timestamptz
+}
+
+entity "messages" as messages {
+  * id : uuid <<PK>>
+  --
+  conversation_id : uuid <<FK>>
+  sender_id : uuid <<FK>>
+  content : text
+  content_type : text
+  is_read : bool
+  created_at : timestamptz
+}
+
+entity "payments" as payments {
+  * id : uuid <<PK>>
+  --
+  session_id : uuid <<FK>>
+  mentee_id : uuid <<FK, nullable>>
+  mentor_id : uuid <<FK, nullable>>
+  amount : int
+  platform_fee : int
+  mentor_amount : int
+  currency : varchar(3)
+  status : enum(payment_status)
+}
+
+entity "reviews" as reviews {
+  * id : uuid <<PK>>
+  --
+  session_id : uuid <<FK>>
+  mentee_id : uuid <<FK>>
+  mentor_id : uuid <<FK>>
+  rating : int
+  created_at : timestamptz
+}
+
+' layout
+users -[hidden]down- mentor_profiles
+users -[hidden]right- mentee_profiles
+mentor_profiles -[hidden]down- mentor_topics
+topics -[hidden]right- mentor_topics
+mentor_profiles -[hidden]down- mentor_services
+mentor_services -[hidden]down- slots
+slots -[hidden]down- sessions
+sessions -[hidden]left- reviews
+sessions -[hidden]right- payments
+sessions -[hidden]down- conversations
+conversations -[hidden]down- messages
+
+' relationships (коротко)
+users ||--o| mentor_profiles
+users ||--o| mentee_profiles
+mentor_profiles ||--o{ mentor_topics : "экспертиза"
+topics ||--o{ mentor_topics : "темы"
+
+users ||--o{ mentor_services
+users ||--o{ slots
+mentor_services ||--o{ sessions : "услуга"
+slots ||--o| sessions : "слот"
+users ||--o{ sessions
+
+sessions ||--o| payments : "оплата"
+sessions ||--o| reviews : "отзыв"
+sessions ||--o| conversations : "чат"
+conversations ||--o{ messages : "сообщения"
+
+legend right
+  PK - основной идентификатор
+  FK - ссылка на связанную запись
+endlegend
+
+@enduml

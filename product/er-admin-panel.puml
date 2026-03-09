@@ -1,0 +1,116 @@
+@startuml
+
+skinparam linetype ortho
+top to bottom direction
+skinparam defaultFontSize 12
+skinparam ArrowFontSize 11
+skinparam nodesep 70
+skinparam ranksep 90
+
+title Mentory ER (Админ-панель / Trust)
+
+entity "users" as users {
+  * id : uuid <<PK>>
+  --
+  email : text <<UQ>>
+  username : text <<UQ, nullable>>
+  full_name : text
+  role : enum(user_role)
+  is_blocked : bool
+  is_email_verified : bool
+  created_at : timestamptz
+}
+
+entity "sessions (ref)" as sessions_ref {
+  * id : uuid <<PK>>
+  --
+  status : enum(session_status)
+  start_at : timestamptz
+}
+
+entity "complaints" as complaints {
+  * id : uuid <<PK>>
+  --
+  author_id : uuid <<FK>>
+  target_user_id : uuid <<FK, nullable>>
+  target_session_id : uuid <<FK, nullable>>
+  assigned_admin_id : uuid <<FK, nullable>>
+  category : text
+  status : text
+  created_at : timestamptz
+  closed_at : timestamptz
+}
+
+entity "complaint_messages" as complaint_messages {
+  * id : uuid <<PK>>
+  --
+  complaint_id : uuid <<FK>>
+  sender_id : uuid <<FK>>
+  body : text
+  created_at : timestamptz
+}
+
+entity "complaint_attachments" as complaint_attachments {
+  * id : uuid <<PK>>
+  --
+  complaint_id : uuid <<FK>>
+  file_name : text
+  file_url : text
+}
+
+entity "mentor_regalia" as mentor_regalia {
+  * id : uuid <<PK>>
+  --
+  mentor_id : uuid <<FK>>
+  reviewed_by_id : uuid <<FK, nullable>>
+  status : text
+  file_url : text
+  reviewed_at : timestamptz
+}
+
+entity "moderation_actions" as moderation_actions {
+  * id : uuid <<PK>>
+  --
+  admin_id : uuid <<FK>>
+  target_type : text
+  target_id : uuid
+  action : text
+  created_at : timestamptz
+}
+
+entity "user_blocks" as user_blocks {
+  * id : uuid <<PK>>
+  --
+  user_id : uuid <<FK>>
+  admin_id : uuid <<FK>>
+  status : text
+  created_at : timestamptz
+}
+
+' layout
+users -[hidden]down- complaints
+sessions_ref -[hidden]down- complaints
+complaints -[hidden]down- complaint_messages
+complaints -[hidden]right- complaint_attachments
+complaint_attachments -[hidden]right- mentor_regalia
+complaint_messages -[hidden]down- moderation_actions
+moderation_actions -[hidden]right- user_blocks
+
+' relationships (короткие подписи, чтобы не наслаивались)
+users ||--o{ complaints
+sessions_ref ||--o{ complaints : "сессия"
+
+complaints ||--o{ complaint_messages : "сообщения"
+complaints ||--o{ complaint_attachments : "файлы"
+users ||--o{ complaint_messages
+
+users ||--o{ mentor_regalia
+users ||--o{ moderation_actions
+users ||--o{ user_blocks
+
+legend right
+  PK - основной идентификатор
+  FK - ссылка на связанную запись
+endlegend
+
+@enduml
