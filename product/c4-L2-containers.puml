@@ -1,0 +1,141 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+title Mentory — L2 Container Diagram (MVP)
+
+' ============================================================
+' ОБОСНОВАНИЯ ВЫБОРА ТЕХНОЛОГИЙ
+' ============================================================
+'
+' 1) SvelteKit 2 (Frontend / SSR)
+'    — Предпосылки:
+'      • NFR3: время загрузки ≤1с при 1000 запросах → SSR обеспечивает
+'        быстрый First Contentful Paint без ожидания JS-бандла;
+'      • FR4, FR7: сложные формы профилей менти/ментора → реактивность
+'        Svelte упрощает валидацию на клиенте;
+'      • FR5: чат в реальном времени → встроенная поддержка WebSocket
+'        через socket.io-client;
+'      • Макеты: каталог менторов, профиль, чат, дашборд — требуют
+'        отзывчивого UI с минимальным JS overhead;
+'      • Svelte компилирует в vanilla JS → меньший бандл → быстрее
+'        загрузка (критично для NFR3/NFR15).
+'
+' 2) NestJS 10 (Backend API)
+'    — Предпосылки:
+'      • FR1-FR22: 22 функциональных требования → модульная архитектура
+'        NestJS (модуль на домен) обеспечивает масштабируемость кодовой базы;
+'      • NFR14: доступность 99.9% → middleware для health-checks,
+'        graceful shutdown, structured logging;
+'      • NFR3/NFR15: до 50000 одновременных пользователей → Node.js
+'        event loop эффективен для I/O-bound нагрузки (чат, API);
+'      • FR22: интеграция с эквайрингом через webhook → NestJS guards/pipes
+'        обеспечивают валидацию входящих данных;
+'      • ER: 15+ сущностей Core MVP → Prisma ORM + NestJS modules
+'        дают чёткую границу между доменами;
+'      • Единый язык TypeScript для FE/BE → общие типы через
+'        packages/shared (DTO, enum-ы статусов из ER).
+'
+' 3) PostgreSQL 16 (Database)
+'    — Предпосылки:
+'      • ER: 22 сущности с FK-связями → реляционная модель необходима
+'        для целостности данных (sessions ↔ payments ↔ slots);
+'      • FR8, FR11: бронирование слотов с защитой от гонок → PostgreSQL
+'        поддерживает row-level locking и SERIALIZABLE транзакции;
+'      • NFR13: до 1 000 000 менторов × 1000 заявок → PostgreSQL
+'        масштабируется до миллиардов записей с правильной индексацией;
+'      • NFR5, NFR6: хранение исторических данных 6 месяцев → нативная
+'        поддержка partitioning по дате;
+'      • ER: text[], json поля (goals, payload_json) → PostgreSQL
+'        поддерживает массивы и JSONB нативно.
+'
+' 4) Redis 7 (Cache + Session + Lock)
+'    — Предпосылки:
+'      • FR8 / Booking hold: 10-минутный hold слота → Redis TTL ключей
+'        для автоматического истечения hold (ER: slots.status: held);
+'      • NFR3: ≤1с ответ при 1000 запросах → кэширование каталога
+'        менторов, профилей, результатов поиска;
+'      • FR5: WebSocket-чат → Redis Pub/Sub для доставки событий
+'        при горизонтальном масштабировании;
+'      • FR1: lockout после 5 неудач → Redis counter с TTL 15 мин
+'        (ER: users.failed_login_attempts, login_locked_until).
+'
+' 5) MinIO / S3 (Object Storage)
+'    — Предпосылки:
+'      • NFR8: PDF до 128 МБ → файловое хранилище отделено от БД;
+'      • FR19: сертификаты менторов → безопасное хранение с presigned URL;
+'      • FR17: вложения жалоб (.png, .jpg, .pdf) → S3-совместимый API;
+'      • ER: mentor_regalia.file_url, complaint_attachments.file_url.
+'
+' 6) Caddy 2 (Reverse Proxy)
+'    — Предпосылки:
+'      • NFR14: доступность 99.9% → автоматический HTTPS, zero-downtime
+'        перезагрузка конфигурации;
+'      • Маршрутизация: /api/* → API, /admin* → AdminJS, /socket.io → WS,
+'        остальное → Web;
+'      • Проще в настройке чем Nginx для auto-TLS сценария.
+'
+' 7) Email-сервис (SMTP / MailHog в dev)
+'    — Предпосылки:
+'      • FR1: подтверждение email при регистрации;
+'      • NFR16: уведомления на почту;
+'      • ER: users.is_email_verified, notifications.type.
+'
+' ============================================================
+
+' --- Акторы ---
+Person(mentee, "Менти", "Ищет ментора, бронирует,\nоплачивает, общается.")
+Person(mentor, "Ментор", "Управляет профилем,\nпроводит сессии,\nвыводит средства.")
+Person(admin, "Администратор", "Модерирует платформу,\nверифицирует регалии.")
+
+' --- System Boundary ---
+System_Boundary(mentory, "Платформа Mentory") {
+
+    ' Frontend
+    Container(web, "Веб-приложение", "SvelteKit 2 / TypeScript / SSR", "Клиентский интерфейс для менти,\nментора и админа.\nSSR для быстрого First Paint (NFR3).\nWebSocket-чат (FR5).\nРеактивные формы профилей (FR4, FR7).")
+
+    ' Backend
+    Container(api, "API-сервер", "NestJS 10 / TypeScript / Prisma", "REST API + WebSocket Gateway.\nМодули: auth, profiles, discovery,\nscheduling, booking, sessions,\npayments, chat, notifications, trust.\n22 ФТ → модуль на домен.\nSwagger: /api/docs.")
+
+    ' Database
+    ContainerDb(db, "База данных", "PostgreSQL 16", "22 сущности ER (Core + Admin MVP).\nACID-транзакции для бронирования (FR8).\nRow-level locking для защиты от гонок.\nМасштаб: до 1М менторов (NFR13).")
+
+    ' Cache
+    ContainerDb(redis, "Кэш / Очереди", "Redis 7", "Кэш каталога менторов (NFR3).\nHold-lock слотов: TTL 10 мин (FR8).\nLogin lockout: TTL 15 мин (FR1).\nPub/Sub для WebSocket-событий (FR5).\nОчередь уведомлений (NFR16).")
+
+    ' Object Storage
+    ContainerDb(minio, "Файловое хранилище", "MinIO (S3-совместимое)", "Сертификаты менторов: PDF ≤128 МБ (FR19, NFR8).\nВложения жалоб: PNG/JPG/PDF (FR17).\nАватары пользователей.\nPresigned URL для безопасного доступа.")
+
+    ' Reverse Proxy
+    Container(caddy, "Reverse Proxy", "Caddy 2", "Auto HTTPS (NFR14).\nМаршрутизация:\n/api/* → API\n/admin* → AdminJS\n/socket.io → WebSocket\n/* → Web")
+}
+
+' --- Внешние системы ---
+System_Ext(payment, "Платёжная система\n(Эквайринг)", "Обработка платежей и выплат.\nКарточные данные хранятся\nтолько на стороне эквайринга.\n(FR9, FR15, FR22)")
+
+System_Ext(email_ext, "Email-сервис\n(SMTP)", "Транзакционные письма:\nверификация, напоминания,\nуведомления.\n(FR1, NFR16)")
+
+System_Ext(video, "Видео-провайдер", "Видеоконсультации.\nВ MVP — внешняя ссылка.\n(FR6, ER: video_rooms)")
+
+' --- Связи: Акторы → Caddy → Контейнеры ---
+Rel(mentee, caddy, "Браузер", "HTTPS")
+Rel(mentor, caddy, "Браузер", "HTTPS")
+Rel(admin, caddy, "Браузер", "HTTPS")
+
+Rel(caddy, web, "Статика + SSR\n(/* → web:3000)", "HTTP")
+Rel(caddy, api, "API + Admin + WS\n(/api/*, /admin*, /socket.io)", "HTTP/WS")
+
+' --- Связи: Web ↔ API ---
+Rel(web, api, "REST API запросы\n+ WebSocket (чат)", "HTTP / WS")
+
+' --- Связи: API → Хранилища ---
+Rel(api, db, "ORM-запросы\n(Prisma Client)", "TCP:5432")
+Rel(api, redis, "Кэш, locks, pub/sub,\nочередь уведомлений", "TCP:6379")
+Rel(api, minio, "Upload/download файлов\n(S3 API)", "HTTP:9000")
+
+' --- Связи: API → Внешние системы ---
+Rel(api, payment, "Создание платежа,\nwebhook оплаты,\nинициация выплат", "REST API")
+Rel(api, email_ext, "Отправка email:\nверификация, уведомления", "SMTP")
+Rel(api, video, "Создание видеокомнаты,\nполучение ссылок", "REST API")
+
+@enduml

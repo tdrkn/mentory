@@ -7,122 +7,147 @@ skinparam ArrowFontSize 11
 skinparam nodesep 70
 skinparam ranksep 95
 
-title Mentory ER (Юзер-панель / Core)
+title Mentory ER (Юзер-панель / Core MVP, Must Have)
 
 entity "users" as users {
-  * id : uuid <<PK>>
+  * id : Integer <<PK>>
   --
   email : text <<UQ>>
-  username : text <<UQ, nullable>>
+  password_hash : text
   full_name : text
-  role : enum(user_role)
-  timezone : text
-  is_blocked : bool
-  is_email_verified : bool
-  created_at : timestamptz
+  role : text
+  status : text
+  created_at : timestamp
 }
 
 entity "mentor_profiles" as mentor_profiles {
-  * user_id : uuid <<PK, FK>>
+  * user_id : Integer <<PK, FK>>
   --
-  headline : text
-  verification_status : text
+  headline : text <<nullable>>
+  bio : text <<nullable>>
   is_active : bool
-  rating_avg : numeric(3,2)
-  rating_count : int
+  rating_avg : numeric <<nullable>>
+  rating_count : int <<nullable>>
 }
 
 entity "mentee_profiles" as mentee_profiles {
-  * user_id : uuid <<PK, FK>>
+  * user_id : Integer <<PK, FK>>
   --
-  background : text
+  background : text <<nullable>>
+  goals : text[] <<nullable>>
 }
 
 entity "topics" as topics {
-  * id : uuid <<PK>>
+  * id : Integer <<PK>>
   --
-  name : text
+  name : text <<UQ>>
 }
 
 entity "mentor_topics" as mentor_topics {
-  * mentor_id : uuid <<PK, FK>>
-  * topic_id : uuid <<PK, FK>>
+  * mentor_id : Integer <<PK, FK>>
+  * topic_id : Integer <<PK, FK>>
 }
 
 entity "mentor_services" as mentor_services {
-  * id : uuid <<PK>>
+  * id : Integer <<PK>>
   --
-  mentor_id : uuid <<FK>>
+  mentor_id : Integer <<FK>>
   title : text
   duration_min : int
-  price_amount : decimal(10,2)
-  currency : varchar(3)
+  price_amount : numeric
+  currency : text
   is_active : bool
 }
 
 entity "slots" as slots {
-  * id : uuid <<PK>>
+  * id : Integer <<PK>>
   --
-  mentor_id : uuid <<FK>>
-  start_at : timestamptz
-  end_at : timestamptz
-  status : enum(slot_status)
-  held_until : timestamptz
+  mentor_id : Integer <<FK>>
+  start_at : timestamp
+  end_at : timestamp
+  status : text
 }
 
 entity "sessions" as sessions {
-  * id : uuid <<PK>>
+  * id : Integer <<PK>>
   --
-  mentor_id : uuid <<FK>>
-  mentee_id : uuid <<FK>>
-  service_id : uuid <<FK>>
-  slot_id : uuid <<FK>>
-  status : enum(session_status)
-  start_at : timestamptz
-  end_at : timestamptz
+  mentor_id : Integer <<FK>>
+  mentee_id : Integer <<FK>>
+  service_id : Integer <<FK>>
+  slot_id : Integer <<FK>>
+  status : text
+  start_at : timestamp
+  end_at : timestamp
+  created_at : timestamp
+  canceled_at : timestamp <<nullable>>
+  cancel_reason : text <<nullable>>
+}
+
+entity "video_rooms" as video_rooms {
+  * id : Integer <<PK>>
+  --
+  session_id : Integer <<FK>>
+  meeting_url : text <<nullable>>
 }
 
 entity "conversations" as conversations {
-  * id : uuid <<PK>>
+  * id : Integer <<PK>>
   --
-  mentor_id : uuid <<FK>>
-  mentee_id : uuid <<FK>>
-  session_id : uuid <<FK, nullable>>
-  updated_at : timestamptz
+  mentor_id : Integer <<FK>>
+  mentee_id : Integer <<FK>>
+  session_id : Integer <<FK, nullable>>
+  created_at : timestamp
 }
 
 entity "messages" as messages {
-  * id : uuid <<PK>>
+  * id : Integer <<PK>>
   --
-  conversation_id : uuid <<FK>>
-  sender_id : uuid <<FK>>
+  conversation_id : Integer <<FK>>
+  sender_id : Integer <<FK>>
   content : text
-  content_type : text
-  is_read : bool
-  created_at : timestamptz
+  created_at : timestamp
+  read_at : timestamp <<nullable>>
 }
 
 entity "payments" as payments {
-  * id : uuid <<PK>>
+  * id : Integer <<PK>>
   --
-  session_id : uuid <<FK>>
-  mentee_id : uuid <<FK, nullable>>
-  mentor_id : uuid <<FK, nullable>>
-  amount : int
-  platform_fee : int
-  mentor_amount : int
-  currency : varchar(3)
-  status : enum(payment_status)
+  session_id : Integer <<FK>>
+  amount_cents : int
+  currency : text
+  status : text
+  provider_payment_id : text <<nullable>>
+  created_at : timestamp
+}
+
+entity "payouts" as payouts {
+  * id : Integer <<PK>>
+  --
+  mentor_id : Integer <<FK>>
+  amount_cents : int
+  currency : text
+  status : text
+  created_at : timestamp
 }
 
 entity "reviews" as reviews {
-  * id : uuid <<PK>>
+  * id : Integer <<PK>>
   --
-  session_id : uuid <<FK>>
-  mentee_id : uuid <<FK>>
-  mentor_id : uuid <<FK>>
+  session_id : Integer <<FK>>
+  mentee_id : Integer <<FK>>
+  mentor_id : Integer <<FK>>
   rating : int
-  created_at : timestamptz
+  text : text <<nullable>>
+  created_at : timestamp
+}
+
+entity "notifications" as notifications {
+  * id : Integer <<PK>>
+  --
+  user_id : Integer <<FK>>
+  type : text
+  created_at : timestamp
+  read_at : timestamp <<nullable>>
 }
 
 ' layout
@@ -137,27 +162,34 @@ sessions -[hidden]left- reviews
 sessions -[hidden]right- payments
 sessions -[hidden]down- conversations
 conversations -[hidden]down- messages
+video_rooms -[hidden]left- sessions
+payouts -[hidden]down- notifications
 
-' relationships (коротко)
-users ||--o| mentor_profiles
-users ||--o| mentee_profiles
+' relationships
+users ||--o| mentor_profiles : "профиль ментора"
+users ||--o| mentee_profiles : "профиль менти"
 mentor_profiles ||--o{ mentor_topics : "экспертиза"
 topics ||--o{ mentor_topics : "темы"
 
-users ||--o{ mentor_services
-users ||--o{ slots
+users ||--o{ mentor_services : "услуги"
+users ||--o{ slots : "слоты"
 mentor_services ||--o{ sessions : "услуга"
 slots ||--o| sessions : "слот"
-users ||--o{ sessions
+users ||--o{ sessions : "участие"
 
 sessions ||--o| payments : "оплата"
+sessions ||--o| video_rooms : "видеокомната"
 sessions ||--o| reviews : "отзыв"
 sessions ||--o| conversations : "чат"
 conversations ||--o{ messages : "сообщения"
 
+users ||--o{ payouts : "выплаты"
+users ||--o{ notifications : "уведомления"
+
 legend right
   PK - основной идентификатор
   FK - ссылка на связанную запись
+  UQ - уникальное значение
 endlegend
 
 @enduml
