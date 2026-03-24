@@ -21,7 +21,7 @@ title Mentory — L2 Container Diagram (MVP)
 '      • Svelte компилирует в vanilla JS → меньший бандл → быстрее
 '        загрузка (критично для NFR3/NFR15).
 '
-' 2) NestJS 10 (Backend API)
+' 2) NestJS 10 (Backend Monolith)
 '    — Предпосылки:
 '      • FR1-FR22: 22 функциональных требования → модульная архитектура
 '        NestJS (модуль на домен) обеспечивает масштабируемость кодовой базы;
@@ -92,22 +92,22 @@ Person(admin, "Администратор", "Модерирует платфор
 System_Boundary(mentory, "Платформа Mentory") {
 
     ' Frontend
-    Container(web, "Веб-приложение", "SvelteKit 2 / TypeScript / SSR", "Клиентский интерфейс для менти,\nментора и админа.\nSSR для быстрого First Paint (NFR3).\nWebSocket-чат (FR5).\nРеактивные формы профилей (FR4, FR7).")
+    Container(web, "Web App", "SvelteKit 2 / TypeScript / SSR", "Клиентский интерфейс для менти,\nментора и админа.\nSSR для быстрого First Paint (NFR3).\nWebSocket-чат (FR5).\nРеактивные формы профилей (FR4, FR7).")
 
     ' Backend
-    Container(api, "API-сервер", "NestJS 10 / TypeScript / Prisma", "REST API + WebSocket Gateway.\nМодули: auth, profiles, discovery,\nscheduling, booking, sessions,\npayments, chat, notifications, trust.\n22 ФТ → модуль на домен.\nSwagger: /api/docs.")
+    Container(api, "Backend Monolith", "NestJS 10 / TypeScript / Prisma", "Монолитное backend-приложение.\nВнутренние модули: API Gateway Module,\nDiscovery Module, Application Module,\nScheduling Module, Booking Module,\nPayment Module, Notification Module,\nConversation Module, Chat Module,\nWebSocket Gateway Module.\nВсе внешние интеграции выполняются\nчерез API Gateway Module.\nSwagger: /api/docs.")
 
     ' Database
     ContainerDb(db, "База данных", "PostgreSQL 16", "22 сущности ER (Core + Admin MVP).\nACID-транзакции для бронирования (FR8).\nRow-level locking для защиты от гонок.\nМасштаб: до 1М менторов (NFR13).")
 
     ' Cache
-    ContainerDb(redis, "Кэш / Очереди", "Redis 7", "Кэш каталога менторов (NFR3).\nHold-lock слотов: TTL 10 мин (FR8).\nLogin lockout: TTL 15 мин (FR1).\nPub/Sub для WebSocket-событий (FR5).\nОчередь уведомлений (NFR16).")
+    ContainerDb(redis, "Кэш / Очереди", "Redis 7", "Кэш каталога менторов (NFR3).\nHold-lock слотов: TTL 10 мин (FR8).\nLogin lockout: TTL 15 мин (FR1).\nPub/Sub и presence для WebSocket-чата (FR5).\nОчередь уведомлений (NFR16).")
 
     ' Object Storage
     ContainerDb(minio, "Файловое хранилище", "MinIO (S3-совместимое)", "Сертификаты менторов: PDF ≤128 МБ (FR19, NFR8).\nВложения жалоб: PNG/JPG/PDF (FR17).\nАватары пользователей.\nPresigned URL для безопасного доступа.")
 
     ' Reverse Proxy
-    Container(caddy, "Reverse Proxy", "Caddy 2", "Auto HTTPS (NFR14).\nМаршрутизация:\n/api/* → API\n/admin* → AdminJS\n/socket.io → WebSocket\n/* → Web")
+    Container(caddy, "Reverse Proxy", "Caddy 2", "Инфраструктурный ingress.\nAuto HTTPS (NFR14).\nTLS termination и reverse proxy\nдо Web App и Backend Monolith.\nДля пользователей прозрачен.")
 }
 
 ' --- Внешние системы ---
@@ -117,13 +117,14 @@ System_Ext(email_ext, "Email-сервис\n(SMTP)", "Транзакционны�
 
 System_Ext(video, "Видео-провайдер", "Видеоконсультации.\nВ MVP — внешняя ссылка.\n(FR6, ER: video_rooms)")
 
-' --- Связи: Акторы → Caddy → Контейнеры ---
-Rel(mentee, caddy, "Браузер", "HTTPS")
-Rel(mentor, caddy, "Браузер", "HTTPS")
-Rel(admin, caddy, "Браузер", "HTTPS")
+' --- Связи: Акторы → Web App ---
+Rel(mentee, web, "Браузер", "HTTPS")
+Rel(mentor, web, "Браузер", "HTTPS")
+Rel(admin, web, "Браузер", "HTTPS")
 
-Rel(caddy, web, "Статика + SSR\n(/* → web:3000)", "HTTP")
-Rel(caddy, api, "API + Admin + WS\n(/api/*, /admin*, /socket.io)", "HTTP/WS")
+' --- Связи: Reverse Proxy → Контейнеры ---
+Rel(caddy, web, "TLS termination + reverse proxy\nдо SSR / статики", "HTTP")
+Rel(caddy, api, "Reverse proxy до /api, /admin,\n/socket.io", "HTTP/WS")
 
 ' --- Связи: Web ↔ API ---
 Rel(web, api, "REST API запросы\n+ WebSocket (чат)", "HTTP / WS")

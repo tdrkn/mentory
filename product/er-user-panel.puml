@@ -48,12 +48,25 @@ entity "mentor_topics" as mentor_topics {
   * topic_id : Integer <<PK, FK>>
 }
 
-entity "mentor_services" as mentor_services {
+entity "mentor_services_single" as mentor_services_single {
   * id : Integer <<PK>>
   --
   mentor_id : Integer <<FK>>
   title : text
   duration_min : int
+  price_amount : numeric
+  currency : text
+  is_active : bool
+}
+
+entity "mentor_subscriptions" as mentor_subscriptions {
+  * id : Integer <<PK>>
+  --
+  mentor_id : Integer <<FK>>
+  title : text
+  description : text <<nullable>>
+  sessions_count : int <<nullable>>
+  session_duration_min : int <<nullable>>
   price_amount : numeric
   currency : text
   is_active : bool
@@ -68,12 +81,23 @@ entity "slots" as slots {
   status : text
 }
 
+entity "applications" as applications {
+  * id : Integer <<PK>>
+  --
+  mentee_id : Integer <<FK>>
+  mentor_id : Integer <<FK>>
+  service_single_id : Integer <<FK, nullable>>
+  mentor_subscription_id : Integer <<FK, nullable>>
+  status : text
+  created_at : timestamp
+}
+
 entity "sessions" as sessions {
   * id : Integer <<PK>>
   --
+  application_id : Integer <<FK>>
   mentor_id : Integer <<FK>>
   mentee_id : Integer <<FK>>
-  service_id : Integer <<FK>>
   slot_id : Integer <<FK>>
   status : text
   start_at : timestamp
@@ -112,7 +136,7 @@ entity "messages" as messages {
 entity "payments" as payments {
   * id : Integer <<PK>>
   --
-  session_id : Integer <<FK>>
+  application_id : Integer <<FK>>
   amount_cents : int
   currency : text
   status : text
@@ -155,11 +179,13 @@ users -[hidden]down- mentor_profiles
 users -[hidden]right- mentee_profiles
 mentor_profiles -[hidden]down- mentor_topics
 topics -[hidden]right- mentor_topics
-mentor_profiles -[hidden]down- mentor_services
-mentor_services -[hidden]down- slots
-slots -[hidden]down- sessions
+mentor_profiles -[hidden]down- mentor_services_single
+mentor_services_single -[hidden]right- mentor_subscriptions
+mentor_services_single -[hidden]down- slots
+slots -[hidden]down- applications
+applications -[hidden]down- sessions
+applications -[hidden]right- payments
 sessions -[hidden]left- reviews
-sessions -[hidden]right- payments
 sessions -[hidden]down- conversations
 conversations -[hidden]down- messages
 video_rooms -[hidden]left- sessions
@@ -171,13 +197,16 @@ users ||--o| mentee_profiles : "профиль менти"
 mentor_profiles ||--o{ mentor_topics : "экспертиза"
 topics ||--o{ mentor_topics : "темы"
 
-users ||--o{ mentor_services : "услуги"
+users ||--o{ mentor_services_single : "услуги"
+users ||--o{ mentor_subscriptions : "подписки (шаблон)"
 users ||--o{ slots : "слоты"
-mentor_services ||--o{ sessions : "услуга"
+mentor_services_single ||--o{ applications : "услуга"
+mentor_subscriptions ||--o{ applications : "подписка"
+users ||--o{ applications : "оформляет"
+applications ||--o{ sessions : "сессии"
 slots ||--o| sessions : "слот"
-users ||--o{ sessions : "участие"
 
-sessions ||--o| payments : "оплата"
+applications ||--o| payments : "оплата"
 sessions ||--o| video_rooms : "видеокомната"
 sessions ||--o| reviews : "отзыв"
 sessions ||--o| conversations : "чат"

@@ -1,0 +1,215 @@
+@startuml Sequence_Chat_Realtime
+
+title UC15: Встроенный чат между ментором и менти
+
+skinparam responseMessageBelowArrow true
+skinparam shadowing false
+skinparam noteBackgroundColor #F7F7F7
+skinparam noteBorderColor #B0B0B0
+skinparam participant {
+    BackgroundColor #F6F7FB
+    BorderColor #344054
+}
+
+actor       "Менти"                        as Mentee
+actor       "Ментор"                       as Mentor
+participant "Web App (отправитель)"       as SenderWeb
+participant "Web App (получатель)"        as RecipientWeb
+participant "Обратный прокси"             as Proxy
+box "Backend Monolith" #EAF2FF
+participant "API Gateway Module"          as GW
+participant "Conversation Module"         as Conv
+participant "Chat Module"                 as Chat
+participant "WebSocket Gateway Module\n(/chat)" as WSG
+end box
+database    "Main DB\n(PostgreSQL)"       as DB
+database    "Redis\n(pub/sub + presence)" as Redis
+
+note over Chat, WSG #EEEEEE
+FR5 и UC15.
+DB является основным источником данных,
+Redis используется для pub/sub fan-out,
+presence и межнодовой доставки realtime-событий.
+end note
+
+== Подключение к чату ==
+
+Mentor -> RecipientWeb : Открывает раздел "Чаты"
+activate RecipientWeb
+    RecipientWeb -> Proxy : WSS /chat\nJWT в handshake
+    activate Proxy
+        Proxy -> WSG : Проксировать WebSocket upgrade
+        activate WSG
+            WSG -> WSG : Проверить JWT\nи заполнить socket.data.user
+            WSG -> Chat : Проверить право доступа\nк активным чатам
+            activate Chat
+                Chat -> DB : SELECT active sessions/subscriptions\nfor current user
+                activate DB
+                    DB --> Chat : scope доступа
+                deactivate DB
+
+                alt #F0FFF0 Доступ разрешен
+                    Chat --> WSG : доступ разрешен
+                else #FFF0F0 Доступ истек или запрещен
+                    Chat --> WSG : доступ запрещен
+                    WSG --> Proxy : close 4403 Forbidden
+                    Proxy --> RecipientWeb : "Чат недоступен"
+                end
+            deactivate Chat
+
+            WSG -> Conv : Получить разговоры пользователя
+            activate Conv
+                Conv -> DB : SELECT conversations by mentorId/menteeId
+                activate DB
+                DB --> Conv : conversations[]
+                deactivate DB
+                Conv --> WSG : conversations[]
+            deactivate Conv
+
+            WSG -> Redis : SET presence:user:{id}\nTTL + SUBSCRIBE conversation:*
+            activate Redis
+                Redis --> WSG : OK
+            deactivate Redis
+            WSG -> WSG : join rooms conversation:{id}
+            WSG --> Proxy : соединение установлено
+        deactivate WSG
+    Proxy --> RecipientWeb : соединение установлено
+    deactivate Proxy
+deactivate RecipientWeb
+
+== Создание / получение диалога по сессии ==
+
+Mentee -> SenderWeb : Открывает чат из карточки сессии
+activate SenderWeb
+    SenderWeb -> Proxy : POST /conversations/{sessionId}
+    activate Proxy
+        Proxy -> GW : Проксировать REST-запрос
+        activate GW
+            GW -> Conv : Получить или создать диалог
+            activate Conv
+                Conv -> DB : SELECT conversation by sessionId\nOR mentor/mentee pair
+                activate DB
+                    DB --> Conv : conversation? + policy доступа
+                deactivate DB
+
+                alt #E8F5E9 Диалог уже существует
+                    Conv --> GW : conversationId
+
+                else #E3F2FD Диалог отсутствует, доступ валиден
+                    Conv -> DB : INSERT conversation
+                    activate DB
+                        DB --> Conv : new conversationId
+                    deactivate DB
+                    Conv --> GW : new conversationId
+
+                else #FFF0F0 Нет активной сессии / подписки
+                    Conv --> GW : 403 Forbidden
+                end
+            deactivate Conv
+        GW --> Proxy : conversationId | ошибка
+        deactivate GW
+    Proxy --> SenderWeb : conversationId | ошибка
+    deactivate Proxy
+deactivate SenderWeb
+
+== Отправка текстового сообщения ==
+
+Mentee -> SenderWeb : Вводит текст и нажимает "Отправить"
+activate SenderWeb
+    SenderWeb -> Proxy : POST /chat/{conversationId}/messages\n{contentType=text, content}
+    activate Proxy
+        Proxy -> GW : Проксировать REST-запрос
+        activate GW
+            GW -> Chat : Отправить сообщение
+            activate Chat
+                Chat -> DB : SELECT conversation + participants + access policy
+                activate DB
+                    DB --> Chat : контекст доступа
+                deactivate DB
+
+                alt #F0FFF0 Доступ валиден
+                    Chat -> Chat : Проверить payload сообщения
+                    Chat -> DB : BEGIN\nINSERT message\nUPDATE conversation.updatedAt\nCOMMIT
+                    activate DB
+                        DB --> Chat : messageId
+                    deactivate DB
+
+                    Chat -> DB : SELECT message + sender + attachments
+                    activate DB
+                        DB --> Chat : сериализованное сообщение
+                    deactivate DB
+
+                    Chat -> Redis : PUBLISH conversation:{id}.new_message
+                    activate Redis
+                        Redis --> WSG : событие new_message
+                    deactivate Redis
+
+                    activate WSG
+                        WSG --> Proxy : событие new_message
+                    deactivate WSG
+                    Proxy --> RecipientWeb : событие new_message
+
+                    Chat --> GW : 201 Created\nmessage payload
+
+                else #FFF0F0 Нет прав / чат заблокирован
+                    Chat --> GW : 403 Forbidden
+                end
+            deactivate Chat
+        GW --> Proxy : ответ
+        deactivate GW
+    Proxy --> SenderWeb : Отправлено | ошибка
+    deactivate Proxy
+    SenderWeb --> Mentee : Сообщение показано в ленте
+deactivate SenderWeb
+
+== Индикатор "печатает..." ==
+
+Mentee -> SenderWeb : Начинает печатать
+activate SenderWeb
+    SenderWeb -> Proxy : WS событие typing\n{conversationId, isTyping=true}
+    activate Proxy
+        Proxy -> WSG : событие typing
+        activate WSG
+            WSG -> Redis : PUBLISH typing event
+            activate Redis
+                Redis --> WSG : fan-out события typing
+            deactivate Redis
+            WSG --> Proxy : событие user_typing
+        deactivate WSG
+    Proxy --> RecipientWeb : событие user_typing
+    deactivate Proxy
+deactivate SenderWeb
+
+== Статус прочтения ==
+
+Mentor -> RecipientWeb : Открывает диалог и читает сообщение
+activate RecipientWeb
+    RecipientWeb -> Proxy : WS событие mark_read\n{conversationId}
+    activate Proxy
+        Proxy -> WSG : событие mark_read
+        activate WSG
+            WSG -> Chat : Отметить как прочитанное
+            activate Chat
+                Chat -> DB : UPDATE messages\nSET is_read=true, read_at=now()
+                activate DB
+                    DB --> Chat : count updated
+                deactivate DB
+                Chat -> Redis : PUBLISH messages_read
+                activate Redis
+                    Redis --> WSG : fan-out события messages_read
+                deactivate Redis
+                Chat --> WSG : {markedAsRead}
+            deactivate Chat
+            WSG --> Proxy : событие messages_read
+        deactivate WSG
+    Proxy --> SenderWeb : событие messages_read
+    deactivate Proxy
+deactivate RecipientWeb
+
+note over Chat #FFF8DC
+В MVP зафиксирован текстовый чат.
+Файлы и изображения оставлены вне рамок текущей версии.
+Emoji/реакции тоже можно не показывать на этой диаграмме.
+end note
+
+@enduml

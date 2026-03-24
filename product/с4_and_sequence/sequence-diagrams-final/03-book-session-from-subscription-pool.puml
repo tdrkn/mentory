@@ -1,0 +1,205 @@
+@startuml Sequence_Book_Session_From_Subscription_Pool
+
+title Подписка: планирование сессии ментором и подтверждение менти
+
+skinparam responseMessageBelowArrow true
+skinparam shadowing false
+skinparam noteBackgroundColor #F7F7F7
+skinparam noteBorderColor #B0B0B0
+skinparam participant {
+    BackgroundColor #F6F7FB
+    BorderColor #344054
+}
+
+actor       "Ментор"                     as Mentor
+actor       "Менти"                      as Mentee
+participant "Web App"                    as Web
+box "Backend Monolith" #EAF2FF
+participant "API Gateway Module"         as GW
+participant "Application Module"         as AppSvc
+participant "Scheduling Module"          as Scheduling
+participant "Booking Module"             as Booking
+participant "Notification Module"        as Notify
+end box
+database    "Main DB\n(PostgreSQL)"      as DB
+database    "Redis\n(lock + hold TTL)"   as Redis
+
+note over AppSvc, Booking #EEEEEE
+Подписка — это временной период доступа к ментору (включая чат).
+Количество сессий в системе жестко не лимитируется (на усмотрение ментора).
+Инициатором создания сессии в рамках подписки выступает Ментор, затем Менти должен её подтвердить.
+end note
+
+== Планирование сессии ментором ==
+
+Mentor -> Web : Открывает чат/подписку с менти и\nвыбирает "Назначить сессию"
+activate Web
+    Web -> GW : GET /applications/{id}/check
+    activate GW
+        GW -> AppSvc : Проверить статус подписки,\nпару mentor-mentee и права ментора
+        activate AppSvc
+            AppSvc -> DB : SELECT application + subscription + mentor_id + mentee_id
+            activate DB
+                DB --> AppSvc : application context
+            deactivate DB
+
+            alt #F0FFF0 Подписка активна и ментор владелец заявки
+                AppSvc --> GW : 200 OK
+                GW --> Web : OK
+
+            else #FFF0F0 Это не ментор данной подписки
+                AppSvc --> GW : 403 Forbidden
+                GW --> Web : "Нельзя планировать сессию\nдля этого клиента"
+                Web --> Mentor : Ошибка доступа
+
+            else #FFFBE6 Подписка истекла или не активна
+                AppSvc --> GW : 409 Conflict
+                GW --> Web : "Подписка не активна"
+                Web --> Mentor : Предложить продлить подписку
+            end
+        deactivate AppSvc
+    deactivate GW
+
+    Web -> GW : GET /schedule/slots?mentorId=...
+    activate GW
+        GW -> Scheduling : Подтянуть свои слоты
+        activate Scheduling
+            Scheduling -> DB : SELECT slots WHERE status='free'
+            activate DB
+                DB --> Scheduling : free slots[]
+            deactivate DB
+            Scheduling --> GW : Календарь слотов
+        deactivate Scheduling
+    GW --> Web : Доступные слоты
+    deactivate GW
+
+    Mentor -> Web : Выбирает слот и нажимает "Запланировать"
+    Web -> GW : POST /applications/{id}/sessions\n{slotId}
+    activate GW
+        GW -> Booking : Создать session в рамках подписки
+        activate Booking
+            Booking -> DB : SELECT application(status='active', mentor_id=currentUser)
+            activate DB
+                DB --> Booking : application access
+            deactivate DB
+
+            alt #FFF0F0 Заявка не принадлежит этому ментору
+                Booking --> GW : 403 Forbidden
+                GW --> Web : "Нельзя назначить сессию\nдля чужого клиента"
+                Web --> Mentor : Ошибка доступа
+
+            else #F0FFF0 Права подтверждены
+                Booking -> Redis : SETNX lock:slot:{slotId}\nTTL=short
+                activate Redis
+                    Redis --> Booking : lock status
+                deactivate Redis
+
+                alt #FFFBE6 Слот уже удерживается другим процессом
+                    Booking --> GW : 409 Conflict\n{reason: slot_locked}
+                    GW --> Web : "Слот уже выбирается\nдругим пользователем"
+                    Web --> Mentor : Выбрать другой слот
+
+                else #F0FFF0 Lock получен
+                    Booking -> DB : SELECT slot WHERE mentor_id=currentUser\nAND status='free'
+                    activate DB
+                        DB --> Booking : slot state
+                    deactivate DB
+
+                    alt #F0FFF0 Слот доступен
+                        Booking -> DB : BEGIN\nINSERT session(application_id, slot_id, status='pending_confirmation')\nUPDATE slot -> held\nCOMMIT
+                        activate DB
+                            DB --> Booking : sessionId
+                        deactivate DB
+
+                        Booking -> Notify : Уведомить менти\nо предложенной встрече
+                        activate Notify
+                            Notify -> DB : INSERT notification
+                            activate DB
+                                DB --> Notify : OK
+                            deactivate DB
+                        deactivate Notify
+
+                        Booking --> GW : 201 Created\n{sessionId}
+                        GW --> Web : Сессия предложена
+                        Web --> Mentor : "Ожидает подтверждения менти"
+
+                    else #FFF0F0 Слот уже занят или не принадлежит ментору
+                        Booking --> GW : 409 Conflict\n{reason: slot_unavailable}
+                        GW --> Web : "Слот недоступен"
+                        Web --> Mentor : Выбрать другой слот
+                    end
+                end
+            end
+        deactivate Booking
+    deactivate GW
+deactivate Web
+
+== Подтверждение сессии менти ==
+
+Mentee -> Web : Открывает уведомление/чат\nс предложенной сессией
+activate Web
+    Mentee -> Web : Нажимает "Подтвердить"\nили "Отклонить"
+    Web -> GW : POST /sessions/{id}/confirm | decline
+    activate GW
+        GW -> Booking : Confirm or decline session
+        activate Booking
+            alt #F0FFF0 Менти подтверждает сессию
+                Booking -> DB : BEGIN\nUPDATE session -> confirmed\nUPDATE slot -> booked\nCOMMIT
+                activate DB
+                    DB --> Booking : OK
+                deactivate DB
+
+                Booking -> Notify : Уведомить ментора\nоб успешном подтверждении
+                activate Notify
+                    Notify -> DB : INSERT notification
+                    activate DB
+                        DB --> Notify : OK
+                    deactivate DB
+                deactivate Notify
+
+                Booking --> GW : 200 OK
+                GW --> Web : Сессия подтверждена
+                Web --> Mentee : "Вы успешно записаны"
+                Web --> Mentor : Статус сессии "Подтверждена"
+
+            else #E3F2FD Менти отклоняет предложение
+                Booking -> DB : BEGIN\nUPDATE session -> declined\nUPDATE slot -> free\nCOMMIT
+                activate DB
+                    DB --> Booking : OK
+                deactivate DB
+
+                Booking -> Notify : Уведомить ментора\nоб отклонении встречи
+                activate Notify
+                    Notify -> DB : INSERT notification
+                    activate DB
+                        DB --> Notify : OK
+                    deactivate DB
+                deactivate Notify
+
+                Booking --> GW : 200 OK
+                GW --> Web : Предложение отклонено
+                Web --> Mentee : "Встреча отклонена"
+                Web --> Mentor : Статус сессии "Отклонена"
+
+            else #FFF0F0 Предложение истекло или слот уже недоступен
+                Booking -> DB : UPDATE session -> canceled\nUPDATE slot -> free
+                activate DB
+                    DB --> Booking : OK
+                deactivate DB
+                Booking --> GW : 409 Conflict
+                GW --> Web : "Предложение больше недоступно"
+                Web --> Mentee : Обновить карточку и выбрать другой слот
+            end
+        deactivate Booking
+    deactivate GW
+deactivate Web
+
+note over Mentor, Mentee #FFF8DC
+**Блокировка чата после окончания**
+После того как заявка/подписка истекает (поле end_at)
+или проходит время после единственной сессии,
+чатовый модуль программно блокирует отправку новых сообщений.
+Это реализовано на уровне прав WebSocket Gateway Module / Chat Module.
+end note
+
+@enduml

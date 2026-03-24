@@ -1,0 +1,948 @@
+@startuml Sequence_Booking_Payment_Confirmation
+
+title UC7 + UC9 + UC13: Запись на разовую сессию, оплата и подтверждение заявки
+
+skinparam responseMessageBelowArrow true
+skinparam shadowing false
+skinparam noteBackgroundColor #F7F7F7
+skinparam noteBorderColor #B0B0B0
+skinparam participant {
+    BackgroundColor #F6F7FB
+    BorderColor #344054
+}
+skinparam participant {
+    BackgroundColor<<external>> #FF6666
+    FontColor<<external>> white
+    BorderColor<<external>> #CC0000
+}
+
+actor       "Менти"                                 as Mentee
+actor       "Ментор"                                as Mentor
+participant "Web App"                               as Web
+participant "API Gateway"                           as GW
+participant "Discovery Service"                     as Discovery
+participant "Scheduling Service"                    as Scheduling
+participant "Booking Service"                       as Booking
+participant "Payment Service"                       as Payment
+participant "Notification Service"                  as Notify
+database    "Main DB\n(PostgreSQL)"                 as DB
+database    "Redis\n(lock + hold TTL)"              as Redis
+participant "Acquiring Gateway\n(card / QR / CBR)"  as Acquirer <<external>>
+participant "SMTP / Email"                          as Email <<external>>
+
+note over GW, Notify #EEEEEE
+Логические сервисы платформы.
+В текущем as-is коде часть из них реализована как модули одного API.
+end note
+
+== Выбор ментора и слота ==
+
+Mentee -> Web : Открывает профиль ментора\nи выбирает разовую сессию
+activate Web
+
+    Web -> GW : GET /mentors/{id}
+    activate GW
+        GW -> Discovery : Запрос профиля ментора,\nуслуг и рейтинга
+        activate Discovery
+            Discovery -> DB : SELECT mentor profile,\nservices, reviews
+            activate DB
+                DB --> Discovery : profile + services + rating
+            deactivate DB
+            Discovery --> GW : Профиль ментора
+        deactivate Discovery
+    GW --> Web : Профиль ментора
+    deactivate GW
+
+    Web -> GW : GET /schedule/slots?mentorId=...
+    activate GW
+        GW -> Scheduling : Получить доступные слоты
+        activate Scheduling
+            Scheduling -> DB : SELECT slots WHERE status='free'
+            activate DB
+                DB --> Scheduling : free slots[]
+            deactivate DB
+            Scheduling --> GW : Доступные слоты
+        deactivate Scheduling
+    GW --> Web : Список слотов
+    deactivate GW
+
+== Hold слота и создание заявки ==
+
+    Mentee -> Web : Выбирает слот и нажимает\n"Продолжить к оплате"
+
+    Web -> GW : POST /booking/hold\n{slotId, serviceId}
+    activate GW
+        GW -> Booking : Hold slot
+        activate Booking
+
+            Booking -> Redis : SETNX lock:slot:{slotId}\nTTL=short
+            activate Redis
+                Redis --> Booking : lock acquired
+            deactivate Redis
+
+            Booking -> DB : SELECT ... FOR UPDATE\nпроверка слота и услуги
+            activate DB
+                DB --> Booking : slot free + service active
+            deactivate DB
+
+            Booking -> DB : BEGIN\nUPDATE slot -> held\nINSERT session(status=requested)\nCOMMIT
+            activate DB
+                DB --> Booking : sessionId + holdExpiresAt
+            deactivate DB
+
+            Booking --> GW : 201 Created\n{sessionId, holdExpiresAt}
+        deactivate Booking
+    GW --> Web : Данные checkout
+    deactivate GW
+
+    note right of Booking
+    Сложное место:
+    slot удерживается 10 минут,
+    защита от двойного бронирования
+    идет через Redis lock + DB transaction.
+    end note
+
+== Создание payment intent ==
+
+    Web --> Mentee : Экран checkout:\nстоимость, длительность,\nкомиссия/правила
+
+    Mentee -> Web : Выбирает способ оплаты
+
+    Web -> GW : POST /payments/intent\n{sessionId}
+    activate GW
+        GW -> Payment : Create payment intent
+        activate Payment
+
+            Payment -> DB : SELECT session + service + slot
+            activate DB
+                DB --> Payment : requested session + held slot
+            deactivate DB
+
+            alt #FFF0F0 Hold истек или слот уже освобожден
+                Payment -> DB : UPDATE slot -> free\nUPDATE session -> canceled
+                activate DB
+                    DB --> Payment : OK
+                deactivate DB
+                Payment --> GW : 410 Gone\n{reason: hold_expired}
+                GW --> Web : Ошибка hold
+                Web --> Mentee : "Время брони истекло,\nвыберите слот заново"
+
+            else #F0FFF0 Hold валиден
+                Payment -> DB : INSERT payment(status=pending,\nproviderPaymentId, amount)
+                activate DB
+                    DB --> Payment : payment + checkoutUrl
+                deactivate DB
+
+                Payment --> GW : 200 OK\n{checkoutUrl, paymentMethods[]}
+                GW --> Web : checkoutUrl
+                Web --> Mentee : Редирект в эквайринг
+            end
+
+        deactivate Payment
+    deactivate GW
+
+== Оплата во внешнем эквайринге ==
+
+    Web -> Acquirer : Redirect / checkout
+    activate Acquirer
+        Mentee -> Acquirer : Вводит данные / подтверждает платеж
+        Acquirer --> Web : Возвращает пользователя\nв платформу
+    deactivate Acquirer
+
+== Webhook и финализация ==
+
+    Acquirer -> GW : POST /payments/webhook\npayment_intent.succeeded | failed
+    activate GW
+        GW -> Payment : Handle webhook
+        activate Payment
+
+            alt #F0FFF0 Платеж подтвержден
+                Payment -> DB : BEGIN\nUPDATE payment -> succeeded\nUPDATE session -> paid\nCOMMIT
+                activate DB
+                    DB --> Payment : OK
+                deactivate DB
+
+                Payment -> Notify : Создать in-app уведомление ментору
+                activate Notify
+                    Notify -> DB : INSERT notification
+                    activate DB
+                        DB --> Notify : OK
+                    deactivate DB
+                    Notify -> Email : Отправить email\nо новой оплаченной заявке
+                    activate Email
+                        Email --> Notify : accepted
+                    deactivate Email
+                deactivate Notify
+
+                Payment --> GW : 200 OK
+
+            else #FFF0F0 Платеж неуспешен
+                Payment -> DB : UPDATE payment -> failed
+                activate DB
+                    DB --> Payment : OK
+                deactivate DB
+                Payment --> GW : 200 OK
+            end
+
+        deactivate Payment
+    deactivate GW
+
+    note over Notify #FFF8DC
+    В as-is проекте in-app уведомления реализованы,
+    email-очередь пока заглушена.
+    Для учебной диаграммы участник Notification Service оставлен,
+    потому что требование о подтверждении/уведомлении есть в отчете.
+    end note
+
+== Подтверждение заявки ментором ==
+
+    Mentor -> Web : Открывает "Управление заявками"
+    Web -> GW : GET /sessions?role=mentor&status=paid
+    activate GW
+        GW -> Booking : Получить заявки на подтверждение
+        activate Booking
+            Booking -> DB : SELECT paid / requested sessions
+            activate DB
+                DB --> Booking : sessions[]
+            deactivate DB
+            Booking --> GW : Список заявок
+        deactivate Booking
+    GW --> Web : Заявки ментору
+    deactivate GW
+
+    Mentor -> Web : Нажимает "Подтвердить"
+    Web -> GW : POST /booking/confirm\n{sessionId, paymentIntentId}
+    activate GW
+        GW -> Booking : Confirm session
+        activate Booking
+
+            Booking -> DB : SELECT session + slot + payment
+            activate DB
+                DB --> Booking : session paid + slot held
+            deactivate DB
+
+            alt #F0FFF0 Проверки пройдены
+                Booking -> DB : BEGIN\nUPDATE slot -> booked\nUPDATE session -> booked\nCOMMIT
+                activate DB
+                    DB --> Booking : booked session
+                deactivate DB
+
+                Booking -> Notify : Создать уведомление менти\nо подтвержденной записи
+                activate Notify
+                    Notify -> DB : INSERT notification
+                    activate DB
+                        DB --> Notify : OK
+                    deactivate DB
+                deactivate Notify
+
+                Booking --> GW : 200 OK\n{status: booked}
+                GW --> Web : Сессия подтверждена
+                Web --> Mentor : Статус "Подтверждена"
+
+            else #FFF0F0 Hold истек / payment mismatch
+                Booking --> GW : 400 Bad Request
+                GW --> Web : Ошибка подтверждения
+                Web --> Mentor : Запрос требует повторной обработки
+            end
+
+        deactivate Booking
+    deactivate GW
+deactivate Web
+
+@enduml
+
+
+@startuml Sequence_Session_Video_Notes_Review
+
+title UC11 + UC12: Проведение сессии, видеокомната, заметки и отзыв
+
+skinparam responseMessageBelowArrow true
+skinparam shadowing false
+skinparam noteBackgroundColor #F7F7F7
+skinparam noteBorderColor #B0B0B0
+skinparam participant {
+    BackgroundColor #F6F7FB
+    BorderColor #344054
+}
+skinparam participant {
+    BackgroundColor<<external>> #FF6666
+    FontColor<<external>> white
+    BorderColor<<external>> #CC0000
+}
+
+actor       "Менти"                          as Mentee
+actor       "Ментор"                         as Mentor
+participant "Web App (mentee)"              as WebMentee
+participant "Web App (mentor)"              as WebMentor
+participant "API Gateway"                   as GW
+participant "Sessions Service"              as Sessions
+participant "Chat / Conversation Service"   as Chat
+participant "Notification Service"          as Notify
+database    "Main DB\n(PostgreSQL)"         as DB
+participant "Video Provider\n(Daily / mock)" as Video <<external>>
+
+note over Sessions, Video #EEEEEE
+Диаграмма соответствует UC11, UC12 и FR11/FR16.
+Video Provider показан как внешний integration point.
+end note
+
+== Подготовка к встрече ==
+
+Mentee -> WebMentee : Открывает карточку предстоящей сессии
+activate WebMentee
+    WebMentee -> GW : GET /sessions/{id}
+    activate GW
+        GW -> Sessions : Get session details
+        activate Sessions
+            Sessions -> DB : SELECT session + service + mentor + videoRoom
+            activate DB
+                DB --> Sessions : session details
+            deactivate DB
+            Sessions --> GW : Детали сессии
+        deactivate Sessions
+    GW --> WebMentee : Детали встречи
+    deactivate GW
+deactivate WebMentee
+
+Mentor -> WebMentor : Открывает карточку этой же сессии
+activate WebMentor
+    WebMentor -> GW : GET /conversations/{sessionId}
+    activate GW
+        GW -> Chat : Get or create conversation
+        activate Chat
+            Chat -> DB : SELECT conversation by session\nOR mentor/mentee pair
+            activate DB
+                DB --> Chat : conversation? 
+            deactivate DB
+
+            alt #F0FFF0 Conversation уже существует
+                Chat --> GW : conversationId
+
+            else #F0FFF0 Conversation отсутствует
+                Chat -> DB : INSERT conversation(sessionId,\nmentorId, menteeId)
+                activate DB
+                    DB --> Chat : new conversationId
+                deactivate DB
+                Chat --> GW : new conversationId
+            end
+
+        deactivate Chat
+    GW --> WebMentor : conversationId
+    deactivate GW
+deactivate WebMentor
+
+== Получение или создание видеокомнаты ==
+
+Mentee -> WebMentee : Нажимает "Подключиться"
+activate WebMentee
+    WebMentee -> GW : GET /sessions/{id}/video
+    activate GW
+        GW -> Sessions : Get or create video room
+        activate Sessions
+            Sessions -> DB : SELECT video_room by sessionId
+            activate DB
+                DB --> Sessions : videoRoom?
+            deactivate DB
+
+            alt #F0FFF0 Комната уже создана
+                Sessions --> GW : joinUrlMentor / joinUrlMentee
+
+            else #F0FFF0 Комнаты еще нет
+                Sessions -> Video : Create room / reserve join URLs
+                activate Video
+                    Video --> Sessions : roomId + join URLs
+                deactivate Video
+
+                Sessions -> DB : INSERT video_room(provider, roomId,\njoinUrlMentor, joinUrlMentee)
+                activate DB
+                    DB --> Sessions : video_room saved
+                deactivate DB
+
+                Sessions --> GW : join URLs
+            end
+        deactivate Sessions
+    GW --> WebMentee : Ссылка на видеокомнату
+    deactivate GW
+    WebMentee --> Mentee : Переход в видеозвонок
+deactivate WebMentee
+
+Mentor -> WebMentor : Подключается к той же сессии
+activate WebMentor
+    WebMentor -> GW : GET /sessions/{id}/video
+    activate GW
+        GW -> Sessions : Get existing room
+        activate Sessions
+            Sessions -> DB : SELECT video_room
+            activate DB
+                DB --> Sessions : existing room
+            deactivate DB
+            Sessions --> GW : joinUrlMentor
+        deactivate Sessions
+    GW --> WebMentor : Ссылка для ментора
+    deactivate GW
+    WebMentor --> Mentor : Переход в видеозвонок
+deactivate WebMentor
+
+note right of Sessions
+В текущем коде видеокомната создается лениво:
+только при первом входе участника в сессию.
+end note
+
+== Заметки ментора по встрече ==
+
+Mentor -> WebMentor : Сохраняет private notes\nи shared summary
+activate WebMentor
+    WebMentor -> GW : PATCH /sessions/{id}/notes
+    activate GW
+        GW -> Sessions : Upsert session notes
+        activate Sessions
+            Sessions -> DB : UPSERT session_notes\n(sessionId, mentorId)
+            activate DB
+                DB --> Sessions : notes saved
+            deactivate DB
+            Sessions --> GW : OK
+        deactivate Sessions
+    GW --> WebMentor : Заметки сохранены
+    deactivate GW
+deactivate WebMentor
+
+note over Sessions #FFF8DC
+FR16: private notes недоступны менти.
+Shared summary может быть сохранен отдельно.
+end note
+
+== Завершение сессии ==
+
+Mentor -> WebMentor : Нажимает "Завершить сессию"
+activate WebMentor
+    WebMentor -> GW : POST /sessions/{id}/complete
+    activate GW
+        GW -> Sessions : Complete session
+        activate Sessions
+            Sessions -> DB : UPDATE session -> completed
+            activate DB
+                DB --> Sessions : completed
+            deactivate DB
+            Sessions -> Notify : Создать событие\nдля post-session коммуникации
+            activate Notify
+                Notify -> DB : INSERT notification / reminder marker
+                activate DB
+                    DB --> Notify : OK
+                deactivate DB
+            deactivate Notify
+            Sessions --> GW : 200 OK
+        deactivate Sessions
+    GW --> WebMentor : Сессия завершена
+    deactivate GW
+deactivate WebMentor
+
+== Отзыв через 24 часа ==
+
+note over Sessions #EEEEEE
+Антифрод-правило из FR11:
+отзыв разрешен только после completed
+и не раньше чем через 24 часа после endAt.
+end note
+
+Mentee -> WebMentee : Открывает прошедшую сессию\nи нажимает "Оценить"
+activate WebMentee
+    WebMentee -> GW : POST /sessions/{id}/review\n{rating, text}
+    activate GW
+        GW -> Sessions : Create review
+        activate Sessions
+            Sessions -> DB : SELECT session(status=completed,\nendAt, menteeId)
+            activate DB
+                DB --> Sessions : completed session
+            deactivate DB
+
+            alt #FFF0F0 24 часа еще не прошло
+                Sessions --> GW : 400 Bad Request\nreview_not_available_yet
+                GW --> WebMentee : Ошибка
+                WebMentee --> Mentee : "Отзыв будет доступен позже"
+
+            else #F0FFF0 Отзыв можно оставить
+                Sessions -> DB : SELECT existing review by session\n+ existing pair review
+                activate DB
+                    DB --> Sessions : not found
+                deactivate DB
+
+                Sessions -> DB : BEGIN\nINSERT review\nUPDATE mentor_profiles rating_avg/rating_count\nCOMMIT
+                activate DB
+                    DB --> Sessions : review saved + rating updated
+                deactivate DB
+
+                Sessions --> GW : 201 Created
+                GW --> WebMentee : Отзыв отправлен
+                WebMentee --> Mentee : Подтверждение публикации
+            end
+
+        deactivate Sessions
+    deactivate GW
+deactivate WebMentee
+
+@enduml
+
+
+@startuml Sequence_Chat_Realtime
+
+title UC15: Встроенный чат между ментором и менти
+
+skinparam responseMessageBelowArrow true
+skinparam shadowing false
+skinparam noteBackgroundColor #F7F7F7
+skinparam noteBorderColor #B0B0B0
+skinparam participant {
+    BackgroundColor #F6F7FB
+    BorderColor #344054
+}
+
+actor       "Менти"                            as Mentee
+actor       "Ментор"                           as Mentor
+participant "Web App (sender)"                as SenderWeb
+participant "Web App (recipient)"             as RecipientWeb
+participant "API Gateway"                     as GW
+participant "Conversation Service"            as Conv
+participant "Chat Service"                    as Chat
+participant "WebSocket Gateway\n(/chat)"      as WSG
+database    "Main DB\n(PostgreSQL)"           as DB
+
+note over Chat, WSG #EEEEEE
+FR5 и UC15.
+В as-is коде DB является source of truth,
+WebSocket используется только для доставки realtime-событий.
+end note
+
+== Подключение к чату ==
+
+Mentor -> RecipientWeb : Открывает раздел "Чаты"
+activate RecipientWeb
+    RecipientWeb -> WSG : connect(namespace=/chat,\nJWT in handshake)
+    activate WSG
+        WSG -> WSG : verify JWT\nattach socket.data.user
+        WSG -> Conv : Получить разговоры пользователя
+        activate Conv
+            Conv -> DB : SELECT conversations by mentorId/menteeId
+            activate DB
+                DB --> Conv : conversations[]
+            deactivate DB
+            Conv --> WSG : conversations[]
+        deactivate Conv
+        WSG -> WSG : join rooms conversation:{id}
+        WSG --> RecipientWeb : connected
+    deactivate WSG
+deactivate RecipientWeb
+
+== Создание / получение диалога по сессии ==
+
+Mentee -> SenderWeb : Открывает чат из карточки сессии
+activate SenderWeb
+    SenderWeb -> GW : POST /conversations/{sessionId}
+    activate GW
+        GW -> Conv : Get or create conversation
+        activate Conv
+            Conv -> DB : SELECT conversation by sessionId\nOR mentor/mentee pair
+            activate DB
+                DB --> Conv : conversation?
+            deactivate DB
+
+            alt #F0FFF0 Диалог уже существует
+                Conv --> GW : conversationId
+
+            else #F0FFF0 Диалог отсутствует
+                Conv -> DB : INSERT conversation
+                activate DB
+                    DB --> Conv : new conversationId
+                deactivate DB
+                Conv --> GW : new conversationId
+            end
+        deactivate Conv
+    GW --> SenderWeb : conversationId
+    deactivate GW
+deactivate SenderWeb
+
+== Отправка сообщения ==
+
+Mentee -> SenderWeb : Вводит текст и нажимает "Отправить"
+activate SenderWeb
+    SenderWeb -> GW : POST /chat/{conversationId}/messages\n{contentType=text, content}
+    activate GW
+        GW -> Chat : Send message
+        activate Chat
+
+            Chat -> DB : SELECT conversation + participants
+            activate DB
+                DB --> Chat : access granted
+            deactivate DB
+
+            Chat -> Chat : validate message payload
+
+            Chat -> DB : BEGIN\nINSERT message\nUPDATE conversation.updatedAt\nCOMMIT
+            activate DB
+                DB --> Chat : messageId
+            deactivate DB
+
+            Chat -> DB : SELECT message + sender + attachments
+            activate DB
+                DB --> Chat : serialized message
+            deactivate DB
+
+            Chat -> WSG : pushNewMessage(conversationId,\nmessage payload)
+            activate WSG
+                WSG --> RecipientWeb : event new_message
+            deactivate WSG
+
+            Chat --> GW : 201 Created\nmessage payload
+        deactivate Chat
+    GW --> SenderWeb : Отправлено
+    deactivate GW
+    SenderWeb --> Mentee : Сообщение показано в ленте
+deactivate SenderWeb
+
+== Индикатор набора текста ==
+
+Mentee -> SenderWeb : Начинает печатать
+activate SenderWeb
+    SenderWeb -> WSG : event typing\n{conversationId, isTyping=true}
+    activate WSG
+        WSG --> RecipientWeb : event user_typing
+    deactivate WSG
+deactivate SenderWeb
+
+== Подтверждение прочтения ==
+
+Mentor -> RecipientWeb : Открывает диалог и читает сообщение
+activate RecipientWeb
+    RecipientWeb -> WSG : event mark_read\n{conversationId}
+    activate WSG
+        WSG -> Chat : Mark as read
+        activate Chat
+            Chat -> DB : UPDATE messages\nSET is_read=true, read_at=now()
+            activate DB
+                DB --> Chat : count updated
+            deactivate DB
+            Chat --> WSG : {markedAsRead}
+        deactivate Chat
+        WSG --> SenderWeb : event messages_read
+    deactivate WSG
+deactivate RecipientWeb
+
+note over Chat #FFF8DC
+В отчете MVP зафиксирован прежде всего текстовый чат.
+Поддержка image/file/emoji есть в as-is коде,
+но может быть оставлена за рамками основной версии диаграммы.
+end note
+
+@enduml
+
+
+@startuml Sequence_Complaint_Processing
+
+title UC18: Подача и обработка жалобы пользователя
+
+skinparam responseMessageBelowArrow true
+skinparam shadowing false
+skinparam noteBackgroundColor #F7F7F7
+skinparam noteBorderColor #B0B0B0
+skinparam participant {
+    BackgroundColor #F6F7FB
+    BorderColor #344054
+}
+
+actor       "Пользователь"                  as User
+actor       "Администратор"                 as Admin
+participant "Web App (user cabinet)"        as UserWeb
+participant "Admin Console"                 as AdminWeb
+participant "API Gateway"                   as GW
+participant "Trust Service"                 as Trust
+database    "Main DB\n(PostgreSQL)"         as DB
+
+note over Trust, DB #EEEEEE
+UC18 + FR17.
+В текущем MVP вложения передаются как fileUrl/data URL,
+без отдельного upload-сервиса.
+end note
+
+== Создание жалобы ==
+
+User -> UserWeb : Открывает раздел "Жалобы"
+activate UserWeb
+    User -> UserWeb : Заполняет категорию,\nдату, описание и прикладывает файлы
+
+    UserWeb -> GW : POST /complaints\n{targetUserId|targetSessionId,\ncategory, occurredOn, description, attachments[]}
+    activate GW
+        GW -> Trust : Create complaint
+        activate Trust
+
+            Trust -> DB : SELECT target user / target session
+            activate DB
+                DB --> Trust : target exists
+            deactivate DB
+
+            Trust -> Trust : validate extensions,\nmime types, size <= 128MB
+
+            alt #FFF0F0 Некорректный формат вложения
+                Trust --> GW : 400 Bad Request
+                GW --> UserWeb : Ошибка валидации
+                UserWeb --> User : "Допустимы .png/.jpg/.jpeg/.pdf"
+
+            else #F0FFF0 Жалоба валидна
+                Trust -> DB : INSERT complaint\n+ complaint_attachments[]
+                activate DB
+                    DB --> Trust : complaintId
+                deactivate DB
+                Trust --> GW : 201 Created
+                GW --> UserWeb : Жалоба создана
+                UserWeb --> User : Статус "Создана"
+            end
+
+        deactivate Trust
+    deactivate GW
+deactivate UserWeb
+
+== Просмотр жалоб администратором ==
+
+Admin -> AdminWeb : Открывает "Обращения в поддержку"
+activate AdminWeb
+    AdminWeb -> GW : GET /admin/trust/complaints
+    activate GW
+        GW -> Trust : Admin list complaints
+        activate Trust
+            Trust -> DB : SELECT complaints + attachments\nORDER BY createdAt
+            activate DB
+                DB --> Trust : complaints[]
+            deactivate DB
+            Trust --> GW : complaints[]
+        deactivate Trust
+    GW --> AdminWeb : Список жалоб
+    deactivate GW
+deactivate AdminWeb
+
+== Переписка по жалобе ==
+
+Admin -> AdminWeb : Открывает жалобу и пишет комментарий
+activate AdminWeb
+    AdminWeb -> GW : POST /complaints/{id}/messages\n{body}
+    activate GW
+        GW -> Trust : Add complaint message
+        activate Trust
+            Trust -> DB : SELECT complaint access data
+            activate DB
+                DB --> Trust : complaint found
+            deactivate DB
+
+            Trust -> DB : INSERT complaint_message
+            activate DB
+                DB --> Trust : message saved
+            deactivate DB
+
+            opt #F0FFF0 Первый ответ администратора
+                Trust -> DB : UPDATE complaint\nSET assignedAdminId, status='in_progress'
+                activate DB
+                    DB --> Trust : assigned
+                deactivate DB
+            end
+
+            Trust --> GW : 201 Created
+        deactivate Trust
+    GW --> AdminWeb : Сообщение добавлено
+    deactivate GW
+deactivate AdminWeb
+
+== Закрытие жалобы ==
+
+Admin -> AdminWeb : Меняет статус на "resolved" или "rejected"
+activate AdminWeb
+    AdminWeb -> GW : PATCH /admin/trust/complaints/{id}
+    activate GW
+        GW -> Trust : Admin update complaint
+        activate Trust
+            Trust -> DB : SELECT complaint
+            activate DB
+                DB --> Trust : complaint
+            deactivate DB
+
+            Trust -> DB : UPDATE complaint\nSET status, resolutionComment,\nassignedAdminId, closedAt
+            activate DB
+                DB --> Trust : updated complaint
+            deactivate DB
+
+            Trust -> DB : INSERT admin_audit_log\n(action='complaint_update')
+            activate DB
+                DB --> Trust : audit saved
+            deactivate DB
+
+            Trust --> GW : 200 OK
+        deactivate Trust
+    GW --> AdminWeb : Статус обновлен
+    deactivate GW
+    AdminWeb --> Admin : Жалоба обработана
+deactivate AdminWeb
+
+note right of Trust
+Если нужно, по этой же жалобе
+могут запускаться связанные действия:
+блокировка пользователя,
+модерация контента,
+ручная работа с платежом.
+end note
+
+@enduml
+
+
+@startuml Sequence_Regalia_Verification
+
+title UC20: Загрузка и верификация регалий ментора
+
+skinparam responseMessageBelowArrow true
+skinparam shadowing false
+skinparam noteBackgroundColor #F7F7F7
+skinparam noteBorderColor #B0B0B0
+skinparam participant {
+    BackgroundColor #F6F7FB
+    BorderColor #344054
+}
+skinparam participant {
+    BackgroundColor<<external>> #FF6666
+    FontColor<<external>> white
+    BorderColor<<external>> #CC0000
+}
+
+actor       "Ментор"                         as Mentor
+actor       "Администратор"                  as Admin
+participant "Web App (mentor cabinet)"       as MentorWeb
+participant "Admin Console"                  as AdminWeb
+participant "API Gateway"                    as GW
+participant "Trust Service"                  as Trust
+participant "Notification Service"           as Notify
+database    "Main DB\n(PostgreSQL)"          as DB
+participant "SMTP / Email"                   as Email <<external>>
+
+note over Trust, Email #EEEEEE
+UC20 + FR19.
+Файлы регалий проходят через Trust Service,
+после чего ментору обновляется verification status.
+end note
+
+== Загрузка документа ментором ==
+
+Mentor -> MentorWeb : Открывает "Регалии" и выбирает PDF
+activate MentorWeb
+    Mentor -> MentorWeb : Загружает сертификат / диплом
+
+    MentorWeb -> GW : POST /regalia\n{fileName, mimeType, size, fileUrl}
+    activate GW
+        GW -> Trust : Upload regalia
+        activate Trust
+            Trust -> Trust : validate mimeType + size
+
+            alt #FFF0F0 Некорректный файл
+                Trust --> GW : 400 Bad Request
+                GW --> MentorWeb : Ошибка загрузки
+                MentorWeb --> Mentor : "Допустим только PDF"
+
+            else #F0FFF0 Файл корректный
+                Trust -> DB : INSERT mentor_regalia(status=pending)
+                activate DB
+                    DB --> Trust : regaliaId
+                deactivate DB
+
+                Trust -> DB : UPDATE mentor_profiles\nSET verificationStatus='pending'
+                activate DB
+                    DB --> Trust : profile updated
+                deactivate DB
+
+                Trust --> GW : 201 Created
+                GW --> MentorWeb : Документ принят
+                MentorWeb --> Mentor : Статус "На проверке"
+            end
+
+        deactivate Trust
+    deactivate GW
+deactivate MentorWeb
+
+== Очередь документов на проверку ==
+
+Admin -> AdminWeb : Открывает "Документы на верификацию"
+activate AdminWeb
+    AdminWeb -> GW : GET /admin/trust/regalia?status=pending
+    activate GW
+        GW -> Trust : Admin list regalia
+        activate Trust
+            Trust -> DB : SELECT mentor_regalia + mentor info
+            activate DB
+                DB --> Trust : pending regalia[]
+            deactivate DB
+            Trust --> GW : pending items
+        deactivate Trust
+    GW --> AdminWeb : Список документов
+    deactivate GW
+deactivate AdminWeb
+
+== Проверка и решение администратора ==
+
+Admin -> AdminWeb : Скачивает документ и выбирает\nApprove / Reject
+activate AdminWeb
+    AdminWeb -> GW : PATCH /admin/trust/regalia/{id}\n{status, comment}
+    activate GW
+        GW -> Trust : Admin review regalia
+        activate Trust
+
+            Trust -> DB : SELECT regalia by id
+            activate DB
+                DB --> Trust : regalia found
+            deactivate DB
+
+            Trust -> DB : BEGIN\nUPDATE mentor_regalia(status, reviewedBy,\nreviewedAt, reviewComment)\nUPDATE mentor_profiles verificationStatus\nCOMMIT
+            activate DB
+                DB --> Trust : review saved
+            deactivate DB
+
+            Trust -> DB : INSERT admin_audit_log\n(action='regalia_review')
+            activate DB
+                DB --> Trust : audit saved
+            deactivate DB
+
+            Trust -> Notify : Создать уведомление ментору
+            activate Notify
+                Notify -> DB : INSERT notification
+                activate DB
+                    DB --> Notify : OK
+                deactivate DB
+                Notify -> Email : Email о результате проверки
+                activate Email
+                    Email --> Notify : accepted
+                deactivate Email
+            deactivate Notify
+
+            Trust --> GW : 200 OK
+        deactivate Trust
+    GW --> AdminWeb : Решение сохранено
+    deactivate GW
+deactivate AdminWeb
+
+== Получение результата ментором ==
+
+Mentor -> MentorWeb : Открывает раздел "Регалии"
+activate MentorWeb
+    MentorWeb -> GW : GET /regalia/mine
+    activate GW
+        GW -> Trust : Get my regalia
+        activate Trust
+            Trust -> DB : SELECT mentor_regalia by mentorId
+            activate DB
+                DB --> Trust : regalia + statuses
+            deactivate DB
+            Trust --> GW : statuses
+        deactivate Trust
+    GW --> MentorWeb : Обновленный статус\n+ комментарий администратора
+    deactivate GW
+    MentorWeb --> Mentor : "Подтверждено" или "Отклонено"
+deactivate MentorWeb
+
+note over Notify #FFF8DC
+В учебной версии диаграммы уведомление показано
+как in-app + email. Это соответствует отчету,
+но email-доставка в as-is проекте еще не полностью автоматизирована.
+end note
+
+@enduml
