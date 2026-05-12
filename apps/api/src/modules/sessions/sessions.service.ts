@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
@@ -7,6 +7,8 @@ import { SessionStatus } from '@prisma/client';
 
 @Injectable()
 export class SessionsService {
+  private readonly logger = new Logger(SessionsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async getUserSessions(
@@ -264,9 +266,31 @@ export class SessionsService {
       throw new NotFoundException('Session not found or cannot be completed');
     }
 
-    return this.prisma.session.update({
-      where: { id: sessionId },
-      data: { status: 'completed' },
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.session.update({
+        where: { id: sessionId },
+        data: { status: 'completed' },
+      });
+
+      // US13: Auto-create pending payout for succeeded payment
+      const payment = await tx.payment.findFirst({
+        where: { sessionId, status: 'succeeded' },
+      });
+
+      if (payment && Number(payment.mentorAmount) > 0) {
+        await tx.payout.create({
+          data: {
+            mentorId,
+            amount: payment.mentorAmount,
+            currency: payment.currency,
+            status: 'pending',
+            provider: payment.provider,
+          },
+        });
+        this.logger.log(`Auto-payout created for mentor ${mentorId}, session ${sessionId}, amount ${payment.mentorAmount} ${payment.currency}`);
+      }
+
+      return updated;
     });
   }
 

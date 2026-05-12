@@ -201,38 +201,31 @@ export class PaymentsService {
   }
 
   async getMentorBalance(mentorId: string) {
-    // Calculate available balance from completed sessions with succeeded payments
-    const result = await this.prisma.payment.aggregate({
-      where: {
-        mentorId,
-        status: 'succeeded',
-        session: { status: 'completed' },
-        // Exclude already paid out
-        NOT: {
-          id: {
-            in: await this.prisma.payout
-              .findMany({
-                where: { mentorId, status: { in: ['pending', 'processing', 'completed'] as const } },
-                select: { id: true },
-              })
-              .then((p) => p.map((x) => x.id)),
-          },
-        },
-      },
+    // Total earned from completed sessions with succeeded payments
+    const earned = await this.prisma.payment.aggregate({
+      where: { mentorId, status: 'succeeded', session: { status: 'completed' } },
       _sum: { mentorAmount: true },
-      _count: true,
     });
 
-    // Get pending payouts
+    // Total committed to payouts (pending/processing/completed)
+    const paidOut = await this.prisma.payout.aggregate({
+      where: { mentorId, status: { in: ['pending', 'processing', 'completed'] as const } },
+      _sum: { amount: true },
+    });
+
+    const totalEarned = Number(earned._sum?.mentorAmount ?? 0);
+    const totalPaidOut = Number(paidOut._sum?.amount ?? 0);
+    const available = Math.max(0, totalEarned - totalPaidOut);
+
     const pendingPayouts = await this.prisma.payout.aggregate({
       where: { mentorId, status: 'pending' },
       _sum: { amount: true },
     });
 
     return {
-      available: result._sum?.mentorAmount ?? 0,
-      pending: pendingPayouts._sum?.amount ?? 0,
-      currency: 'USD', // TODO: Support multiple currencies
+      available,
+      pending: Number(pendingPayouts._sum?.amount ?? 0),
+      currency: 'USD',
     };
   }
 
