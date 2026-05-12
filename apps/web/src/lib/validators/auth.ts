@@ -23,7 +23,7 @@ export const registerSchema = z
       .string()
       .min(3, 'Логин должен быть не короче 3 символов')
       .max(40, 'Логин должен быть не длиннее 40 символов')
-      .regex(/^[a-zA-Z]+$/, 'Используйте только латинские буквы'),
+      .regex(/^[a-zA-Z0-9_]+$/, 'Используйте латинские буквы, цифры и символ _'),
     password: passwordSchema,
     confirmPassword: z.string().min(1, 'Повторите пароль'),
     role: z.enum(['mentor', 'mentee']),

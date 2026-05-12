@@ -17,8 +17,8 @@ export class RegisterDto {
   @IsString()
   @MinLength(3)
   @MaxLength(40)
-  @Matches(/^[a-zA-Z]+$/, {
-    message: 'Username must contain only latin letters',
+  @Matches(/^[a-zA-Z0-9_]+$/, {
+    message: 'Username may contain latin letters, numbers and underscores',
   })
   username: string;
 

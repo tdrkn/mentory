@@ -94,6 +94,22 @@ export class AuthService {
       return created;
     });
 
+    const skipVerification = this.config.get<string>('SKIP_EMAIL_VERIFICATION') === 'true';
+
+    if (skipVerification) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { isEmailVerified: true, emailVerifiedAt: new Date() },
+      });
+      const token = this.jwtService.sign({ sub: user.id, email: user.email, role: user.role });
+      return {
+        user,
+        accessToken: token,
+        requiresEmailVerification: false,
+        verificationEmailSent: false,
+      };
+    }
+
     let verificationEmailSent = true;
     try {
       await this.sendEmailVerification(user);
