@@ -504,7 +504,11 @@
                   <span class={statusClass(item.status)}>{statusLabel[item.status]}</span>
                 </div>
                 <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                  <a class="btn btn-outline btn-sm" href="/chat">Чат</a>
+                  {#if item.mentor?.id}
+                    <a class="btn btn-outline btn-sm" href={`/chat?mentorId=${item.mentor.id}`}>Чат</a>
+                  {:else}
+                    <a class="btn btn-outline btn-sm" href="/chat">Чат</a>
+                  {/if}
                   {#if item.mentor?.id}
                     <a class="btn btn-outline btn-sm" href={`/mentors/${item.mentor.id}`}>Профиль</a>
                   {/if}

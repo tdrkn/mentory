@@ -354,9 +354,13 @@
     await loadConversations();
 
     const sessionId = $page.url.searchParams.get('session');
+    const mentorId = $page.url.searchParams.get('mentorId');
     if (sessionId) {
       const conv = await api.post<Conversation>(`/conversations/${sessionId}`);
       activeConversation = conv.id;
+    } else if (mentorId) {
+      const match = conversations.find((c) => c.mentor?.id === mentorId || c.mentee?.id === mentorId);
+      activeConversation = match?.id ?? (conversations.length > 0 ? conversations[0].id : null);
     } else if (conversations.length > 0) {
       activeConversation = conversations[0].id;
     }

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
 import { UpdateNotificationSettingsDto } from './dto/update-notification-settings.dto';
 import { NotificationType } from '@prisma/client';
+import { EmailService } from './email.service';
 
 // Notification types for type safety
 export type NotificationData = {
@@ -17,6 +18,7 @@ export class NotificationsService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
   ) {}
 
   async getNotifications(
@@ -153,34 +155,67 @@ export class NotificationsService {
   async notifySessionConfirmed(menteeId: string, session: any) {
     await this.createNotification(menteeId, {
       type: 'session_confirmed',
-      title: 'Session Confirmed',
-      body: `${session.mentor.fullName} has confirmed your session`,
+      title: 'Сессия подтверждена',
+      body: `${session.mentor.fullName} подтвердил(а) вашу сессию`,
       data: { sessionId: session.id },
     });
 
-    // TODO: Send email notification
+    this.emailService.sendEmail({
+      to: session.mentee.email,
+      subject: 'Сессия подтверждена — Mentory',
+      template: 'session_booked',
+      context: {
+        mentorName: session.mentee.fullName,
+        menteeName: session.mentor.fullName,
+        sessionDate: new Date(session.startAt).toLocaleDateString('ru-RU'),
+        sessionTime: new Date(session.startAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+        topic: 'Менторская сессия',
+        sessionLink: `${process.env.PUBLIC_APP_URL || 'http://localhost:3000'}/sessions/${session.id}`,
+      },
+    }).catch((e) => this.logger.warn(`Email failed for session_confirmed: ${e.message}`));
   }
 
   async notifySessionCanceled(userId: string, session: any, canceledBy: string) {
     await this.createNotification(userId, {
       type: 'session_canceled',
-      title: 'Session Canceled',
-      body: `Your session has been canceled`,
+      title: 'Сессия отменена',
+      body: `Ваша сессия была отменена`,
       data: { sessionId: session.id, canceledBy },
     });
 
-    // TODO: Send email notification
+    const recipient = userId === session.mentorId ? session.mentor : session.mentee;
+    if (recipient?.email) {
+      this.emailService.sendEmail({
+        to: recipient.email,
+        subject: 'Сессия отменена — Mentory',
+        html: `<p>Привет, ${recipient.fullName}! Ваша сессия была отменена.</p>`,
+      }).catch((e) => this.logger.warn(`Email failed for session_canceled: ${e.message}`));
+    }
   }
 
   async notifySessionReminder(userId: string, session: any, minutesBefore: number) {
     await this.createNotification(userId, {
       type: 'session_reminder',
-      title: 'Session Reminder',
-      body: `Your session starts in ${minutesBefore} minutes`,
+      title: 'Напоминание о сессии',
+      body: `Ваша сессия начинается через ${minutesBefore} минут`,
       data: { sessionId: session.id },
     });
 
-    // TODO: Send push notification
+    const recipient = userId === session.mentorId ? session.mentor : session.mentee;
+    if (recipient?.email) {
+      this.emailService.sendEmail({
+        to: recipient.email,
+        subject: `Сессия через ${minutesBefore} минут — Mentory`,
+        template: 'session_reminder',
+        context: {
+          recipientName: recipient.fullName,
+          minutesBefore,
+          sessionDate: new Date(session.startAt).toLocaleDateString('ru-RU'),
+          sessionTime: new Date(session.startAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+          sessionLink: `${process.env.PUBLIC_APP_URL || 'http://localhost:3000'}/sessions/${session.id}`,
+        },
+      }).catch((e) => this.logger.warn(`Email failed for session_reminder: ${e.message}`));
+    }
   }
 
   async notifyNewMessage(userId: string, sender: any, conversationId: string, recipientEmail: string, recipientName: string, messagePreview: string) {
@@ -210,12 +245,18 @@ export class NotificationsService {
   async notifyNewReview(mentorId: string, review: any) {
     await this.createNotification(mentorId, {
       type: 'new_review',
-      title: 'New Review',
-      body: `You received a ${review.rating}-star review`,
+      title: 'Новый отзыв',
+      body: `Вы получили отзыв на ${review.rating} звезд(ы)`,
       data: { reviewId: review.id, sessionId: review.sessionId },
     });
 
-    // TODO: Send email notification
+    if (review.mentor?.email) {
+      this.emailService.sendEmail({
+        to: review.mentor.email,
+        subject: 'Новый отзыв — Mentory',
+        html: `<p>Привет, ${review.mentor.fullName}! Вы получили новый отзыв: ${review.rating} ⭐${review.text ? ` — "${review.text}"` : ''}.</p>`,
+      }).catch((e) => this.logger.warn(`Email failed for new_review: ${e.message}`));
+    }
   }
 
   async notifyPaymentReceived(mentorId: string, payment: any, mentorEmail: string, mentorName: string) {
@@ -255,10 +296,6 @@ export class NotificationsService {
 
   // ========== Email Queue Methods ==========
 
-  /**
-   * Queue an email job for async processing
-   * TODO: Re-enable BullMQ when ready
-   */
   private async queueEmail(
     jobType: string,
     data: {
@@ -267,23 +304,30 @@ export class NotificationsService {
       context: Record<string, any>;
     },
   ) {
-    // STUB: Just log for now, email queue disabled
-    this.logger.log(`[STUB] Would queue ${jobType} email for user ${data.userId}`);
-    return null;
+    try {
+      await this.emailService.sendEmail({
+        to: data.to,
+        subject: this.getEmailSubject(jobType),
+        template: jobType,
+        context: data.context,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.logger.warn(`Email delivery failed [${jobType}] for user ${data.userId}: ${msg}`);
+    }
   }
 
-  /**
-   * Get queue statistics
-   * TODO: Re-enable when BullMQ is configured
-   */
-  async getQueueStats() {
-    // STUB: Return zeros for now
-    return {
-      queue: 'email',
-      waiting: 0,
-      active: 0,
-      completed: 0,
-      failed: 0,
+  private getEmailSubject(jobType: string): string {
+    const subjects: Record<string, string> = {
+      session_booked: 'Новая сессия забронирована — Mentory',
+      payment_received: 'Оплата получена — Mentory',
+      new_message: 'Новое сообщение — Mentory',
+      session_reminder: 'Напоминание о сессии — Mentory',
     };
+    return subjects[jobType] || 'Уведомление — Mentory';
+  }
+
+  async getQueueStats() {
+    return { queue: 'email', waiting: 0, active: 0, completed: 0, failed: 0 };
   }
 }
