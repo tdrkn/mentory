@@ -397,6 +397,10 @@
       display: none;
     }
 
+    .nav-actions > .btn {
+      display: none;
+    }
+
     .user-menu {
       display: none;
     }
