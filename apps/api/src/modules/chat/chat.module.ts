@@ -11,6 +11,7 @@ import { ChatController } from './chat.controller';
 import { ConversationsController } from './conversations.controller';
 import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
+import { FileStorageService } from '../../common/file-storage.service';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { ChatGateway } from './chat.gateway';
     ConfigModule,
   ],
   controllers: [ChatController, ConversationsController],
-  providers: [ChatService, ChatGateway],
+  providers: [ChatService, ChatGateway, FileStorageService],
   exports: [ChatService, ChatGateway],
 })
 export class ChatModule {}

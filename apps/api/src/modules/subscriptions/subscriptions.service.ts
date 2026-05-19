@@ -163,34 +163,36 @@ export class SubscriptionsService {
       where: {
         mentorId: plan.mentorId,
         menteeId: user.id,
-        status: { in: [MentorshipSubscriptionStatus.active, MentorshipSubscriptionStatus.paused] },
+        status: {
+          in: [
+            MentorshipSubscriptionStatus.pending,
+            MentorshipSubscriptionStatus.active,
+            MentorshipSubscriptionStatus.paused,
+          ],
+        },
       },
       select: { id: true, status: true },
     });
 
     if (existing) {
-      throw new BadRequestException('Active or paused subscription already exists for this mentor');
+      throw new BadRequestException('Pending, active or paused subscription already exists for this mentor');
     }
 
     const now = new Date();
-    const intervalMonths = plan.kind === MentorshipPlanKind.subscription
-      ? Math.max(plan.billingIntervalMonths || 1, 1)
-      : 1;
-
     return this.prisma.mentorshipSubscription.create({
       data: {
         mentorId: plan.mentorId,
         menteeId: user.id,
         planId: plan.id,
-        status: MentorshipSubscriptionStatus.active,
+        status: MentorshipSubscriptionStatus.pending,
         startedAt: now,
-        currentPeriodStart: now,
-        currentPeriodEnd: this.addMonths(now, intervalMonths),
-        nextBillingAt: plan.kind === MentorshipPlanKind.subscription
-          ? this.addMonths(now, intervalMonths)
-          : null,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+        nextBillingAt: null,
         monthlyPrice: plan.priceAmount,
         currency: plan.currency,
+        requestGoal: dto.requestGoal?.trim() || null,
+        requestMotivation: dto.requestMotivation?.trim() || null,
         notes: dto.notes,
       },
       include: {
@@ -229,12 +231,41 @@ export class SubscriptionsService {
       throw new BadRequestException('Ended subscriptions cannot be re-activated');
     }
 
+    if (
+      (dto.status === MentorshipSubscriptionStatus.active ||
+        dto.status === MentorshipSubscriptionStatus.rejected) &&
+      user.role !== 'admin' &&
+      subscription.mentorId !== user.id
+    ) {
+      throw new ForbiddenException('Only mentor or admin can approve or reject subscription requests');
+    }
+
+    if (subscription.status === MentorshipSubscriptionStatus.rejected) {
+      throw new BadRequestException('Rejected subscriptions cannot be changed');
+    }
+
+    const intervalMonths = subscription.plan.kind === MentorshipPlanKind.subscription
+      ? Math.max(subscription.plan.billingIntervalMonths || 1, 1)
+      : 1;
+    const activatingPending =
+      dto.status === MentorshipSubscriptionStatus.active &&
+      subscription.status === MentorshipSubscriptionStatus.pending;
+
     return this.prisma.mentorshipSubscription.update({
       where: { id: subscription.id },
       data: {
         status: dto.status,
         pausedAt: dto.status === MentorshipSubscriptionStatus.paused ? now : null,
-        endedAt: dto.status === MentorshipSubscriptionStatus.ended ? now : null,
+        endedAt:
+          dto.status === MentorshipSubscriptionStatus.ended ||
+          dto.status === MentorshipSubscriptionStatus.rejected
+            ? now
+            : null,
+        currentPeriodStart: activatingPending ? now : undefined,
+        currentPeriodEnd: activatingPending ? this.addMonths(now, intervalMonths) : undefined,
+        nextBillingAt: activatingPending && subscription.plan.kind === MentorshipPlanKind.subscription
+          ? this.addMonths(now, intervalMonths)
+          : undefined,
         notes: dto.reason ? this.mergeNotes(subscription.notes, dto.reason) : undefined,
       },
       include: {
@@ -245,6 +276,7 @@ export class SubscriptionsService {
 
   async getWorkspace(user: CurrentUser, subscriptionId: string) {
     const subscription = await this.getSubscriptionForParticipant(user, subscriptionId);
+    this.ensureWorkspaceOpen(subscription.status);
 
     const [tasks, bookmarks] = await Promise.all([
       this.prisma.mentorshipTask.findMany({
@@ -265,7 +297,8 @@ export class SubscriptionsService {
   }
 
   async listTasks(user: CurrentUser, subscriptionId: string) {
-    await this.getSubscriptionForParticipant(user, subscriptionId);
+    const subscription = await this.getSubscriptionForParticipant(user, subscriptionId);
+    this.ensureWorkspaceOpen(subscription.status);
 
     return this.prisma.mentorshipTask.findMany({
       where: { subscriptionId },
@@ -275,6 +308,7 @@ export class SubscriptionsService {
 
   async createTask(user: CurrentUser, subscriptionId: string, dto: CreateMentorshipTaskDto) {
     const subscription = await this.getSubscriptionForParticipant(user, subscriptionId);
+    this.ensureWorkspaceOpen(subscription.status);
 
     this.ensureAssigneeInSubscription(dto.assigneeId, subscription.mentorId, subscription.menteeId);
 
@@ -298,6 +332,7 @@ export class SubscriptionsService {
     dto: UpdateMentorshipTaskDto,
   ) {
     const subscription = await this.getSubscriptionForParticipant(user, subscriptionId);
+    this.ensureWorkspaceOpen(subscription.status);
 
     const task = await this.prisma.mentorshipTask.findFirst({
       where: {
@@ -334,7 +369,8 @@ export class SubscriptionsService {
   }
 
   async listBookmarks(user: CurrentUser, subscriptionId: string) {
-    await this.getSubscriptionForParticipant(user, subscriptionId);
+    const subscription = await this.getSubscriptionForParticipant(user, subscriptionId);
+    this.ensureWorkspaceOpen(subscription.status);
 
     return this.prisma.mentorshipBookmark.findMany({
       where: { subscriptionId },
@@ -343,7 +379,8 @@ export class SubscriptionsService {
   }
 
   async createBookmark(user: CurrentUser, subscriptionId: string, dto: CreateMentorshipBookmarkDto) {
-    await this.getSubscriptionForParticipant(user, subscriptionId);
+    const subscription = await this.getSubscriptionForParticipant(user, subscriptionId);
+    this.ensureWorkspaceOpen(subscription.status);
 
     return this.prisma.mentorshipBookmark.create({
       data: {
@@ -362,7 +399,8 @@ export class SubscriptionsService {
     bookmarkId: string,
     dto: UpdateMentorshipBookmarkDto,
   ) {
-    await this.getSubscriptionForParticipant(user, subscriptionId);
+    const subscription = await this.getSubscriptionForParticipant(user, subscriptionId);
+    this.ensureWorkspaceOpen(subscription.status);
 
     const bookmark = await this.prisma.mentorshipBookmark.findFirst({
       where: {
@@ -387,7 +425,8 @@ export class SubscriptionsService {
   }
 
   async deleteBookmark(user: CurrentUser, subscriptionId: string, bookmarkId: string) {
-    await this.getSubscriptionForParticipant(user, subscriptionId);
+    const subscription = await this.getSubscriptionForParticipant(user, subscriptionId);
+    this.ensureWorkspaceOpen(subscription.status);
 
     const bookmark = await this.prisma.mentorshipBookmark.findFirst({
       where: {
@@ -578,6 +617,15 @@ export class SubscriptionsService {
   private ensureAssigneeInSubscription(assigneeId: string, mentorId: string, menteeId: string) {
     if (assigneeId !== mentorId && assigneeId !== menteeId) {
       throw new BadRequestException('Task assignee must be mentor or mentee of this subscription');
+    }
+  }
+
+  private ensureWorkspaceOpen(status: MentorshipSubscriptionStatus) {
+    if (
+      status !== MentorshipSubscriptionStatus.active &&
+      status !== MentorshipSubscriptionStatus.paused
+    ) {
+      throw new BadRequestException('Workspace is available only after mentor approval');
     }
   }
 

@@ -1,4 +1,4 @@
-import { IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class CreateBookingDto {
   @IsUUID()
@@ -6,4 +6,14 @@ export class CreateBookingDto {
 
   @IsUUID()
   serviceId: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  requestGoal?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  requestMotivation?: string;
 }

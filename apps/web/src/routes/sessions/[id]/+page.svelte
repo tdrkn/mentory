@@ -94,6 +94,23 @@
     }
   };
 
+  const statusLabel = (status: string) => {
+    switch (status) {
+      case 'requested':
+        return 'Ожидает подтверждения';
+      case 'paid':
+        return 'Оплачена, ждет подтверждения';
+      case 'booked':
+        return 'Подтверждена';
+      case 'completed':
+        return 'Завершена';
+      case 'canceled':
+        return 'Отменена';
+      default:
+        return status;
+    }
+  };
+
   onMount(async () => {
     if (!$isAuthenticated && !$authLoading) {
       goto('/login');
@@ -135,7 +152,7 @@
               С {session.mentorId === $user?.id ? session.mentee.fullName : session.mentor.fullName}
             </p>
           </div>
-          <span class="badge">{session.status}</span>
+          <span class="badge">{statusLabel(session.status)}</span>
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-top:16px;">
@@ -164,11 +181,11 @@
         {/if}
 
         <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;">
-          {#if session.status !== 'canceled' && session.status !== 'completed'}
+          {#if session.status === 'booked'}
             <button class="btn btn-primary" on:click={handleJoin}>Присоединиться</button>
           {/if}
           <a class="btn btn-ghost" href={`/chat?session=${session.id}`}>Открыть чат</a>
-          {#if $isMentor && (session.status === 'booked' || session.status === 'paid')}
+          {#if $isMentor && session.status === 'booked'}
             <button class="btn btn-outline" on:click={handleCompleteSession} disabled={isCompleting}>
               {isCompleting ? 'Завершение...' : 'Завершить сессию'}
             </button>

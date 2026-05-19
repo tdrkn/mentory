@@ -10,6 +10,8 @@
     id: string;
     status: string;
     startAt: string;
+    requestGoal?: string | null;
+    requestMotivation?: string | null;
     mentee: { id: string; fullName: string };
     service: { title: string };
   }
@@ -47,12 +49,12 @@
 
   const now = new Date();
   const upcoming = () => sessions.filter((s) => new Date(s.startAt) > now && s.status !== 'canceled');
-  const pending = () => sessions.filter((s) => s.status === 'requested');
+  const pending = () => sessions.filter((s) => s.status === 'requested' || s.status === 'paid');
 
   const approveRequest = async (sessionId: string) => {
     actionInProgressId = sessionId;
     try {
-      await api.post('/booking/confirm', { sessionId });
+      await api.patch(`/sessions/${sessionId}/confirm`, {});
       sessions = await api.get<SessionItem[]>('/sessions?role=mentor');
     } finally {
       actionInProgressId = null;
@@ -62,7 +64,7 @@
   const rejectRequest = async (sessionId: string) => {
     actionInProgressId = sessionId;
     try {
-      await api.patch(`/booking/${sessionId}/cancel`, {
+      await api.patch(`/sessions/${sessionId}/reject`, {
         reason: 'Rejected by mentor',
       });
       sessions = await api.get<SessionItem[]>('/sessions?role=mentor');
@@ -114,6 +116,15 @@
                 <div>
                   <strong>{request.mentee.fullName}</strong>
                   <div class="muted">{request.service.title}</div>
+                  {#if request.status === 'paid'}
+                    <div class="muted" style="font-size:0.86rem;color:var(--accent);">Оплачено, ожидает вашего подтверждения</div>
+                  {/if}
+                  {#if request.requestGoal}
+                    <div class="muted" style="font-size:0.86rem;">Цель: {request.requestGoal}</div>
+                  {/if}
+                  {#if request.requestMotivation}
+                    <div class="muted" style="font-size:0.86rem;max-width:520px;">{request.requestMotivation}</div>
+                  {/if}
                   <div class="muted" style="font-size:0.86rem;">
                     {new Date(request.startAt).toLocaleDateString('ru-RU')} · {new Date(request.startAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                   </div>

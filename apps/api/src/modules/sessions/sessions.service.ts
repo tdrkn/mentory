@@ -1,9 +1,12 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import { addBusinessDays } from 'date-fns';
 import { PrismaService } from '../../prisma';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateSessionNotesDto } from './dto/update-session-notes.dto';
 import { SessionStatus } from '@prisma/client';
+
+const PAYOUT_DELAY_BUSINESS_DAYS = 5;
 
 @Injectable()
 export class SessionsService {
@@ -171,6 +174,8 @@ export class SessionsService {
           status: 'requested',
           startAt: slot.startAt,
           endAt: slot.endAt,
+          requestGoal: dto.requestGoal?.trim() || null,
+          requestMotivation: dto.requestMotivation?.trim() || null,
         },
         include: {
           mentor: { select: { id: true, fullName: true } },
@@ -184,22 +189,8 @@ export class SessionsService {
 
   async confirmSession(mentorId: string, sessionId: string) {
     const session = await this.prisma.session.findFirst({
-      where: { id: sessionId, mentorId, status: 'requested' },
-    });
-
-    if (!session) {
-      throw new NotFoundException('Session not found or already processed');
-    }
-
-    return this.prisma.session.update({
-      where: { id: sessionId },
-      data: { status: 'booked' },
-    });
-  }
-
-  async rejectSession(mentorId: string, sessionId: string, reason?: string) {
-    const session = await this.prisma.session.findFirst({
-      where: { id: sessionId, mentorId, status: 'requested' },
+      where: { id: sessionId, mentorId, status: { in: ['requested', 'paid', 'booked'] } },
+      include: { slot: true },
     });
 
     if (!session) {
@@ -207,10 +198,55 @@ export class SessionsService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      await tx.slot.update({
+        where: { id: session.slotId },
+        data: { status: 'booked', heldUntil: null },
+      });
+
+      return tx.session.update({
+        where: { id: sessionId },
+        data: { status: 'booked' },
+        include: {
+          mentor: { select: { id: true, fullName: true } },
+          mentee: { select: { id: true, fullName: true } },
+          service: true,
+          slot: true,
+        },
+      });
+    });
+  }
+
+  async rejectSession(mentorId: string, sessionId: string, reason?: string) {
+    const session = await this.prisma.session.findFirst({
+      where: { id: sessionId, mentorId, status: { in: ['requested', 'paid', 'booked'] } },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Session not found or already processed');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.findUnique({
+        where: { sessionId },
+        select: { id: true, status: true },
+      });
+
+      if (payment && ['succeeded', 'paid'].includes(payment.status)) {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: 'refunded' },
+        });
+      } else if (payment?.status === 'pending') {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: 'failed' },
+        });
+      }
+
       // Free up the slot
       await tx.slot.update({
         where: { id: session.slotId },
-        data: { status: 'free' },
+        data: { status: 'free', heldUntil: null },
       });
 
       // Cancel session
@@ -239,10 +275,27 @@ export class SessionsService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.findUnique({
+        where: { sessionId },
+        select: { id: true, status: true },
+      });
+
+      if (payment && ['succeeded', 'paid'].includes(payment.status)) {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: 'refunded' },
+        });
+      } else if (payment?.status === 'pending') {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: 'failed' },
+        });
+      }
+
       // Free up the slot
       await tx.slot.update({
         where: { id: session.slotId },
-        data: { status: 'free' },
+        data: { status: 'free', heldUntil: null },
       });
 
       // Cancel session
@@ -259,7 +312,7 @@ export class SessionsService {
 
   async completeSession(mentorId: string, sessionId: string) {
     const session = await this.prisma.session.findFirst({
-      where: { id: sessionId, mentorId, status: { in: ['booked', 'paid'] } },
+      where: { id: sessionId, mentorId, status: 'booked' },
     });
 
     if (!session) {
@@ -272,22 +325,44 @@ export class SessionsService {
         data: { status: 'completed' },
       });
 
-      // US13: Auto-create pending payout for succeeded payment
+      // US13: Schedule a payout only after the complaint window/delay.
       const payment = await tx.payment.findFirst({
         where: { sessionId, status: 'succeeded' },
       });
 
       if (payment && Number(payment.mentorAmount) > 0) {
-        await tx.payout.create({
-          data: {
-            mentorId,
-            amount: payment.mentorAmount,
-            currency: payment.currency,
-            status: 'pending',
-            provider: payment.provider,
+        const activeComplaint = await tx.complaint.findFirst({
+          where: {
+            targetSessionId: sessionId,
+            status: { in: ['new', 'in_progress'] },
           },
+          select: { id: true },
         });
-        this.logger.log(`Auto-payout created for mentor ${mentorId}, session ${sessionId}, amount ${payment.mentorAmount} ${payment.currency}`);
+
+        if (activeComplaint) {
+          this.logger.warn(`Payout deferred for session ${sessionId}: active complaint ${activeComplaint.id}`);
+        } else {
+          const existingPayout = await tx.payout.findUnique({
+            where: { sessionId },
+            select: { id: true },
+          });
+
+          if (!existingPayout) {
+            const availableAt = addBusinessDays(new Date(), PAYOUT_DELAY_BUSINESS_DAYS);
+            await tx.payout.create({
+              data: {
+                mentorId,
+                sessionId,
+                amount: payment.mentorAmount,
+                currency: payment.currency,
+                status: 'pending',
+                provider: payment.provider,
+                availableAt,
+              },
+            });
+            this.logger.log(`Payout scheduled for mentor ${mentorId}, session ${sessionId}, available at ${availableAt.toISOString()}`);
+          }
+        }
       }
 
       return updated;
@@ -305,6 +380,10 @@ export class SessionsService {
 
     if (!session) {
       throw new NotFoundException('Session not found');
+    }
+
+    if (session.status !== 'booked') {
+      throw new BadRequestException('Video room is available only after mentor confirmation');
     }
 
     if (session.videoRoom) {

@@ -2,7 +2,7 @@
 // Notifications Module - In-App + Email via BullMQ
 // ============================================
 // Tables: notifications
-// Queue: email-notifications (BullMQ)
+// Delivery: in-app notifications plus direct SMTP email delivery
 // Email: Nodemailer → Mailhog (dev) / SMTP (prod)
 
 import { Module } from '@nestjs/common';

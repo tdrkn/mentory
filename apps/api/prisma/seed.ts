@@ -47,6 +47,12 @@ async function main() {
   await prisma.attachment.deleteMany();
   await prisma.message.deleteMany();
   await prisma.conversation.deleteMany();
+  await prisma.mentorshipBookmark.deleteMany();
+  await prisma.mentorshipTask.deleteMany();
+  await prisma.mentorshipSubscription.deleteMany();
+  await prisma.mentorshipPlan.deleteMany();
+  await prisma.menteeCreditTransaction.deleteMany();
+  await prisma.menteeCreditBalance.deleteMany();
   await prisma.sessionNote.deleteMany();
   await prisma.videoRoom.deleteMany();
   await prisma.payment.deleteMany();

@@ -4,6 +4,10 @@
 LAYOUT_WITH_LEGEND()
 title Mentory — L2 Container Diagram (MVP)
 
+' Диаграмма описывает текущую реализацию as-is.
+' Формулировка "микросервисная архитектура" из последнего DOCX-отчета
+' сохранена как target/report wording, но код сейчас является modular monolith.
+
 ' ============================================================
 ' ОБОСНОВАНИЯ ВЫБОРА ТЕХНОЛОГИЙ
 ' ============================================================
@@ -38,7 +42,8 @@ title Mentory — L2 Container Diagram (MVP)
 '
 ' 3) PostgreSQL 16 (Database)
 '    — Предпосылки:
-'      • ER: 22 сущности с FK-связями → реляционная модель необходима
+'      • Prisma schema содержит связанные домены core/trust/subscriptions →
+'        реляционная модель необходима
 '        для целостности данных (sessions ↔ payments ↔ slots);
 '      • FR8, FR11: бронирование слотов с защитой от гонок → PostgreSQL
 '        поддерживает row-level locking и SERIALIZABLE транзакции;
@@ -60,11 +65,14 @@ title Mentory — L2 Container Diagram (MVP)
 '      • FR1: lockout после 5 неудач → Redis counter с TTL 15 мин
 '        (ER: users.failed_login_attempts, login_locked_until).
 '
-' 5) MinIO / S3 (Object Storage)
+' 5) Upload/File Storage Boundary
 '    — Предпосылки:
-'      • NFR8: PDF до 128 МБ → файловое хранилище отделено от БД;
-'      • FR19: сертификаты менторов → безопасное хранение с presigned URL;
-'      • FR17: вложения жалоб (.png, .jpg, .pdf) → S3-совместимый API;
+'      • NFR8: PDF до 128 МБ → файлы не должны храниться base64 в JSON;
+'      • FR19: сертификаты менторов и FR17: вложения жалоб должны жить
+'        в файловой подсистеме, а не в теле бизнес-сущностей;
+'      • As-is: FileStorageService сохраняет data URL в local uploads
+'        и возвращает публичный /uploads/* URL;
+'      • MinIO остается в dev infra как возможная production/S3 замена.
 '      • ER: mentor_regalia.file_url, complaint_attachments.file_url.
 '
 ' 6) Caddy 2 (Reverse Proxy)
@@ -95,16 +103,16 @@ System_Boundary(mentory, "Платформа Mentory") {
     Container(web, "Web App", "SvelteKit 2 / TypeScript / SSR", "Клиентский интерфейс для менти,\nментора и админа.\nSSR для быстрого First Paint (NFR3).\nWebSocket-чат (FR5).\nРеактивные формы профилей (FR4, FR7).")
 
     ' Backend
-    Container(api, "Backend Monolith", "NestJS 10 / TypeScript / Prisma", "Монолитное backend-приложение.\nВнутренние модули: API Gateway Module,\nDiscovery Module, Application Module,\nScheduling Module, Booking Module,\nPayment Module, Notification Module,\nConversation Module, Chat Module,\nWebSocket Gateway Module.\nВсе внешние интеграции выполняются\nчерез API Gateway Module.\nSwagger: /api/docs.")
+    Container(api, "Backend Monolith", "NestJS 10 / TypeScript / Prisma", "Монолитное backend-приложение.\nКлючевые модули: Auth, Profiles,\nDiscovery, Scheduling, Booking,\nSessions, Payments, Chat, Trust,\nNotifications, Subscriptions.\nSwagger: /api/docs.")
 
     ' Database
-    ContainerDb(db, "База данных", "PostgreSQL 16", "22 сущности ER (Core + Admin MVP).\nACID-транзакции для бронирования (FR8).\nRow-level locking для защиты от гонок.\nМасштаб: до 1М менторов (NFR13).")
+    ContainerDb(db, "База данных", "PostgreSQL 16", "Фактическая Prisma schema:\ncore mentoring, trust/admin,\nsubscriptions/workspace/credits.\nACID-транзакции для бронирования (FR8).\nRow-level locking для защиты от гонок.")
 
     ' Cache
-    ContainerDb(redis, "Кэш / Очереди", "Redis 7", "Кэш каталога менторов (NFR3).\nHold-lock слотов: TTL 10 мин (FR8).\nLogin lockout: TTL 15 мин (FR1).\nPub/Sub и presence для WebSocket-чата (FR5).\nОчередь уведомлений (NFR16).")
+    ContainerDb(redis, "Кэш / Locks", "Redis 7", "Hold-lock слотов: TTL 10 мин (FR8).\nLogin lockout: TTL 15 мин (FR1).\nPub/Sub/presence для WebSocket-чата (FR5).\nEmail отправляется напрямую через SMTP,\nproduction queue пока не включена.")
 
-    ' Object Storage
-    ContainerDb(minio, "Файловое хранилище", "MinIO (S3-совместимое)", "Сертификаты менторов: PDF ≤128 МБ (FR19, NFR8).\nВложения жалоб: PNG/JPG/PDF (FR17).\nАватары пользователей.\nPresigned URL для безопасного доступа.")
+    ' Upload storage boundary
+    ContainerDb(localUploads, "Файловое хранилище", "Local uploads adapter", "As-is: FileStorageService принимает data URL,\nпроверяет mime/размер и пишет файл\nв UPLOADS_DIR или ./uploads.\nВ БД сохраняется публичный fileUrl.\nПокрывает regalia, complaints, chat attachments.")
 
     ' Reverse Proxy
     Container(caddy, "Reverse Proxy", "Caddy 2", "Инфраструктурный ingress.\nAuto HTTPS (NFR14).\nTLS termination и reverse proxy\nдо Web App и Backend Monolith.\nДля пользователей прозрачен.")
@@ -131,8 +139,8 @@ Rel(web, api, "REST API запросы\n+ WebSocket (чат)", "HTTP / WS")
 
 ' --- Связи: API → Хранилища ---
 Rel(api, db, "ORM-запросы\n(Prisma Client)", "TCP:5432")
-Rel(api, redis, "Кэш, locks, pub/sub,\nочередь уведомлений", "TCP:6379")
-Rel(api, minio, "Upload/download файлов\n(S3 API)", "HTTP:9000")
+Rel(api, redis, "Кэш, locks, pub/sub", "TCP:6379")
+Rel(api, localUploads, "Сохранение файлов\nи отдача /uploads/*", "Filesystem")
 
 ' --- Связи: API → Внешние системы ---
 Rel(api, payment, "Создание платежа,\nwebhook оплаты,\nинициация выплат", "REST API")

@@ -13,6 +13,7 @@ import { ReviewRegaliaDto } from './dto/review-regalia.dto';
 import { BlockUserDto } from './dto/block-user.dto';
 import { CreateModerationActionDto } from './dto/create-moderation-action.dto';
 import { CreatePlatformWithdrawalDto } from './dto/create-platform-withdrawal.dto';
+import { FileStorageService } from '../../common/file-storage.service';
 
 const MAX_UPLOAD_SIZE_BYTES = 128 * 1024 * 1024;
 const ALLOWED_COMPLAINT_ATTACHMENT_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.pdf']);
@@ -25,7 +26,10 @@ const ALLOWED_COMPLAINT_ATTACHMENT_MIME_TYPES = new Set([
 
 @Injectable()
 export class TrustService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly fileStorage: FileStorageService,
+  ) {}
 
   async createComplaint(authorId: string, dto: CreateComplaintDto) {
     if (dto.targetUserId) {
@@ -51,6 +55,18 @@ export class TrustService {
       this.validateAttachment(attachment.fileName, attachment.mimeType, attachment.size);
     }
 
+    const storedAttachments = await Promise.all(
+      attachments.map(async (attachment) => ({
+        ...attachment,
+        fileUrl: await this.fileStorage.storeDataUrlIfNeeded(attachment.fileUrl, {
+          scope: 'complaints',
+          fileName: attachment.fileName,
+          mimeType: attachment.mimeType,
+          sizeBytes: attachment.size,
+        }),
+      })),
+    );
+
     const complaint = await this.prisma.complaint.create({
       data: {
         authorId,
@@ -60,7 +76,7 @@ export class TrustService {
         occurredAt,
         description: dto.description,
         attachments: {
-          create: attachments.map((attachment) => ({
+          create: storedAttachments.map((attachment) => ({
             fileName: attachment.fileName,
             fileUrl: attachment.fileUrl,
             mimeType: attachment.mimeType,
@@ -215,11 +231,17 @@ export class TrustService {
 
   async uploadRegalia(mentorId: string, dto: UploadRegaliaDto) {
     this.validateRegaliaFile(dto.fileName, dto.mimeType, dto.size);
+    const fileUrl = await this.fileStorage.storeDataUrlIfNeeded(dto.fileUrl, {
+      scope: 'regalia',
+      fileName: dto.fileName,
+      mimeType: dto.mimeType,
+      sizeBytes: dto.size,
+    });
 
     const regalia = await this.prisma.mentorRegalia.create({
       data: {
         mentorId,
-        fileUrl: dto.fileUrl,
+        fileUrl,
         fileName: dto.fileName,
         mimeType: dto.mimeType,
         sizeBytes: dto.size,

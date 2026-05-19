@@ -62,7 +62,7 @@
       case 'booked':
         return 'Подтверждена';
       case 'paid':
-        return 'Оплачена';
+        return 'Оплачена, ждет подтверждения';
       case 'completed':
         return 'Завершена';
       case 'canceled':
@@ -74,7 +74,7 @@
 
   const statusClass = (status: string) => {
     if (status === 'completed') return 'status-success';
-    if (status === 'requested') return 'status-warning';
+    if (status === 'requested' || status === 'paid') return 'status-warning';
     if (status === 'canceled') return 'status-error';
     return '';
   };

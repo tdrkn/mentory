@@ -7,94 +7,143 @@ skinparam ArrowFontSize 11
 skinparam nodesep 70
 skinparam ranksep 90
 
-title Mentory ER (Админ-панель / Trust MVP, Must Have)
+title Mentory ER (Админ-панель / Trust и операционный контур)
+
+' As-is implementation ER.
+' DOCX-отчет описывает админские операции местами как работу через стороннюю БД.
+' В текущем коде это first-party trust/admin контур: /trust, /admin/trust,
+' AdminJS, Prisma tables, audit logs, blocks и platform withdrawals.
 
 entity "users" as users {
-  * id : Integer <<PK>>
+  * id : UUID <<PK>>
   --
   email : text <<UQ>>
   role : text
-  status : text
+  is_blocked : bool
+  blocked_at : timestamptz <<nullable>>
+  blocked_reason : text <<nullable>>
 }
 
 entity "sessions (ref)" as sessions_ref {
-  * id : Integer <<PK>>
+  * id : UUID <<PK>>
   --
   status : text
+  start_at : timestamptz
 }
 
 entity "mentor_regalia" as mentor_regalia {
-  * id : Integer <<PK>>
+  * id : UUID <<PK>>
   --
-  mentor_id : Integer <<FK>>
+  mentor_id : UUID <<FK>>
   file_url : text
+  file_name : text
+  mime_type : text
+  size_bytes : bigint
   status : text
-  reviewed_by : Integer <<FK, nullable>>
-  reviewed_at : timestamp <<nullable>>
-  created_at : timestamp
+  rejection_reason : text <<nullable>>
+  reviewed_by_id : UUID <<FK, nullable>>
+  reviewed_at : timestamptz <<nullable>>
+  created_at : timestamptz
 }
 
 entity "complaints" as complaints {
-  * id : Integer <<PK>>
+  * id : UUID <<PK>>
   --
-  author_id : Integer <<FK>>
-  target_user_id : Integer <<FK>>
-  target_session_id : Integer <<FK, nullable>>
-  assigned_admin_id : Integer <<FK, nullable>>
+  author_id : UUID <<FK>>
+  target_user_id : UUID <<FK, nullable>>
+  target_session_id : UUID <<FK, nullable>>
+  assigned_admin_id : UUID <<FK, nullable>>
   category : text
+  occurred_at : date
+  description : text
   status : text
   resolution_comment : text <<nullable>>
-  created_at : timestamp
-  closed_at : timestamp <<nullable>>
+  created_at : timestamptz
+  closed_at : timestamptz <<nullable>>
+}
+
+entity "complaint_attachments" as complaint_attachments {
+  * id : UUID <<PK>>
+  --
+  complaint_id : UUID <<FK>>
+  file_name : text
+  file_url : text
+  mime_type : text
+  size_bytes : bigint
 }
 
 entity "complaint_messages" as complaint_messages {
-  * id : Integer <<PK>>
+  * id : UUID <<PK>>
   --
-  complaint_id : Integer <<FK>>
-  sender_id : Integer <<FK>>
+  complaint_id : UUID <<FK>>
+  sender_id : UUID <<FK>>
   body : text
-  created_at : timestamp
+  created_at : timestamptz
 }
 
 entity "moderation_actions" as moderation_actions {
-  * id : Integer <<PK>>
+  * id : UUID <<PK>>
   --
-  admin_id : Integer <<FK>>
+  admin_id : UUID <<FK>>
   target_type : text
-  target_id : Integer
+  target_id : UUID
   action : text
   reason : text <<nullable>>
-  created_at : timestamp
+  created_at : timestamptz
+}
+
+entity "user_blocks" as user_blocks {
+  * id : UUID <<PK>>
+  --
+  user_id : UUID <<FK>>
+  admin_id : UUID <<FK>>
+  status : text
+  reason : text <<nullable>>
+  created_at : timestamptz
+}
+
+entity "platform_withdrawals" as platform_withdrawals {
+  * id : UUID <<PK>>
+  --
+  admin_id : UUID <<FK>>
+  amount : int
+  currency : text
+  provider : text
+  status : text
+  created_at : timestamptz
 }
 
 entity "admin_audit_logs" as admin_audit_logs {
-  * id : Integer <<PK>>
+  * id : UUID <<PK>>
   --
-  admin_id : Integer <<FK>>
+  admin_id : UUID <<FK>>
   action : text
   target_type : text
-  target_id : Integer
-  created_at : timestamp
+  target_id : UUID <<nullable>>
+  created_at : timestamptz
 }
 
 ' layout
 users -[hidden]down- complaints
 sessions_ref -[hidden]down- complaints
-complaints -[hidden]down- complaint_messages
+complaints -[hidden]down- complaint_attachments
+complaint_attachments -[hidden]down- complaint_messages
 complaint_messages -[hidden]down- moderation_actions
 moderation_actions -[hidden]down- admin_audit_logs
 mentor_regalia -[hidden]left- complaints
+user_blocks -[hidden]right- admin_audit_logs
 
 ' relationships
-users ||--o{ complaints : "автор"
-sessions_ref ||--o{ complaints : "сессия"
-
-complaints ||--o{ complaint_messages : "сообщения"
+users ||--o{ complaints : "автор / target / admin"
+sessions_ref ||--o{ complaints : "контекст сессии"
+complaints ||--o{ complaint_attachments : "вложения"
+complaints ||--o{ complaint_messages : "переписка"
 users ||--o{ complaint_messages : "отправитель"
 
 users ||--o{ mentor_regalia : "регалии"
 users ||--o{ moderation_actions : "действия"
+users ||--o{ user_blocks : "блокировки"
+users ||--o{ platform_withdrawals : "вывод комиссии"
 users ||--o{ admin_audit_logs : "аудит"
 
 legend right

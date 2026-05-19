@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma';
-import { Prisma, SlotStatus, SessionStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { RedisLockService } from './redis-lock.service';
 import { HoldSlotDto } from './dto/hold-slot.dto';
 import { ConfirmSessionDto } from './dto/confirm-session.dto';
@@ -17,19 +17,19 @@ import { ConfirmSessionDto } from './dto/confirm-session.dto';
  *    - Acquire Redis lock on slot
  *    - Check slot is free (in transaction)
  *    - Update slot: free -> held, set held_until
- *    - Create session: status = booked_pending_payment
+ *    - Create session: status = requested
  *    - Release lock
  * 
  * 2. User has 10 minutes to pay
  * 
  * 3. POST /sessions/confirm (after payment)
  *    - Update slot: held -> booked
- *    - Update session: booked_pending_payment -> booked
+ *    - Update session: requested/paid -> booked
  * 
  * 4. If hold expires:
  *    - Cron job or next request releases slot
  *    - slot: held -> free (if held_until < now)
- *    - session: booked_pending_payment -> canceled
+ *    - session: requested -> canceled
  * 
  * STATUS DIAGRAMS:
  * 
@@ -40,8 +40,9 @@ import { ConfirmSessionDto } from './dto/confirm-session.dto';
  *   booked -> completed (after session)
  * 
  * Session:
- *   booked_pending_payment -> booked (on payment)
- *   booked_pending_payment -> canceled (on hold expiry)
+ *   requested -> paid (payment succeeded, waiting mentor)
+ *   requested -> canceled (on hold expiry)
+ *   paid -> booked (mentor confirms)
  *   booked -> completed (after session ends)
  *   booked -> canceled (on cancel)
  */
@@ -132,9 +133,11 @@ export class BookingService {
             menteeId,
             slotId,
             serviceId,
-            status: 'requested', // Will be 'booked_pending_payment' after mentor confirms
+            status: 'requested',
             startAt: slotData.start_at,
             endAt: slotData.end_at,
+            requestGoal: dto.requestGoal?.trim() || null,
+            requestMotivation: dto.requestMotivation?.trim() || null,
           },
           include: {
             mentor: { select: { id: true, fullName: true, email: true } },
@@ -181,10 +184,12 @@ export class BookingService {
         throw new BadRequestException('Not authorized');
       }
 
-      // Check session status
-      if (session.status !== 'requested' && session.status !== 'booked') {
+      // Check session status. `paid` is allowed for idempotent finalization after webhook.
+      if (!['requested', 'booked', 'paid'].includes(session.status)) {
         throw new BadRequestException(`Cannot confirm session with status: ${session.status}`);
       }
+
+      let hasSucceededPayment = false;
 
       if (paymentIntentId) {
         const payment = await tx.payment.findUnique({
@@ -211,6 +216,14 @@ export class BookingService {
         if (payment.status !== 'succeeded' && payment.status !== 'paid') {
           throw new BadRequestException('Payment has not been confirmed by acquirer');
         }
+
+        hasSucceededPayment = true;
+      } else {
+        const payment = await tx.payment.findUnique({
+          where: { sessionId },
+          select: { status: true },
+        });
+        hasSucceededPayment = payment?.status === 'succeeded' || payment?.status === 'paid';
       }
 
       // Check if hold expired
@@ -242,7 +255,12 @@ export class BookingService {
       const updatedSession = await tx.session.update({
         where: { id: sessionId },
         data: {
-          status: 'booked',
+          status:
+            session.mentorId === userId
+              ? 'booked'
+              : hasSucceededPayment || session.status === 'paid'
+                ? 'paid'
+                : 'booked',
         },
         include: {
           mentor: { select: { id: true, fullName: true } },
@@ -278,6 +296,23 @@ export class BookingService {
       // Check if can be canceled
       if (!['requested', 'booked', 'paid'].includes(session.status)) {
         throw new BadRequestException(`Cannot cancel session with status: ${session.status}`);
+      }
+
+      const payment = await tx.payment.findUnique({
+        where: { sessionId },
+        select: { id: true, status: true },
+      });
+
+      if (payment && ['succeeded', 'paid'].includes(payment.status)) {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: 'refunded' },
+        });
+      } else if (payment?.status === 'pending') {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: 'failed' },
+        });
       }
 
       // Release slot

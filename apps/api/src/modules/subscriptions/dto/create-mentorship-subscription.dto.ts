@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateMentorshipSubscriptionDto {
   @IsString()
@@ -7,4 +7,14 @@ export class CreateMentorshipSubscriptionDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  requestGoal?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  requestMotivation?: string;
 }

@@ -3,6 +3,7 @@ import { JwtAuthGuard } from '../auth/guards';
 import { CurrentUser } from '../auth/decorators';
 import { SessionsService } from './sessions.service';
 import { UpdateSessionNotesDto } from './dto/update-session-notes.dto';
+import { CancelSessionDto } from './dto/cancel-session.dto';
 
 @Controller('sessions')
 @UseGuards(JwtAuthGuard)
@@ -76,6 +77,33 @@ export class SessionsController {
     @Body() dto: UpdateSessionNotesDto,
   ) {
     return this.sessionsService.updateSessionNotes(userId, sessionId, dto);
+  }
+
+  /**
+   * PATCH /api/sessions/:id/confirm
+   * Confirm a requested or paid session
+   * Access: Mentor of the session
+   */
+  @Patch(':id/confirm')
+  async confirmSession(
+    @CurrentUser('id') userId: string,
+    @Param('id') sessionId: string,
+  ) {
+    return this.sessionsService.confirmSession(userId, sessionId);
+  }
+
+  /**
+   * PATCH /api/sessions/:id/reject
+   * Reject a requested or paid session
+   * Access: Mentor of the session
+   */
+  @Patch(':id/reject')
+  async rejectSession(
+    @CurrentUser('id') userId: string,
+    @Param('id') sessionId: string,
+    @Body() dto?: CancelSessionDto,
+  ) {
+    return this.sessionsService.rejectSession(userId, sessionId, dto?.reason);
   }
 
   /**

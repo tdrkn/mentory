@@ -371,7 +371,7 @@
           </div>
         </div>
 
-        <div class="grid" style="grid-template-columns:1fr 1.1fr;gap:18px;">
+        <div class="grid admin-complaints-grid">
           <div class="stack-sm">
             {#if complaints.length === 0}
               <p class="muted">Жалобы не найдены.</p>
@@ -536,7 +536,7 @@
 
       <section class="card" style="margin-top:20px;">
         <h2 class="section-title">Блокировки и модерация</h2>
-        <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:16px;">
+        <div class="grid admin-actions-grid">
           <div class="stack-sm">
             <h3 style="margin:0;">Блокировка</h3>
             <input class="input" bind:value={blockUserId} placeholder="User ID" />
@@ -562,7 +562,7 @@
 
       <section class="card" style="margin-top:20px;">
         <h2 class="section-title">Комиссия платформы</h2>
-        <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="grid admin-money-grid">
           <div class="stack-sm">
             <div class="surface">
               <div class="muted">Total fees</div>
@@ -609,3 +609,34 @@
     </main>
   {/if}
 </div>
+
+<style>
+  .admin-complaints-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 18px;
+  }
+
+  .admin-actions-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .admin-money-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .admin-complaints-grid > *,
+  .admin-actions-grid > *,
+  .admin-money-grid > * {
+    min-width: 0;
+  }
+
+  @media (max-width: 760px) {
+    .admin-complaints-grid,
+    .admin-actions-grid,
+    .admin-money-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

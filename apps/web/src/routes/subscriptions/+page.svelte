@@ -35,7 +35,7 @@
     mentorId: string;
     menteeId: string;
     planId: string;
-    status: 'active' | 'paused' | 'ended';
+    status: 'pending' | 'active' | 'paused' | 'ended' | 'rejected';
     startedAt: string;
     pausedAt?: string | null;
     endedAt?: string | null;
@@ -44,6 +44,8 @@
     currentPeriodEnd?: string | null;
     monthlyPrice?: number | string | null;
     currency: string;
+    requestGoal?: string | null;
+    requestMotivation?: string | null;
     notes?: string | null;
     plan?: MentorshipPlan;
     mentor?: UserRef;
@@ -139,6 +141,8 @@
 
   const subscribeForm = {
     planId: '',
+    requestGoal: '',
+    requestMotivation: '',
     notes: '',
   };
 
@@ -185,8 +189,18 @@
       return;
     }
 
-    if (!selectedSubscriptionId || !subscriptions.some((item) => item.id === selectedSubscriptionId)) {
+    const workspaceCandidate =
+      subscriptions.find((item) => item.id === selectedSubscriptionId && canOpenWorkspace(item.status)) ||
+      subscriptions.find((item) => canOpenWorkspace(item.status));
+
+    if (!workspaceCandidate) {
       selectedSubscriptionId = subscriptions[0].id;
+      workspace = null;
+      return;
+    }
+
+    if (!selectedSubscriptionId || selectedSubscriptionId !== workspaceCandidate.id) {
+      selectedSubscriptionId = workspaceCandidate.id;
     }
 
     await loadWorkspace(selectedSubscriptionId);
@@ -285,12 +299,16 @@
 
       await api.post('/subscriptions', {
         planId: targetPlanId,
+        requestGoal: subscribeForm.requestGoal.trim() || undefined,
+        requestMotivation: subscribeForm.requestMotivation.trim() || undefined,
         notes: subscribeForm.notes || undefined,
       });
 
       subscribeForm.planId = '';
+      subscribeForm.requestGoal = '';
+      subscribeForm.requestMotivation = '';
       subscribeForm.notes = '';
-      infoMessage = 'Подписка создана';
+      infoMessage = 'Заявка на подписку отправлена ментору';
       await loadSubscriptions();
     });
   }
@@ -300,7 +318,7 @@
     infoMessage = 'Программа выбрана. Нажмите «Оформить подписку».';
   }
 
-  async function changeSubscriptionStatus(subscriptionId: string, status: 'active' | 'paused' | 'ended') {
+  async function changeSubscriptionStatus(subscriptionId: string, status: MentorshipSubscription['status']) {
     await withBusy(async () => {
       await api.patch(`/subscriptions/${subscriptionId}/status`, { status });
       infoMessage = 'Статус подписки обновлён';
@@ -315,6 +333,11 @@
 
     await withBusy(async () => {
       selectedSubscriptionId = subscriptionId;
+      const selected = subscriptions.find((item) => item.id === subscriptionId);
+      if (!selected || !canOpenWorkspace(selected.status)) {
+        workspace = null;
+        return;
+      }
       await loadWorkspace(subscriptionId);
     });
   }
@@ -438,6 +461,10 @@
   }
 
   function formatSubscriptionStatus(status: MentorshipSubscription['status']) {
+    if (status === 'pending') {
+      return 'На рассмотрении';
+    }
+
     if (status === 'active') {
       return 'Активна';
     }
@@ -446,7 +473,25 @@
       return 'На паузе';
     }
 
-    return 'Завершена';
+    if (status === 'ended') {
+      return 'Завершена';
+    }
+
+    return 'Отклонена';
+  }
+
+  function subscriptionBadgeClass(status: MentorshipSubscription['status']) {
+    if (status === 'active') return 'success';
+    if (status === 'paused' || status === 'pending') return 'warning';
+    return 'error';
+  }
+
+  function canOpenWorkspace(status: MentorshipSubscription['status']) {
+    return status === 'active' || status === 'paused';
+  }
+
+  function canReviewSubscription(item: MentorshipSubscription) {
+    return item.status === 'pending' && ($user?.role === 'admin' || item.mentorId === $user?.id);
   }
 
   function formatTaskStatus(status: MentorshipTask['status']) {
@@ -548,8 +593,8 @@
           <div class="kpi kpi-accent">{subscriptions.filter((item) => item.status === 'active').length}</div>
         </div>
         <div class="card">
-          <div class="muted">На паузе</div>
-          <div class="kpi kpi-warn">{subscriptions.filter((item) => item.status === 'paused').length}</div>
+          <div class="muted">На рассмотрении</div>
+          <div class="kpi kpi-warn">{subscriptions.filter((item) => item.status === 'pending').length}</div>
         </div>
         <div class="card">
           <div class="muted">Баланс кредитов</div>
@@ -591,7 +636,7 @@
                 <button class="subscription-select" on:click={() => selectSubscription(item.id)} disabled={isBusy}>
                   <div class="subscription-main">
                     <strong>{item.plan?.title || 'Программа менторства'}</strong>
-                    <span class="badge {item.status === 'active' ? 'success' : item.status === 'paused' ? 'warning' : 'error'}">{formatSubscriptionStatus(item.status)}</span>
+                    <span class="badge {subscriptionBadgeClass(item.status)}">{formatSubscriptionStatus(item.status)}</span>
                   </div>
                   <div class="muted">
                     Ментор: {item.mentor?.fullName || item.mentorId}
@@ -602,9 +647,18 @@
                   <div class="muted">
                     Цена: {formatMoney(item.monthlyPrice ?? item.plan?.priceAmount, item.currency || item.plan?.currency || 'USD')}
                   </div>
+                  {#if item.requestGoal}
+                    <div class="muted">Цель: {item.requestGoal}</div>
+                  {/if}
+                  {#if item.requestMotivation}
+                    <div class="muted">Мотивация: {item.requestMotivation}</div>
+                  {/if}
                 </button>
                 <div class="subscription-actions">
-                  {#if item.status === 'active'}
+                  {#if canReviewSubscription(item)}
+                    <button class="btn btn-sm btn-primary" on:click={() => changeSubscriptionStatus(item.id, 'active')} disabled={isBusy}>Принять</button>
+                    <button class="btn btn-sm btn-outline" on:click={() => changeSubscriptionStatus(item.id, 'rejected')} disabled={isBusy}>Отклонить</button>
+                  {:else if item.status === 'active'}
                     <button class="btn btn-sm btn-ghost" on:click={() => changeSubscriptionStatus(item.id, 'paused')} disabled={isBusy}>Пауза</button>
                     <button class="btn btn-sm btn-outline" on:click={() => changeSubscriptionStatus(item.id, 'ended')} disabled={isBusy}>Завершить</button>
                   {:else if item.status === 'paused'}
@@ -626,7 +680,11 @@
         </p>
 
         {#if !selectedSubscription || !workspace}
-          <p class="muted">Когда у вас будет подписка, здесь появится ваш рабочий план.</p>
+          <p class="muted">
+            {selectedSubscription && !canOpenWorkspace(selectedSubscription.status)
+              ? 'Рабочее пространство откроется после одобрения заявки ментором.'
+              : 'Когда у вас будет подписка, здесь появится ваш рабочий план.'}
+          </p>
         {:else}
           <div class="workspace-meta">
             <div class="muted">Программа: <strong>{selectedSubscription.plan?.title || selectedSubscription.planId}</strong></div>
@@ -820,6 +878,8 @@
               <h3 class="section-subtitle">Шаг 2. Оформить подписку</h3>
               <p class="muted">ID программы можно выбрать слева или вставить вручную.</p>
               <input class="input" placeholder="ID программы" bind:value={subscribeForm.planId} />
+              <input class="input" placeholder="Цель менторства" bind:value={subscribeForm.requestGoal} maxlength="500" />
+              <textarea class="textarea" placeholder="Мотивационное письмо для ментора" bind:value={subscribeForm.requestMotivation} maxlength="2000"></textarea>
               <textarea class="textarea" placeholder="Комментарий для ментора (необязательно)" bind:value={subscribeForm.notes}></textarea>
               <button class="btn btn-primary" type="submit" disabled={isBusy}>Оформить подписку</button>
             </form>

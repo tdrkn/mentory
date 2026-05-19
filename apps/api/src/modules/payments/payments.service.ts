@@ -108,34 +108,99 @@ export class PaymentsService {
   }
 
   private async handlePaymentSuccess(providerPaymentId: string) {
-    const payment = await this.prisma.payment.findFirst({
-      where: { providerPaymentId },
-    });
+    const now = new Date();
 
-    if (!payment) return;
+    await this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.findFirst({
+        where: { providerPaymentId },
+        include: {
+          session: {
+            include: { slot: true },
+          },
+        },
+      });
 
-    await this.prisma.$transaction([
-      this.prisma.payment.update({
+      if (!payment) return;
+      if (payment.status === 'refunded') return;
+
+      const { session } = payment;
+      const holdExpired =
+        session.slot.status === 'held' &&
+        session.slot.heldUntil !== null &&
+        session.slot.heldUntil < now;
+
+      if (holdExpired) {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: 'refunded', paidAt: now },
+        });
+        await tx.slot.update({
+          where: { id: session.slotId },
+          data: { status: 'free', heldUntil: null },
+        });
+        await tx.session.update({
+          where: { id: session.id },
+          data: {
+            status: 'canceled',
+            canceledAt: now,
+            cancelReason: 'Payment succeeded after hold expired; refund required',
+          },
+        });
+        return;
+      }
+
+      await tx.payment.update({
         where: { id: payment.id },
-        data: { status: 'succeeded', paidAt: new Date() },
-      }),
-      this.prisma.session.update({
-        where: { id: payment.sessionId },
-        data: { status: 'paid' },
-      }),
-    ]);
+        data: { status: 'succeeded', paidAt: now },
+      });
+      await tx.slot.update({
+        where: { id: session.slotId },
+        data: { status: 'booked', heldUntil: null },
+      });
+      await tx.session.update({
+        where: { id: session.id },
+        data: { status: session.status === 'booked' ? 'booked' : 'paid' },
+      });
+    });
   }
 
   private async handlePaymentFailure(providerPaymentId: string) {
-    const payment = await this.prisma.payment.findFirst({
-      where: { providerPaymentId },
-    });
+    const now = new Date();
 
-    if (!payment) return;
+    await this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.findFirst({
+        where: { providerPaymentId },
+        include: {
+          session: {
+            include: { slot: true },
+          },
+        },
+      });
 
-    await this.prisma.payment.update({
-      where: { id: payment.id },
-      data: { status: 'failed' },
+      if (!payment) return;
+
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: { status: 'failed' },
+      });
+
+      if (payment.session.status === 'requested' || payment.session.status === 'booked') {
+        await tx.session.update({
+          where: { id: payment.sessionId },
+          data: {
+            status: 'canceled',
+            canceledAt: now,
+            cancelReason: 'Payment failed',
+          },
+        });
+      }
+
+      if (payment.session.slot.status === 'held') {
+        await tx.slot.update({
+          where: { id: payment.session.slotId },
+          data: { status: 'free', heldUntil: null },
+        });
+      }
     });
   }
 
@@ -281,6 +346,53 @@ export class PaymentsService {
     };
   }
 
+  async processReadyPayouts(adminId: string) {
+    const now = new Date();
+    const duePayouts = await this.prisma.payout.findMany({
+      where: {
+        status: 'pending',
+        availableAt: { lte: now },
+      },
+      include: {
+        session: {
+          include: {
+            complaints: true,
+          },
+        },
+      },
+      orderBy: { availableAt: 'asc' },
+    });
+
+    let completed = 0;
+    let blocked = 0;
+
+    for (const payout of duePayouts) {
+      const hasActiveComplaint = payout.session?.complaints.some((complaint) =>
+        ['new', 'in_progress'].includes(complaint.status),
+      );
+
+      if (hasActiveComplaint) {
+        blocked++;
+        continue;
+      }
+
+      await this.prisma.payout.update({
+        where: { id: payout.id },
+        data: {
+          status: 'completed',
+          provider: payout.provider || `processed_by_admin_${adminId}`,
+        },
+      });
+      completed++;
+    }
+
+    return {
+      checked: duePayouts.length,
+      completed,
+      blocked,
+    };
+  }
+
   async adminFreezePayment(adminId: string, paymentId: string, reason?: string) {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
@@ -311,7 +423,12 @@ export class PaymentsService {
   async adminUnfreezePayment(adminId: string, paymentId: string, reason?: string) {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
-      select: { id: true, sessionId: true, status: true },
+      select: {
+        id: true,
+        sessionId: true,
+        status: true,
+        session: { select: { status: true } },
+      },
     });
 
     if (!payment) {
@@ -323,19 +440,25 @@ export class PaymentsService {
     }
 
     const now = new Date();
-    const [updated] = await this.prisma.$transaction([
-      this.prisma.payment.update({
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const updatedPayment = await tx.payment.update({
         where: { id: paymentId },
         data: {
           status: 'paid',
           paidAt: now,
         },
-      }),
-      this.prisma.session.update({
+      });
+      const session = await tx.session.update({
         where: { id: payment.sessionId },
-        data: { status: 'paid' },
-      }),
-    ]);
+        data: { status: payment.session.status === 'booked' ? 'booked' : 'paid' },
+        select: { slotId: true },
+      });
+      await tx.slot.update({
+        where: { id: session.slotId },
+        data: { status: 'booked', heldUntil: null },
+      });
+      return updatedPayment;
+    });
 
     return {
       action: 'unfreeze',
@@ -360,20 +483,26 @@ export class PaymentsService {
     }
 
     const now = new Date();
-    const [updatedPayment] = await this.prisma.$transaction([
-      this.prisma.payment.update({
+    const updatedPayment = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.payment.update({
         where: { id: paymentId },
         data: { status: 'refunded' },
-      }),
-      this.prisma.session.update({
+      });
+      const session = await tx.session.update({
         where: { id: payment.sessionId },
         data: {
           status: 'canceled',
           canceledAt: now,
           cancelReason: reason || 'Canceled by admin',
         },
-      }),
-    ]);
+        select: { slotId: true },
+      });
+      await tx.slot.update({
+        where: { id: session.slotId },
+        data: { status: 'free', heldUntil: null },
+      });
+      return updated;
+    });
 
     return {
       action: 'cancel',

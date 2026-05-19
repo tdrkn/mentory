@@ -49,6 +49,7 @@ describe('BookingService', () => {
       $queryRaw: jest.fn(),
       slot: { update: jest.fn(), findMany: jest.fn() },
       session: { create: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
+      payment: { findUnique: jest.fn() },
       mentorService: { findFirst: jest.fn() },
     }));
 
@@ -133,12 +134,8 @@ describe('BookingService', () => {
       };
 
       redisLockService.withLock.mockImplementation(async (slotId, callback) => {
-        try {
-          await callback();
-        } catch (error) {
-          return { success: true, result: null, error: error.message };
-        }
-        return { success: true };
+        const result = await callback();
+        return { success: true, result };
       });
 
       prismaService.$transaction.mockImplementation(async (callback) => {
@@ -277,6 +274,9 @@ describe('BookingService', () => {
           slot: {
             update: jest.fn().mockResolvedValue({ ...mockSession.slot, status: 'booked' }),
           },
+          payment: {
+            findUnique: jest.fn().mockResolvedValue(null),
+          },
         };
         return callback(tx);
       });
@@ -307,6 +307,9 @@ describe('BookingService', () => {
           slot: {
             update: jest.fn().mockResolvedValue({ ...expiredSession.slot, status: 'free' }),
           },
+          payment: {
+            findUnique: jest.fn().mockResolvedValue(null),
+          },
         };
         return callback(tx);
       });
@@ -324,6 +327,7 @@ describe('BookingService', () => {
             update: jest.fn(),
           },
           slot: { update: jest.fn() },
+          payment: { findUnique: jest.fn() },
         };
         return callback(tx);
       });

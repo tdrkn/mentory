@@ -46,6 +46,8 @@
   let slots: Slot[] = [];
   let selectedSlot: string | null = null;
   let selectedService: string | null = null;
+  let requestGoal = '';
+  let requestMotivation = '';
   let isLoading = true;
   let isBooking = false;
   let error: string | null = null;
@@ -102,6 +104,8 @@
       const result = await api.post<{ session: { id: string } }>('/booking/hold', {
         slotId: selectedSlot,
         serviceId: selectedService,
+        requestGoal: requestGoal.trim() || undefined,
+        requestMotivation: requestMotivation.trim() || undefined,
       });
       goto(`/checkout/${result.session.id}`);
     } catch (err) {
@@ -288,6 +292,16 @@
             {#if error}
               <div class="alert alert-error">{error}</div>
             {/if}
+
+            <label style="display:block;margin:12px 0;">
+              <div class="muted" style="margin-bottom:4px;">Цель встречи</div>
+              <input class="input" bind:value={requestGoal} maxlength="500" placeholder="Например: подготовиться к system design" />
+            </label>
+
+            <label style="display:block;margin-bottom:12px;">
+              <div class="muted" style="margin-bottom:4px;">Мотивация</div>
+              <textarea class="textarea" bind:value={requestMotivation} maxlength="2000" rows="4" placeholder="Коротко опишите контекст и ожидания от ментора"></textarea>
+            </label>
 
             {#if Object.keys(groupedSlots()).length === 0}
               <div class="no-slots">

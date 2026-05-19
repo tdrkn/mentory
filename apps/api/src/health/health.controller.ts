@@ -31,10 +31,13 @@ export class HealthController {
     private readonly config: ConfigService,
   ) {
     // Initialize Redis client for health checks
+    const redisUrl = this.config.get<string>('REDIS_URL');
     const redisHost = this.config.get<string>('REDIS_HOST', 'localhost');
     const redisPort = this.config.get<number>('REDIS_PORT', 6379);
     try {
-      this.redis = new Redis({ host: redisHost, port: redisPort, lazyConnect: true });
+      this.redis = redisUrl
+        ? new Redis(redisUrl, { lazyConnect: true })
+        : new Redis({ host: redisHost, port: redisPort, lazyConnect: true });
     } catch {
       // Redis might not be available
     }

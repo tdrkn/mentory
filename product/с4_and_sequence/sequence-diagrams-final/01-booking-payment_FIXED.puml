@@ -1,6 +1,13 @@
 @startuml Sequence_Booking_Payment_Confirmation
 
-title UC7 + UC9 + UC13: Запись на разовую сессию, оплата и подтверждение заявки
+title UC7 + UC9: Запись на разовую сессию, hold слота и оплата
+
+' As-is / report alignment note:
+' DOCX-отчет описывает отдельную заявку/application и подтверждение ментором.
+' Текущий код использует sessions.status=requested как заявку.
+' State machine after alignment:
+' requested = создана заявка/hold, paid = оплачено и ждет решения ментора,
+' booked = ментор подтвердил, canceled/refunded = отказ/ошибка/истекший hold.
 
 skinparam responseMessageBelowArrow true
 skinparam shadowing false
@@ -20,7 +27,6 @@ actor       "Менти"                                 as Mentee
 actor       "Ментор"                                as Mentor
 participant "Web App"                               as Web
 box "Backend Monolith" #EAF2FF
-participant "API Gateway Module"                    as GW
 participant "Discovery Module"                      as Discovery
 participant "Scheduling Module"                     as Scheduling
 participant "Booking Module"                        as Booking
@@ -32,219 +38,139 @@ database    "Redis\n(lock + hold TTL)"              as Redis
 participant "Acquiring Gateway\n(card / QR / CBR)"  as Acquirer <<external>>
 participant "SMTP / Email"                          as Email <<external>>
 
-note over GW, Notify #EEEEEE
-Логические модули backend-монолита.
-Внешние интеграции проходят через API Gateway Module.
-end note
-
 == Выбор ментора и слота ==
 
-Mentee -> Web : Открывает профиль ментора\nи выбирает разовую сессию
+Mentee -> Web : Открывает профиль ментора\nи выбирает услугу
 activate Web
 
-    Web -> GW : GET /mentors/{id}
-    activate GW
-        GW -> Discovery : Запрос профиля ментора,\nуслуг и рейтинга
-        activate Discovery
-            Discovery -> DB : SELECT mentor profile,\nservices, reviews
-            activate DB
-                DB --> Discovery : profile + services + rating
-            deactivate DB
-            Discovery --> GW : Профиль ментора
-        deactivate Discovery
-    GW --> Web : Профиль ментора
-    deactivate GW
+Web -> Discovery : Получить профиль, услуги и рейтинг
+activate Discovery
+Discovery -> DB : SELECT mentor profile, services, reviews
+DB --> Discovery : profile + services + rating
+Discovery --> Web : Профиль ментора
+deactivate Discovery
 
-    Web -> GW : GET /schedule/slots?mentorId=...
-    activate GW
-        GW -> Scheduling : Получить доступные слоты
-        activate Scheduling
-            Scheduling -> DB : SELECT slots WHERE status='free'
-            activate DB
-                DB --> Scheduling : free slots[]
-            deactivate DB
-            Scheduling --> GW : Доступные слоты
-        deactivate Scheduling
-    GW --> Web : Список слотов
-    deactivate GW
+Web -> Scheduling : Получить доступные слоты
+activate Scheduling
+Scheduling -> DB : SELECT slots WHERE status='free'
+DB --> Scheduling : free slots[]
+Scheduling --> Web : Список слотов
+deactivate Scheduling
 
-== Hold слота и создание заявки ==
+== Hold слота и создание сессии ==
 
-    Mentee -> Web : Выбирает слот и нажимает\n"Продолжить к оплате"
+Mentee -> Web : Выбирает слот и нажимает\n"Продолжить к оплате"
 
-    Web -> GW : POST /applications/single\n{slotId, serviceSingleId}
-    activate GW
-        GW -> Booking : Hold slot and create application
-        activate Booking
+Web -> Booking : POST /booking/hold\n{slotId, serviceId,\nrequestGoal, requestMotivation}
+activate Booking
+Booking -> Redis : SETNX lock:slot:{slotId}\nTTL=short
+Redis --> Booking : lock acquired
+Booking -> DB : SELECT ... FOR UPDATE\nпроверка слота и услуги
+DB --> Booking : slot free + service active
+Booking -> DB : BEGIN\nUPDATE slot -> held\nINSERT session(status=requested)\nCOMMIT
+DB --> Booking : sessionId + holdExpiresAt
+Booking --> Web : 201 Created\n{sessionId, holdExpiresAt}
+deactivate Booking
 
-            Booking -> Redis : SETNX lock:slot:{slotId}\nTTL=short
-            activate Redis
-                Redis --> Booking : lock acquired
-            deactivate Redis
-
-            Booking -> DB : SELECT ... FOR UPDATE\nпроверка слота и услуги
-            activate DB
-                DB --> Booking : slot free + service active
-            deactivate DB
-
-            Booking -> DB : BEGIN\nUPDATE slot -> held\nINSERT application(status=requested)\nINSERT session(status=requested)\nCOMMIT
-            activate DB
-                DB --> Booking : applicationId + sessionId + holdExpiresAt
-            deactivate DB
-
-            Booking --> GW : 201 Created\n{applicationId, sessionId, holdExpiresAt}
-        deactivate Booking
-    GW --> Web : Данные checkout
-    deactivate GW
-
-    note right of Booking
-    Сложное место:
-    slot удерживается 10 минут,
-    защита от двойного бронирования
-    идет через Redis lock + DB transaction.
-    end note
+note right of Booking
+Слот удерживается 10 минут.
+Защита от double booking:
+Redis lock + DB transaction + held_until.
+end note
 
 == Создание payment intent ==
 
-    Web --> Mentee : Экран checkout:\nстоимость, длительность,\nкомиссия/правила
+Web --> Mentee : Экран checkout:\nстоимость, длительность,\nспособы оплаты
 
-    Mentee -> Web : Выбирает способ оплаты
+Mentee -> Web : Выбирает способ оплаты
 
-    Web -> GW : POST /payments/intent\n{applicationId}
-    activate GW
-        GW -> Payment : Create payment intent
-        activate Payment
+Web -> Payment : POST /payments/intent\n{sessionId}
+activate Payment
+Payment -> DB : SELECT session + slot + service
+DB --> Payment : requested/booked session
 
-            Payment -> DB : SELECT application + session + slot
-            activate DB
-                DB --> Payment : requested application + held slot
-            deactivate DB
+alt Hold истек
+  Payment -> DB : UPDATE slot -> free\nUPDATE session -> canceled
+  DB --> Payment : OK
+  Payment --> Web : 410 Gone
+  Web --> Mentee : "Время брони истекло"
+else Hold валиден
+  Payment -> Acquirer : POST /payment_intents
+  activate Acquirer
+  Acquirer --> Payment : providerPaymentId + checkoutUrl
+  deactivate Acquirer
 
-            alt #FFF0F0 Hold истек или слот уже освобожден
-                Payment -> DB : UPDATE slot -> free\nUPDATE application -> canceled\nUPDATE session -> canceled
-                activate DB
-                    DB --> Payment : OK
-                deactivate DB
-                Payment --> GW : 410 Gone\n{reason: hold_expired}
-                GW --> Web : Ошибка hold
-                Web --> Mentee : "Время брони истекло,\nвыберите слот заново"
-
-            else #F0FFF0 Hold валиден
-                Payment -> GW : Запросить создание\npayment intent
-                activate GW
-                    GW -> Acquirer : POST /payment_intents
-                    activate Acquirer
-                        Acquirer --> GW : providerPaymentId + checkoutUrl
-                    deactivate Acquirer
-                GW --> Payment : providerPaymentId + checkoutUrl
-                deactivate GW
-
-                Payment -> DB : INSERT payment(status=pending,\nproviderPaymentId, amount)
-                activate DB
-                    DB --> Payment : payment + checkoutUrl
-                deactivate DB
-
-                Payment --> GW : 200 OK\n{checkoutUrl, paymentMethods[]}
-                GW --> Web : checkoutUrl
-                Web --> Mentee : Редирект в эквайринг
-            end
-
-        deactivate Payment
-    deactivate GW
+  Payment -> DB : INSERT payment(status=pending,\nproviderPaymentId, amount, platform_fee, mentor_amount)
+  DB --> Payment : payment + checkoutUrl
+  Payment --> Web : 200 OK\n{checkoutUrl, paymentMethods[]}
+  Web --> Mentee : Редирект в эквайринг
+end
+deactivate Payment
 
 == Оплата во внешнем эквайринге ==
 
-    Web -> Acquirer : Redirect / checkout
-    activate Acquirer
-        Mentee -> Acquirer : Вводит данные / подтверждает платеж
-        Acquirer --> Web : Возвращает пользователя\nв платформу
-    deactivate Acquirer
-    Web --> Mentee : Экран "Проверяем статус оплаты"
+Web -> Acquirer : Redirect / checkout
+activate Acquirer
+Mentee -> Acquirer : Подтверждает платеж
+Acquirer --> Web : Return URL в платформу
+deactivate Acquirer
 
-== Webhook и финализация ==
+== Webhook и финализация оплаты ==
 
-    Acquirer -> GW : POST /payments/webhook\npayment_intent.succeeded | failed
-    activate GW
-        GW -> Payment : Handle webhook
-        activate Payment
+Acquirer -> Payment : POST /payments/webhook\npayment_intent.succeeded | failed
+activate Payment
 
-            alt #F0FFF0 Платеж подтвержден
-                Payment -> DB : BEGIN\nUPDATE payment -> succeeded\nUPDATE application -> confirmed\nUPDATE session -> confirmed\nUPDATE slot -> booked\nCOMMIT
-                activate DB
-                    DB --> Payment : OK
-                deactivate DB
+alt payment_intent.succeeded
+  Payment -> DB : BEGIN\nUPDATE payment -> succeeded\nUPDATE slot -> booked\nUPDATE session -> paid\nCOMMIT
+  DB --> Payment : OK
 
-                Payment -> Notify : Создать in-app уведомление ментору
-                activate Notify
-                    Notify -> DB : INSERT notification
-                    activate DB
-                        DB --> Notify : OK
-                    deactivate DB
-                    Notify -> GW : Отправить email\nо новой оплаченной заявке
-                    activate GW
-                        GW -> Email : SMTP send
-                        activate Email
-                            Email --> GW : accepted
-                        deactivate Email
-                    GW --> Notify : accepted
-                    deactivate GW
-                deactivate Notify
+  Payment -> Notify : Создать уведомление ментору
+  activate Notify
+  Notify -> DB : INSERT notification
+  DB --> Notify : OK
+  Notify -> Email : Отправить письмо о новой оплаченной записи
+  activate Email
+  Email --> Notify : accepted
+  deactivate Email
+  deactivate Notify
 
-                Payment -> Notify : Создать уведомление менти\nо подтвержденной записи
-                activate Notify
-                    Notify -> DB : INSERT notification
-                    activate DB
-                        DB --> Notify : OK
-                    deactivate DB
-                deactivate Notify
+  Payment --> Web : 200 OK
+else payment_intent.payment_failed
+  Payment -> DB : UPDATE payment -> failed
+  DB --> Payment : OK
+  Payment --> Web : 200 OK
+end
 
-                Payment --> GW : 200 OK
+deactivate Payment
 
-            else #FFF0F0 Платеж неуспешен
-                Payment -> DB : UPDATE payment -> failed
-                activate DB
-                    DB --> Payment : OK
-                deactivate DB
-                Payment --> GW : 200 OK
-            end
+== Решение ментора ==
 
-        deactivate Payment
-    deactivate GW
+Mentor -> Web : Открывает dashboard\nи видит paid/requested заявки
+Web -> Booking : PATCH /sessions/{id}/confirm\nили /sessions/{id}/reject
+
+alt Ментор подтверждает
+  Booking -> DB : UPDATE session -> booked\nUPDATE slot -> booked
+  DB --> Booking : OK
+  Booking --> Web : booked session
+  Web --> Mentee : Сессия подтверждена
+else Ментор отклоняет
+  Booking -> DB : UPDATE payment -> refunded/failed\nUPDATE session -> canceled\nUPDATE slot -> free
+  DB --> Booking : OK
+  Booking --> Web : canceled session
+  Web --> Mentee : Заявка отклонена,\nвозврат/отмена платежа
+end
 
 == Обновление статуса в UI ==
 
-    Web -> GW : GET /applications/{applicationId}/status\n(returnUrl page / polling)
-    activate GW
-        GW -> Payment : Get payment and booking status
-        activate Payment
-            Payment -> DB : SELECT payment + application + session + slot
-            activate DB
-                DB --> Payment : aggregate status
-            deactivate DB
+Web -> Booking : GET /booking/{sessionId}
+activate Booking
+Booking -> DB : SELECT session + slot + payments
+DB --> Booking : paid session + slot state
+Booking --> Web : Актуальное состояние
+deactivate Booking
 
-            alt #F0FFF0 Оплата успешна и бронь подтверждена
-                Payment --> GW : {paymentStatus=succeeded,\nbookingStatus=confirmed}
-                GW --> Web : Успешный статус
-                Web --> Mentee : "Оплата прошла, сессия подтверждена"
-
-            else #FFF0F0 Оплата неуспешна
-                Payment --> GW : {paymentStatus=failed,\nbookingStatus=requested}
-                GW --> Web : Ошибка оплаты
-                Web --> Mentee : "Оплата не прошла,\nпопробуйте снова"
-
-            else #FFFBE6 Webhook еще не обработан
-                Payment --> GW : {paymentStatus=pending,\nbookingStatus=requested}
-                GW --> Web : Статус pending
-                Web --> Mentee : "Платеж обрабатывается,\nобновим статус автоматически"
-            end
-        deactivate Payment
-    deactivate GW
-
-    note over Notify #FFF8DC
-    В as-is проекте планируется реализация уведомлений через почту,
-    однако на текущий момент это может быть не реализовано из-за тех трудностей, 
-    связанных с настройкой почтового сервера и интеграцией с ним. 
-    end note
+Web --> Mentee : "Оплата прошла,\nожидаем подтверждения ментора"
+Web --> Mentor : Уведомление о новой оплаченной записи
 
 deactivate Web
 

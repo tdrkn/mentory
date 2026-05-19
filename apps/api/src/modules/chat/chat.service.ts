@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { PrismaService } from '../../prisma';
 import { SendMessageDto } from './dto/send-message.dto';
 import { ChatGateway } from './chat.gateway';
+import { FileStorageService } from '../../common/file-storage.service';
 
 const MAX_ATTACHMENT_SIZE_BYTES = 128 * 1024 * 1024;
 const ALLOWED_DOCUMENT_EXTENSIONS = new Set(['.pptx', '.pdf', '.txt', '.mvd']);
@@ -44,7 +45,10 @@ type MessageWithAttachments = {
 export class ChatService {
   private chatGateway: ChatGateway | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly fileStorage: FileStorageService,
+  ) {}
 
   /**
    * Set gateway reference (called after module init to avoid circular dep)
@@ -221,6 +225,17 @@ export class ChatService {
     }
 
     const payload = this.validateAndNormalizeMessage(dto);
+    const attachments = await Promise.all(
+      payload.attachments.map(async (attachment) => ({
+        ...attachment,
+        url: await this.fileStorage.storeDataUrlIfNeeded(attachment.url, {
+          scope: 'chat',
+          fileName: attachment.filename,
+          mimeType: attachment.mimeType,
+          sizeBytes: attachment.size,
+        }),
+      })),
+    );
 
     const message = await this.prisma.$transaction(async (tx) => {
       // Create message
@@ -237,9 +252,9 @@ export class ChatService {
       });
 
       // Create attachments if any
-      if (payload.attachments.length) {
+      if (attachments.length) {
         await tx.attachment.createMany({
-          data: payload.attachments.map((a) => ({
+          data: attachments.map((a) => ({
             messageId: msg.id,
             filename: a.filename,
             mimeType: a.mimeType,

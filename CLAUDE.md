@@ -10,6 +10,27 @@ Mentory is a mentor-marketplace platform connecting mentees with expert mentors 
 - `apps/web` — SvelteKit 2 with Svelte 5 (adapter-node, SSR)
 - `packages/shared` — shared types, DTOs, and constants consumed by both apps
 
+## Report Alignment
+
+The latest course/report document (`1-Отчет_обновленный.docx`) is treated as a target requirements source, not as the implementation source of truth.
+
+When implementation and report wording disagree:
+
+- Use `apps/api/prisma/schema.prisma`, `apps/api`, `apps/web`, and `infra` as the as-is truth.
+- Use `product/requirements-gap.md` for the report-vs-code matrix.
+- Use `product/usm.txt` for the report US/UC baseline with current implementation notes.
+- Use `product/*.puml` diagrams as as-is implementation diagrams unless a file explicitly says it is target-only.
+
+Known alignment decisions:
+
+- Architecture as-is is a NestJS modular monolith, even though the report uses "microservice architecture" wording.
+- There is no separate `applications` table; `sessions.status = requested` currently acts as the booking request.
+- Booking requests support `requestGoal` and `requestMotivation`. `paid` means "paid, waiting for mentor decision"; `booked` means mentor confirmed.
+- Subscriptions use `pending/active/paused/ended/rejected`; pending requests include goal/motivation and workspace opens only after mentor/admin approval.
+- Payments/payouts are still mock/provider-placeholder flows, but completed sessions now schedule delayed payouts with session-level idempotency and an active complaint gate.
+- Dev infra includes MinIO, but the as-is upload strategy is a local `FileStorageService` adapter: data URLs are stored under `UPLOADS_DIR`/`./uploads`, and DB records keep `/uploads/*` URLs.
+- Push notifications, DWH export, retention policy, load-test evidence, and formal SLO/RTO/RPO controls are target/backlog items.
+
 ## Commands
 
 ### Development
@@ -120,10 +141,13 @@ mentee holds slot (POST /api/booking/hold)
   → Redis distributed lock on slotId
   → DB transaction: slot free→held, session created (status: requested)
   → 10-minute hold window
-mentee pays → POST /api/booking/confirm
-  → slot held→booked, session→booked/paid
+mentee pays → POST /api/payments/intent + mock acquirer webhook
+  → payment pending→succeeded, session→paid
+booking finalization should ensure slot held→booked
 hold expires → slot auto-released (held→free), session canceled
 ```
+
+Important: booking/payment state machine is an active alignment area. The report describes an explicit application/request with mentor approval; the current code uses `Session requested`. Keep any future changes consistent across `BookingService`, `SessionsService`, `PaymentsService`, checkout UI, and `product/с4_and_sequence/sequence-diagrams-final/01-booking-payment_FIXED.puml`.
 
 ### Chat / WebSocket
 
@@ -148,7 +172,8 @@ All datetimes stored as UTC in PostgreSQL. Availability rules store `startTime`/
 
 ### Infrastructure
 
-- Dev: Docker Compose with hot-reload volume mounts; MinIO for object storage; MailHog for email capture.
+- Dev: Docker Compose with hot-reload volume mounts; MinIO is provisioned for object storage; MailHog for email capture.
+- Uploads: trust/chat/regalia flows accept `fileUrl` or data URL payloads. Data URLs are converted by `FileStorageService` into local files under `UPLOADS_DIR`/`./uploads`; the database stores the resulting public URL. MinIO/S3 remains a future production storage swap, not the active adapter.
 - Prod: Multi-stage Docker builds; Caddy as reverse proxy with auto-HTTPS (ACME for domains, internal TLS for raw IPs). Caddy routes `/api/*`, `/admin*`, `/socket.io*` to `api:4000`, everything else to `web:3000`.
 - CI/CD: GitHub Actions (`.github/workflows/deploy-main.yml`) — on push to `main`, runs lint/check/build, then SSH-deploys via `scripts/deploy_prod.sh`.
 

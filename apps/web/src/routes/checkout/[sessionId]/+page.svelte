@@ -137,7 +137,7 @@
       });
 
       const refreshedSession = await api.get<SessionDetail>(`/booking/${session.id}`);
-      if (refreshedSession.status !== 'paid') {
+      if (refreshedSession.status !== 'paid' && refreshedSession.status !== 'booked') {
         try {
           await api.post('/booking/confirm', { sessionId: session.id, paymentIntentId });
         } catch (confirmErr) {

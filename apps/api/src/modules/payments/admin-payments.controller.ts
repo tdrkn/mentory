@@ -10,6 +10,11 @@ import { AdminUpdatePaymentDto } from './dto/admin-update-payment.dto';
 export class AdminPaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
+  @Post('payouts/process-ready')
+  async processReadyPayouts(@CurrentUser('id') adminId: string) {
+    return this.paymentsService.processReadyPayouts(adminId);
+  }
+
   @Post(':id/freeze')
   async freezePayment(
     @CurrentUser('id') adminId: string,

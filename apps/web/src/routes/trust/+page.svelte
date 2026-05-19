@@ -393,7 +393,7 @@
         <div class="surface" style="margin-top:12px;background:var(--status-error-bg);border-color:var(--status-error-border);color:var(--status-error-ink);">{error}</div>
       {/if}
 
-      <div class="grid" style="grid-template-columns:1.1fr 1fr;gap:20px;margin-top:18px;">
+      <div class="grid trust-complaints-grid">
         <section class="card">
           <h2 class="section-title">Новая жалоба</h2>
           <div class="stack-sm">
@@ -545,7 +545,7 @@
       {#if isMentorRole()}
         <section class="card" style="margin-top:20px;">
           <h2 class="section-title">Регалии ментора</h2>
-          <div class="grid" style="grid-template-columns:1fr 1.2fr;gap:20px;">
+          <div class="grid trust-regalia-grid">
             <div class="stack-sm">
               <label>
                 <div class="muted" style="margin-bottom:6px;">PDF файл (до 128MB)</div>
@@ -599,3 +599,28 @@
     </main>
   {/if}
 </div>
+
+<style>
+  .trust-complaints-grid {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: 20px;
+    margin-top: 18px;
+  }
+
+  .trust-regalia-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    gap: 20px;
+  }
+
+  .trust-complaints-grid > *,
+  .trust-regalia-grid > * {
+    min-width: 0;
+  }
+
+  @media (max-width: 760px) {
+    .trust-complaints-grid,
+    .trust-regalia-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

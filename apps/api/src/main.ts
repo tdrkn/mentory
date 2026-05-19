@@ -5,7 +5,7 @@ import { AppModule } from './app.module';
 import { StructuredLogger } from './common/logger';
 import * as prismaModule from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import { json, urlencoded } from 'express';
+import { json, static as serveStatic, urlencoded } from 'express';
 
 async function bootstrap() {
   const logger = new StructuredLogger();
@@ -23,6 +23,7 @@ async function bootstrap() {
   // Base64 attachments in chat/trust can exceed default 100kb parser limit.
   app.use(json({ limit: '130mb' }));
   app.use(urlencoded({ extended: true, limit: '130mb' }));
+  app.use('/uploads', serveStatic(process.env.UPLOADS_DIR || 'uploads'));
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -32,9 +33,7 @@ async function bootstrap() {
     }),
   );
 
-  app.setGlobalPrefix('api', {
-    exclude: ['admin', 'admin/(.*)'],
-  });
+  app.setGlobalPrefix('api');
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Mentory API')

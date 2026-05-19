@@ -15,6 +15,11 @@ export type NotificationData = {
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
+  private readonly emailDeliveryStats = {
+    attempted: 0,
+    completed: 0,
+    failed: 0,
+  };
 
   constructor(
     private readonly prisma: PrismaService,
@@ -135,7 +140,7 @@ export class NotificationsService {
       data: { sessionId: session.id },
     });
 
-    // Queue email notification
+    // Send transactional email notification
     await this.queueEmail('session_booked', {
       userId: mentorId,
       to: session.mentor.email,
@@ -226,7 +231,7 @@ export class NotificationsService {
       data: { conversationId, senderId: sender.id },
     });
 
-    // Queue email notification
+    // Send transactional email notification
     await this.queueEmail('new_message', {
       userId,
       to: recipientEmail,
@@ -267,7 +272,7 @@ export class NotificationsService {
       data: { paymentId: payment.id, sessionId: payment.sessionId },
     });
 
-    // Queue email notification
+    // Send transactional email notification
     await this.queueEmail('payment_received', {
       userId: mentorId,
       to: mentorEmail,
@@ -294,7 +299,7 @@ export class NotificationsService {
     // TODO: Send email notification
   }
 
-  // ========== Email Queue Methods ==========
+  // ========== Email Delivery Methods ==========
 
   private async queueEmail(
     jobType: string,
@@ -304,6 +309,7 @@ export class NotificationsService {
       context: Record<string, any>;
     },
   ) {
+    this.emailDeliveryStats.attempted += 1;
     try {
       await this.emailService.sendEmail({
         to: data.to,
@@ -311,7 +317,9 @@ export class NotificationsService {
         template: jobType,
         context: data.context,
       });
+      this.emailDeliveryStats.completed += 1;
     } catch (e) {
+      this.emailDeliveryStats.failed += 1;
       const msg = e instanceof Error ? e.message : String(e);
       this.logger.warn(`Email delivery failed [${jobType}] for user ${data.userId}: ${msg}`);
     }
@@ -328,6 +336,15 @@ export class NotificationsService {
   }
 
   async getQueueStats() {
-    return { queue: 'email', waiting: 0, active: 0, completed: 0, failed: 0 };
+    return {
+      queue: 'email',
+      mode: 'direct-smtp',
+      waiting: 0,
+      active: 0,
+      completed: this.emailDeliveryStats.completed,
+      failed: this.emailDeliveryStats.failed,
+      attempted: this.emailDeliveryStats.attempted,
+      pushDelivery: 'not_implemented',
+    };
   }
 }
