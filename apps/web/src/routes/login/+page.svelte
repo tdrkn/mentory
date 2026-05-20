@@ -13,7 +13,7 @@
   import { page } from '$app/stores';
   import { loginSchema } from '$lib/validators/auth';
   import BrandLogo from '$lib/components/BrandLogo.svelte';
-  import { User, Lock, ArrowRight } from 'lucide-svelte';
+  import { Mail, Lock, ArrowRight } from 'lucide-svelte';
 
   let loginValue = '';
   let password = '';
@@ -141,15 +141,15 @@
 
       <form class="auth-form" on:submit|preventDefault={handleSubmit}>
         <div class="form-group">
-          <label class="label" for="login">Логин или email</label>
+          <label class="label" for="login">Email</label>
           <div class="input-with-icon">
-            <User size={18} />
-            <input 
+            <Mail size={18} />
+            <input
               id="login"
-              class="input" 
-              type="text" 
-              bind:value={loginValue} 
-              placeholder="username или you@example.com" 
+              class="input"
+              type="email"
+              bind:value={loginValue}
+              placeholder="you@example.com"
             />
           </div>
           {#if fieldErrors.login}

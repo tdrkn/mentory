@@ -3,8 +3,8 @@ import { z } from 'zod/v3';
 export const loginSchema = z.object({
   login: z
     .string()
-    .min(3, 'Введите логин или email')
-    .max(80, 'Слишком длинный логин'),
+    .email('Введите корректный email')
+    .max(80, 'Слишком длинный email'),
   password: z.string().min(1, 'Введите пароль'),
 });
 
@@ -17,13 +17,9 @@ const passwordSchema = z
 
 export const registerSchema = z
   .object({
-    fullName: z.string().min(2, 'Укажите имя и фамилию'),
+    firstName: z.string().min(1, 'Укажите имя'),
+    lastName: z.string().min(1, 'Укажите фамилию'),
     email: z.string().email('Введите корректный email'),
-    username: z
-      .string()
-      .min(3, 'Логин должен быть не короче 3 символов')
-      .max(40, 'Логин должен быть не длиннее 40 символов')
-      .regex(/^[a-zA-Z0-9_]+$/, 'Используйте латинские буквы, цифры и символ _'),
     password: passwordSchema,
     confirmPassword: z.string().min(1, 'Повторите пароль'),
     role: z.enum(['mentor', 'mentee']),

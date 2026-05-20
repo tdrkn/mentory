@@ -8,7 +8,7 @@
   import { zodClient } from 'sveltekit-superforms/adapters';
   import { registerSchema, type RegisterForm } from '$lib/validators/auth';
   import BrandLogo from '$lib/components/BrandLogo.svelte';
-  import { User, Mail, Lock, ArrowRight, Search, BookOpen, AtSign } from 'lucide-svelte';
+  import { User, Mail, Lock, ArrowRight, Search, BookOpen } from 'lucide-svelte';
 
   export let data;
 
@@ -44,9 +44,9 @@
     try {
       const result = await register(
         $formData.email,
-        $formData.username,
         $formData.password,
-        $formData.fullName,
+        $formData.firstName,
+        $formData.lastName,
         $formData.role,
         $formData.termsAccepted,
       );
@@ -87,32 +87,50 @@
       {/if}
 
       <form class="auth-form" on:submit|preventDefault={handleSubmit}>
-        <div class="form-group">
-          <label class="label" for="fullName">Имя и фамилия</label>
-          <div class="input-with-icon">
-            <User size={18} />
-            <input 
-              id="fullName"
-              class="input" 
-              bind:value={$formData.fullName} 
-              placeholder="Иван Иванов" 
-            />
+        <div class="name-row">
+          <div class="form-group">
+            <label class="label" for="firstName">Имя</label>
+            <div class="input-with-icon">
+              <User size={18} />
+              <input
+                id="firstName"
+                class="input"
+                bind:value={$formData.firstName}
+                placeholder="Иван"
+              />
+            </div>
+            {#if $errors.firstName}
+              <span class="form-error">{errorMessage($errors.firstName)}</span>
+            {/if}
           </div>
-          {#if $errors.fullName}
-            <span class="form-error">{errorMessage($errors.fullName)}</span>
-          {/if}
+
+          <div class="form-group">
+            <label class="label" for="lastName">Фамилия</label>
+            <div class="input-with-icon">
+              <User size={18} />
+              <input
+                id="lastName"
+                class="input"
+                bind:value={$formData.lastName}
+                placeholder="Иванов"
+              />
+            </div>
+            {#if $errors.lastName}
+              <span class="form-error">{errorMessage($errors.lastName)}</span>
+            {/if}
+          </div>
         </div>
 
         <div class="form-group">
           <label class="label" for="email">Email</label>
           <div class="input-with-icon">
             <Mail size={18} />
-            <input 
+            <input
               id="email"
-              class="input" 
-              type="email" 
-              bind:value={$formData.email} 
-              placeholder="you@example.com" 
+              class="input"
+              type="email"
+              bind:value={$formData.email}
+              placeholder="you@example.com"
             />
           </div>
           {#if $errors.email}
@@ -121,31 +139,15 @@
         </div>
 
         <div class="form-group">
-          <label class="label" for="username">Логин</label>
-          <div class="input-with-icon">
-            <AtSign size={18} />
-            <input
-              id="username"
-              class="input"
-              bind:value={$formData.username}
-              placeholder="username"
-            />
-          </div>
-          {#if $errors.username}
-            <span class="form-error">{errorMessage($errors.username)}</span>
-          {/if}
-        </div>
-
-        <div class="form-group">
           <label class="label" for="password">Пароль</label>
           <div class="input-with-icon">
             <Lock size={18} />
-            <input 
+            <input
               id="password"
-              class="input" 
-              type="password" 
-              bind:value={$formData.password} 
-              placeholder="Минимум 8 символов" 
+              class="input"
+              type="password"
+              bind:value={$formData.password}
+              placeholder="Минимум 8 символов"
             />
           </div>
           {#if $errors.password}
@@ -173,8 +175,8 @@
         <div class="form-group">
           <div class="label">Я хочу</div>
           <div class="role-selector">
-            <button 
-              type="button" 
+            <button
+              type="button"
               class="role-option {$formData.role === 'mentee' ? 'selected' : ''}"
               on:click={() => formData.update((current) => ({ ...current, role: 'mentee' }))}
             >
@@ -186,8 +188,8 @@
                 <span>Получить консультацию от экспертов</span>
               </div>
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               class="role-option {$formData.role === 'mentor' ? 'selected' : ''}"
               on:click={() => formData.update((current) => ({ ...current, role: 'mentor' }))}
             >
@@ -274,6 +276,12 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
+  }
+
+  .name-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
   }
 
   .input-with-icon {
@@ -413,6 +421,10 @@
   @media (max-width: 480px) {
     .auth-card {
       padding: 28px 20px;
+    }
+
+    .name-row {
+      grid-template-columns: 1fr;
     }
 
     .role-selector {

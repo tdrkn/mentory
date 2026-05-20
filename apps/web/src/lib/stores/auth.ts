@@ -68,9 +68,9 @@ export async function login(login: string, password: string) {
 
 export async function register(
   email: string,
-  username: string,
   password: string,
-  fullName: string,
+  firstName: string,
+  lastName: string,
   role: 'mentor' | 'mentee',
   termsAccepted: boolean,
 ) {
@@ -80,9 +80,9 @@ export async function register(
       '/auth/register',
       {
         email,
-        username,
         password,
-        fullName,
+        firstName,
+        lastName,
         role,
         termsAccepted,
       },

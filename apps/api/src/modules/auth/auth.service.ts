@@ -36,19 +36,38 @@ export class AuthService {
       throw new BadRequestException('Необходимо принять пользовательское соглашение');
     }
 
-    // Check if user exists by email or username
+    // Compute fullName from firstName/lastName if not provided explicitly
+    const firstName = dto.firstName?.trim() || null;
+    const lastName = dto.lastName?.trim() || null;
+    const fullName =
+      dto.fullName?.trim() ||
+      [firstName, lastName].filter(Boolean).join(' ') ||
+      dto.email.split('@')[0];
+
+    // Auto-generate username from email prefix if not provided
+    const baseUsername = (dto.username?.trim() || dto.email.split('@')[0])
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '_')
+      .slice(0, 30);
+
+    // Ensure username is unique
+    let username = baseUsername;
+    const existingWithBase = await this.prisma.user.findUnique({
+      where: { username: baseUsername },
+      select: { id: true },
+    });
+    if (existingWithBase) {
+      username = `${baseUsername}_${Math.floor(Math.random() * 9000) + 1000}`;
+    }
+
+    // Check if user exists by email
     const existing = await this.prisma.user.findFirst({
-      where: {
-        OR: [{ email: dto.email }, { username: dto.username }],
-      },
-      select: { email: true, username: true },
+      where: { email: dto.email },
+      select: { email: true },
     });
 
     if (existing?.email === dto.email) {
       throw new ConflictException('Email already registered');
-    }
-    if (existing?.username === dto.username) {
-      throw new ConflictException('Username already taken');
     }
 
     // Hash password
@@ -59,9 +78,11 @@ export class AuthService {
       const created = await tx.user.create({
         data: {
           email: dto.email,
-          username: dto.username,
+          username,
           passwordHash,
-          fullName: dto.fullName,
+          fullName,
+          firstName,
+          lastName,
           timezone: dto.timezone || 'UTC',
           role: dto.role as UserRole,
           isEmailVerified: false,
@@ -78,6 +99,8 @@ export class AuthService {
           email: true,
           username: true,
           fullName: true,
+          firstName: true,
+          lastName: true,
           role: true,
           createdAt: true,
         },
