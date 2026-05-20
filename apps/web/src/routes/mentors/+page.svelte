@@ -96,7 +96,7 @@
     $mentorsQuery.status === 'pending';
 
   $: filteredMentors = searchQuery
-    ? mentors.filter(m => 
+    ? mentors.filter(m =>
         m.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.headline?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.education?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -120,6 +120,23 @@
 
   const hasActiveFilters = () =>
     topicId || minPrice || maxPrice || minRating || sort || education || workplace || hobby || skill;
+
+  const formatPrice = (amount: string | number, currency: string) => {
+    const num = Number(amount);
+    if (!num) return 'По запросу';
+    const formatted = num.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
+    return `От ${formatted} руб`;
+  };
+
+  // Active filter pills
+  $: activeFilterPills = [
+    ...(minPrice ? [{ label: `Цена от: ${minPrice} руб`, clear: () => { minPrice = ''; } }] : []),
+    ...(maxPrice ? [{ label: `Цена до: ${maxPrice} руб`, clear: () => { maxPrice = ''; } }] : []),
+    ...(minRating ? [{ label: `Рейтинг ≥ ${minRating}`, clear: () => { minRating = ''; } }] : []),
+    ...(skill ? [{ label: `Навык: ${skill}`, clear: () => { skill = ''; } }] : []),
+    ...(education ? [{ label: `Образование: ${education}`, clear: () => { education = ''; } }] : []),
+    ...(workplace ? [{ label: `Компания: ${workplace}`, clear: () => { workplace = ''; } }] : []),
+  ];
 </script>
 
 <div class="page">
@@ -217,14 +234,14 @@
 
     <!-- Quick topic filters -->
     <div class="topics-scroll reveal">
-      <button 
-        class={`topic-chip ${!topicId ? 'active' : ''}`} 
+      <button
+        class={`topic-chip ${!topicId ? 'active' : ''}`}
         on:click={() => topicId = ''}
       >
         Все
       </button>
       {#each topics.slice(0, 8) as topic}
-        <button 
+        <button
           class={`topic-chip ${topicId === topic.id ? 'active' : ''}`}
           on:click={() => topicId = topic.id}
         >
@@ -232,6 +249,18 @@
         </button>
       {/each}
     </div>
+
+    <!-- Active filter pills -->
+    {#if activeFilterPills.length > 0}
+      <div class="active-pills reveal">
+        {#each activeFilterPills as pill}
+          <button class="active-pill" on:click={pill.clear}>
+            {pill.label} <span class="pill-x">×</span>
+          </button>
+        {/each}
+        <button class="clear-all-btn" on:click={clearFilters}>Сбросить всё</button>
+      </div>
+    {/if}
 
     <!-- Results info -->
     <div class="results-info">
@@ -275,20 +304,22 @@
                   {/if}
                 </div>
                 <div class="mentor-card-info">
-                  <div class="mentor-card-name">{mentor.fullName}</div>
-                  <div class="mentor-card-title">{mentor.headline || 'Эксперт'}</div>
+                  <div class="mentor-name-row">
+                    <div class="mentor-card-name">{mentor.fullName}</div>
+                    <span class="mentor-role-badge">{mentor.rating?.average >= 4.5 ? 'Эксперт' : 'Ментор'}</span>
+                  </div>
+                  <div class="mentor-card-title">{mentor.headline || 'Ментор'}</div>
                   {#if mentor.workplace || mentor.education}
                     <div class="mentor-card-subtitle muted">
-                      {[mentor.workplace, mentor.education].filter(Boolean).join(' • ')}
+                      {[mentor.workplace, mentor.education].filter(Boolean).join(' · ')}
                     </div>
                   {/if}
                   <div class="mentor-card-meta">
                     <span class="rating">
                       <Star size={14} fill="currentColor" />
-                      {mentor.rating?.average || '0'}
+                      {mentor.rating?.average ? Number(mentor.rating.average).toFixed(1) : '0.0'}
                     </span>
                     <span class="muted">
-                      <Users size={14} style="display:inline;vertical-align:-2px;" />
                       {mentor.completedSessions} сессий
                     </span>
                   </div>
@@ -308,12 +339,9 @@
 
               <div class="mentor-card-footer">
                 <div class="mentor-card-price">
-                  {mentor.startingPrice 
-                    ? `${mentor.startingPrice.priceAmount} ${mentor.startingPrice.currency}` 
+                  {mentor.startingPrice
+                    ? formatPrice(mentor.startingPrice.priceAmount, mentor.startingPrice.currency)
                     : 'По запросу'}
-                  {#if mentor.startingPrice}
-                    <span>/ {mentor.startingPrice.durationMin} мин</span>
-                  {/if}
                 </div>
                 <span class="view-profile">
                   Профиль <ChevronRight size={16} />
@@ -426,6 +454,75 @@
   .mentor-card-subtitle {
     font-size: 0.82rem;
     margin-top: 2px;
+  }
+
+  /* Name + role badge row */
+  .mentor-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .mentor-role-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--accent-muted);
+    color: var(--accent);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  /* Active filter pills */
+  .active-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+
+  .active-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    background: var(--accent-muted);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .active-pill:hover {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .pill-x {
+    font-size: 1rem;
+    line-height: 1;
+    opacity: 0.7;
+  }
+
+  .clear-all-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 0.82rem;
+    cursor: pointer;
+    padding: 5px 8px;
+    text-decoration: underline;
+  }
+
+  .clear-all-btn:hover {
+    color: var(--ink);
   }
 
   .mentors-grid {
