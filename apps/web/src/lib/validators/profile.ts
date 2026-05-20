@@ -1,6 +1,8 @@
 import { z } from 'zod/v3';
 
 export const profileSchema = z.object({
+  firstName: z.string().optional().default(''),
+  lastName: z.string().optional().default(''),
   fullName: z.string().min(2, 'Укажите полное имя'),
   timezone: z.string().min(1, 'Укажите часовой пояс'),
   birthDate: z.string().optional(),

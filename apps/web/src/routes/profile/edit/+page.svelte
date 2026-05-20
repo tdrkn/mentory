@@ -54,6 +54,8 @@
 
   const form = superForm<ProfileForm>(
     {
+      firstName: '',
+      lastName: '',
       fullName: '',
       timezone: 'Europe/Moscow',
       birthDate: '',
@@ -101,6 +103,57 @@
 
   const removeGoal = (index: number) => {
     formData.update((f) => ({ ...f, goals: (f.goals || []).filter((_, i) => i !== index) }));
+  };
+
+  // Service edit state
+  let editingServiceId: string | null = null;
+  let editServiceDraft: { title: string; durationMin: number; priceAmount: string; currency: string } | null = null;
+
+  const startEditService = (svc: Service) => {
+    editingServiceId = svc.id;
+    editServiceDraft = { title: svc.title, durationMin: svc.durationMin, priceAmount: String(svc.priceAmount), currency: svc.currency };
+  };
+  const cancelEditService = () => { editingServiceId = null; editServiceDraft = null; };
+  const saveService = async (id: string) => {
+    if (!editServiceDraft) return;
+    await api.patch(`/services/${id}`, {
+      title: editServiceDraft.title,
+      durationMin: Number(editServiceDraft.durationMin),
+      priceAmount: Number(editServiceDraft.priceAmount),
+      currency: editServiceDraft.currency,
+    });
+    services = services.map((s) => s.id === id ? { ...s, title: editServiceDraft!.title, durationMin: Number(editServiceDraft!.durationMin), priceAmount: editServiceDraft!.priceAmount } : s);
+    cancelEditService();
+    message = 'Услуга обновлена.';
+  };
+  const deleteService = async (id: string) => {
+    await api.delete(`/services/${id}`);
+    services = services.filter((s) => s.id !== id);
+  };
+
+  // Plan edit state
+  let editingPlanId: string | null = null;
+  let editPlanDraft: { title: string; priceAmount: string; description: string } | null = null;
+
+  const startEditPlan = (p: MentorshipPlan) => {
+    editingPlanId = p.id;
+    editPlanDraft = { title: p.title, priceAmount: String(p.priceAmount), description: p.description || '' };
+  };
+  const cancelEditPlan = () => { editingPlanId = null; editPlanDraft = null; };
+  const savePlan = async (id: string) => {
+    if (!editPlanDraft) return;
+    await api.patch(`/subscriptions/plans/${id}`, {
+      title: editPlanDraft.title,
+      priceAmount: Number(editPlanDraft.priceAmount),
+      description: editPlanDraft.description,
+    });
+    plans = plans.map((p) => p.id === id ? { ...p, title: editPlanDraft!.title, priceAmount: editPlanDraft!.priceAmount, description: editPlanDraft!.description } : p);
+    cancelEditPlan();
+    message = 'План обновлён.';
+  };
+  const deletePlan = async (id: string) => {
+    await api.delete(`/subscriptions/plans/${id}`);
+    plans = plans.filter((p) => p.id !== id);
   };
 
   let services: Service[] = [];
@@ -189,8 +242,13 @@
     profileRole = profile.role || '';
     avatarUrl = profile.avatarUrl || null;
 
+    const fn = profile.firstName || (profile.fullName || '').split(' ')[0] || '';
+    const ln = profile.lastName || (profile.fullName || '').split(' ').slice(1).join(' ') || '';
+
     const nextForm: ProfileForm = {
-      fullName: profile.fullName || '',
+      firstName: fn,
+      lastName: ln,
+      fullName: profile.fullName || [fn, ln].filter(Boolean).join(' ') || '',
       timezone: profile.timezone || 'Europe/Moscow',
       birthDate: '',
       age: null,
@@ -272,9 +330,18 @@
     saving = true;
     message = null;
 
+    // Keep fullName in sync before save
+    const fn = ($formData.firstName || '').trim();
+    const ln = ($formData.lastName || '').trim();
+    if (fn || ln) {
+      formData.update((f) => ({ ...f, fullName: [fn, ln].filter(Boolean).join(' ') }));
+    }
+
     try {
       await api.patch('/profile', {
-        fullName: $formData.fullName,
+        firstName: fn || undefined,
+        lastName: ln || undefined,
+        fullName: [fn, ln].filter(Boolean).join(' ') || $formData.fullName,
         timezone: $formData.timezone || 'Europe/Moscow',
       });
 
@@ -462,13 +529,19 @@
         <div class="left-column">
           <section class="profile-card">
             <h2>Основная информация</h2>
-            <label class="field">
-              <span>ФИО*</span>
-              <input class="input" bind:value={$formData.fullName} />
-              {#if $errors.fullName}
-                <small>{errorMessage($errors.fullName)}</small>
-              {/if}
-            </label>
+            <div class="name-row">
+              <label class="field">
+                <span>Имя*</span>
+                <input class="input" bind:value={$formData.firstName} placeholder="Иван" />
+              </label>
+              <label class="field">
+                <span>Фамилия*</span>
+                <input class="input" bind:value={$formData.lastName} placeholder="Иванов" />
+              </label>
+            </div>
+            {#if $errors.fullName}
+              <small style="color:var(--status-warning-ink);">{errorMessage($errors.fullName)}</small>
+            {/if}
             <label class="field">
               <span>Дата рождения</span>
               <input class="input" type="date" bind:value={$formData.birthDate} />
@@ -629,44 +702,93 @@
             </section>
 
             <section class="profile-card">
-              <h2>Добавить услугу</h2>
-              <input class="input" bind:value={newService.title} placeholder="Название услуги (разовая сессия)" />
-              <div class="two-fields">
-                <input class="input" type="number" min="15" bind:value={newService.durationMin} placeholder="Продолжительность" />
-                <input class="input" type="number" min="0" bind:value={newService.priceAmount} placeholder="Цена" />
-              </div>
-              <input class="input" bind:value={newService.currency} />
-              <button class="btn btn-primary" on:click={addService}>Добавить</button>
+              <h2>Услуги</h2>
               {#if services.length > 0}
-                <div class="compact-list">
-                  {#each services as service}
-                    <span>{service.title}</span>
+                <div class="item-cards">
+                  {#each services as svc}
+                    {#if editingServiceId === svc.id && editServiceDraft}
+                      <div class="item-card item-edit">
+                        <input class="input" bind:value={editServiceDraft.title} placeholder="Название" />
+                        <div class="two-fields" style="margin-top:6px;">
+                          <input class="input" type="number" min="15" bind:value={editServiceDraft.durationMin} placeholder="Минуты" />
+                          <input class="input" type="number" min="0" bind:value={editServiceDraft.priceAmount} placeholder="Цена" />
+                        </div>
+                        <div class="item-card-actions">
+                          <button class="btn btn-primary btn-sm" on:click={() => saveService(svc.id)}>Сохранить</button>
+                          <button class="btn btn-ghost btn-sm" on:click={cancelEditService}>Отмена</button>
+                        </div>
+                      </div>
+                    {:else}
+                      <div class="item-card">
+                        <div class="item-card-info">
+                          <strong class="item-title">{svc.title}</strong>
+                          <span class="item-meta">{svc.durationMin} мин · {Number(svc.priceAmount).toLocaleString('ru-RU')} {svc.currency}</span>
+                        </div>
+                        <div class="item-card-actions">
+                          <button class="btn btn-ghost btn-sm" on:click={() => startEditService(svc)}>Ред.</button>
+                          <button class="btn btn-ghost btn-sm danger" on:click={() => deleteService(svc.id)}>Удалить</button>
+                        </div>
+                      </div>
+                    {/if}
                   {/each}
                 </div>
               {/if}
+              <p class="section-label" style="margin-top:{services.length > 0 ? '16px' : '0'};">Добавить услугу</p>
+              <input class="input" style="margin-top:6px;" bind:value={newService.title} placeholder="Название услуги (разовая сессия)" />
+              <div class="two-fields">
+                <input class="input" type="number" min="15" bind:value={newService.durationMin} placeholder="Продолжительность (мин)" />
+                <input class="input" type="number" min="0" bind:value={newService.priceAmount} placeholder="Цена" />
+              </div>
+              <input class="input" bind:value={newService.currency} placeholder="Валюта (RUB)" />
+              <button class="btn btn-primary" on:click={addService}>Добавить услугу</button>
             </section>
 
             <section class="profile-card">
-              <h2>Добавить план подписки</h2>
-              <input class="input" bind:value={newPlan.title} placeholder="Название плана подписки" />
-              <div class="two-fields">
-                <input class="input" type="number" min="1" bind:value={newPlan.callsPerMonth} placeholder="Количество сессий" />
-                <input class="input" type="number" min="15" bind:value={newPlan.sessionDurationMin} placeholder="Продолжительность" />
-              </div>
-              <input class="input" type="number" min="1" bind:value={newPlan.durationDays} placeholder="Срок действия подписки в днях" />
-              <div class="two-fields">
-                <input class="input" bind:value={newPlan.currency} />
-                <input class="input" type="number" min="0" bind:value={newPlan.priceAmount} placeholder="Цена" />
-              </div>
-              <input class="input" bind:value={newPlan.description} placeholder="Описание подписки" />
-              <button class="btn btn-primary" on:click={createPlan}>Добавить</button>
+              <h2>Планы подписки</h2>
               {#if plans.length > 0}
-                <div class="compact-list">
+                <div class="item-cards">
                   {#each plans as plan}
-                    <span>{plan.title}</span>
+                    {#if editingPlanId === plan.id && editPlanDraft}
+                      <div class="item-card item-edit">
+                        <input class="input" bind:value={editPlanDraft.title} placeholder="Название" />
+                        <input class="input" style="margin-top:6px;" type="number" min="0" bind:value={editPlanDraft.priceAmount} placeholder="Цена" />
+                        <input class="input" style="margin-top:6px;" bind:value={editPlanDraft.description} placeholder="Описание" />
+                        <div class="item-card-actions">
+                          <button class="btn btn-primary btn-sm" on:click={() => savePlan(plan.id)}>Сохранить</button>
+                          <button class="btn btn-ghost btn-sm" on:click={cancelEditPlan}>Отмена</button>
+                        </div>
+                      </div>
+                    {:else}
+                      <div class="item-card">
+                        <div class="item-card-info">
+                          <strong class="item-title">{plan.title}</strong>
+                          <span class="item-meta">{Number(plan.priceAmount).toLocaleString('ru-RU')} {plan.currency}/мес</span>
+                          {#if plan.description}
+                            <span class="item-desc">{plan.description}</span>
+                          {/if}
+                        </div>
+                        <div class="item-card-actions">
+                          <button class="btn btn-ghost btn-sm" on:click={() => startEditPlan(plan)}>Ред.</button>
+                          <button class="btn btn-ghost btn-sm danger" on:click={() => deletePlan(plan.id)}>Удалить</button>
+                        </div>
+                      </div>
+                    {/if}
                   {/each}
                 </div>
               {/if}
+              <p class="section-label" style="margin-top:{plans.length > 0 ? '16px' : '0'};">Добавить план подписки</p>
+              <input class="input" style="margin-top:6px;" bind:value={newPlan.title} placeholder="Название плана подписки" />
+              <div class="two-fields">
+                <input class="input" type="number" min="1" bind:value={newPlan.callsPerMonth} placeholder="Сессий / мес" />
+                <input class="input" type="number" min="15" bind:value={newPlan.sessionDurationMin} placeholder="Длительность (мин)" />
+              </div>
+              <input class="input" type="number" min="1" bind:value={newPlan.durationDays} placeholder="Срок действия в днях" />
+              <div class="two-fields">
+                <input class="input" bind:value={newPlan.currency} placeholder="Валюта (RUB)" />
+                <input class="input" type="number" min="0" bind:value={newPlan.priceAmount} placeholder="Цена" />
+              </div>
+              <input class="input" bind:value={newPlan.description} placeholder="Описание подписки" />
+              <button class="btn btn-primary" on:click={createPlan}>Добавить план</button>
             </section>
           </aside>
         {:else}
@@ -824,11 +946,6 @@
     font-size: 0.9rem;
   }
 
-  .field small {
-    color: var(--status-warning-ink);
-    display: block;
-    margin-top: 4px;
-  }
 
   .selection-grid {
     display: grid;
@@ -906,8 +1023,7 @@
     margin-top: 8px;
   }
 
-  .achievement-list,
-  .compact-list {
+  .achievement-list {
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -932,8 +1048,7 @@
     white-space: nowrap;
   }
 
-  .achievement-item span,
-  .compact-list span {
+  .achievement-item span {
     color: var(--muted);
     font-size: 0.85rem;
   }
@@ -1007,6 +1122,99 @@
     color: var(--muted);
     margin: 10px 0 0;
     text-align: center;
+  }
+
+  /* Name row (Имя + Фамилия) */
+  .name-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  /* Section label (small uppercase heading) */
+  .section-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  /* Service/plan item cards */
+  .item-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .item-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    background: var(--bg-alt);
+  }
+
+  .item-edit {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    background: var(--surface);
+  }
+
+  .item-card-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .item-title {
+    font-size: 0.9rem;
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .item-meta {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .item-desc {
+    font-size: 0.82rem;
+    color: var(--ink-secondary);
+    margin-top: 2px;
+  }
+
+  .item-card-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-top: 8px;
+  }
+
+  .btn-sm {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+  }
+
+  .danger {
+    color: var(--status-error-ink);
+  }
+
+  .danger:hover {
+    background: var(--status-error-bg);
+  }
+
+  @media (max-width: 560px) {
+    .name-row {
+      grid-template-columns: 1fr;
+    }
   }
 
   @media (max-width: 900px) {

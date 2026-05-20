@@ -139,6 +139,27 @@ export class SubscriptionsService {
     });
   }
 
+  async deletePlan(user: CurrentUser, planId: string) {
+    const plan = await this.prisma.mentorshipPlan.findUnique({
+      where: { id: planId },
+      select: { id: true, mentorId: true },
+    });
+
+    if (!plan) {
+      throw new NotFoundException('Plan not found');
+    }
+
+    if (user.role !== 'admin' && plan.mentorId !== user.id) {
+      throw new ForbiddenException('Only plan owner can delete this plan');
+    }
+
+    // Soft delete: mark inactive rather than hard delete to preserve subscription history
+    return this.prisma.mentorshipPlan.update({
+      where: { id: planId },
+      data: { isActive: false },
+    });
+  }
+
   async createSubscription(user: CurrentUser, dto: CreateMentorshipSubscriptionDto) {
     this.ensureMenteeRole(user.role);
 

@@ -35,7 +35,7 @@ export class ProfilesService {
   }
 
   async updateUser(userId: string, dto: UpdateUserDto) {
-    const { avatarFileName, avatarMimeType, avatarSize, ...data } = dto;
+    const { avatarFileName, avatarMimeType, avatarSize, firstName, lastName, ...data } = dto;
 
     if (data.avatarUrl) {
       data.avatarUrl = await this.fileStorage.storeDataUrlIfNeeded(data.avatarUrl, {
@@ -46,6 +46,20 @@ export class ProfilesService {
       });
     }
 
+    // If firstName/lastName provided, recompute fullName
+    if (firstName !== undefined || lastName !== undefined) {
+      const current = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { firstName: true, lastName: true },
+      });
+      const fn = (firstName ?? current?.firstName ?? '').trim();
+      const ln = (lastName ?? current?.lastName ?? '').trim();
+      const computed = [fn, ln].filter(Boolean).join(' ');
+      if (computed) data.fullName = computed;
+      (data as any).firstName = fn || null;
+      (data as any).lastName = ln || null;
+    }
+
     return this.prisma.user.update({
       where: { id: userId },
       data,
@@ -53,6 +67,8 @@ export class ProfilesService {
         id: true,
         email: true,
         fullName: true,
+        firstName: true,
+        lastName: true,
         avatarUrl: true,
         timezone: true,
         role: true,

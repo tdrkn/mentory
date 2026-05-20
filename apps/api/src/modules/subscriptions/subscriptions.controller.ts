@@ -50,6 +50,14 @@ export class SubscriptionsController {
     return this.subscriptionsService.updatePlan(user, planId, dto);
   }
 
+  @Delete('plans/:planId')
+  async deletePlan(
+    @CurrentUser() user: { id: string; role: string },
+    @Param('planId') planId: string,
+  ) {
+    return this.subscriptionsService.deletePlan(user, planId);
+  }
+
   @Post()
   async createSubscription(
     @CurrentUser() user: { id: string; role: string },

@@ -3,6 +3,16 @@ import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validato
 export class UpdateUserDto {
   @IsOptional()
   @IsString()
+  @MaxLength(100)
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  lastName?: string;
+
+  @IsOptional()
+  @IsString()
   fullName?: string;
 
   @IsOptional()
