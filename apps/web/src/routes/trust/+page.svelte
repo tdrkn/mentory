@@ -2,6 +2,7 @@
   import AppHeader from '$lib/components/AppHeader.svelte';
   import Loading from '$lib/components/Loading.svelte';
   import { api, ApiError } from '$lib/api';
+  import { getApiUrl } from '$lib/env';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { isAuthenticated, isLoading as authLoading, user } from '$lib/stores/auth';
@@ -150,6 +151,12 @@
     if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
     if (value >= 1024) return `${(value / 1024).toFixed(1)} KB`;
     return `${value} B`;
+  };
+
+  const resolveFileUrl = (value?: string | null) => {
+    if (!value) return '';
+    if (value.startsWith('http') || value.startsWith('data:') || value.startsWith('blob:')) return value;
+    return `${getApiUrl()}${value.startsWith('/') ? value : `/${value}`}`;
   };
 
   const fileToDataUrl = (file: File) =>
@@ -506,7 +513,7 @@
             {#if selectedComplaint.attachments && selectedComplaint.attachments.length > 0}
               <div class="stack-sm" style="margin-top:8px;">
                 {#each selectedComplaint.attachments as attachment}
-                  <a href={attachment.fileUrl} target="_blank" rel="noreferrer" style="word-break:break-all;">
+                  <a href={resolveFileUrl(attachment.fileUrl)} target="_blank" rel="noreferrer" style="word-break:break-all;">
                     {attachment.fileName} ({formatBytes(attachment.size ?? attachment.sizeBytes ?? 0)})
                   </a>
                 {/each}
@@ -576,7 +583,7 @@
                   {#each regalia as item}
                     <div class="surface">
                       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
-                        <a href={item.fileUrl} target="_blank" rel="noreferrer"><strong>{item.fileName}</strong></a>
+                        <a href={resolveFileUrl(item.fileUrl)} target="_blank" rel="noreferrer"><strong>{item.fileName}</strong></a>
                         <span class={statusClass(item.status)}>{statusLabel[item.status]}</span>
                       </div>
                       <div class="muted" style="font-size:0.84rem;margin-top:6px;">

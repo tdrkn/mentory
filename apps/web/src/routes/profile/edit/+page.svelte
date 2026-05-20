@@ -500,6 +500,10 @@
   });
 </script>
 
+<svelte:head>
+  <title>Редактирование профиля — Mentory</title>
+</svelte:head>
+
 <div class="page">
   <AppHeader />
 

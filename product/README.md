@@ -3,7 +3,7 @@
 Эта папка описывает продукт Mentory с двумя разными углами зрения:
 
 1. **As-is реализация** - то, что реально есть в коде, Prisma schema и infra.
-2. **Target/report требования** - то, что описано в последнем DOCX-отчете.
+2. **Target/report требования** - то, что описано в последнем DOCX-отчете и Figma-макетах.
 
 Важно: если отчет и код расходятся, источником истины для текущей архитектуры считается код. Расхождения фиксируются явно, чтобы их можно было согласовать и постепенно закрывать.
 
@@ -11,9 +11,10 @@
 
 1. `apps/api/prisma/schema.prisma`, `apps/api`, `apps/web`, `infra` - фактическая реализация.
 2. Последний DOCX-отчет `1-Отчет_обновленный.docx` - целевые/учебные требования.
-3. `requirements-gap.md` - матрица различий между отчетом и текущей backend/domain реализацией.
-4. `frontend-gap.md` - frontend/UI gap-анализ и browser QA evidence.
-5. Диаграммы `*.puml` - визуальное описание согласованного as-is состояния, если рядом не указано обратное.
+3. Figma source `Figma basics.pdf` и приложенные PNG-макеты - целевое UI/CJM-направление. Raw PDF не коммитится; выводы фиксируются в `figma-alignment-plan.md` и `frontend-gap.md`.
+4. `requirements-gap.md` - матрица различий между отчетом и текущей backend/domain реализацией.
+5. `frontend-gap.md` - frontend/UI gap-анализ и browser QA evidence.
+6. Диаграммы `*.puml` - визуальное описание согласованного as-is состояния, если рядом не указано обратное.
 
 ## Key Files
 
@@ -46,4 +47,5 @@
 - Подписки: домен реализован (`mentorship_*`, credits) с `pending/active/paused/ended/rejected` approval flow; workspace доступен только после approval.
 - Payout: после `completeSession` создается delayed pending payout с `availableAt` через 5 рабочих дней; активные complaints блокируют создание/процессинг выплаты.
 - Uploads: trust/chat/regalia data URL payloads сохраняются через local `FileStorageService`; в БД остается `/uploads/*` URL. MinIO/S3 - будущая production-замена.
+- Figma UI: профиль ментора на просмотре использует отдельные правые блоки `Планы подписки` и `Разовые сессии и услуги`; старые табы `Сессия/Подписка` не возвращать без нового согласования.
 - NFR: 50k users, 99.9%, RTO/RPO, retention, DWH и SLA поддержки пока являются target-only требованиями без нагрузочного/операционного evidence.

@@ -104,6 +104,10 @@
   };
 </script>
 
+<svelte:head>
+  <title>Вход — Mentory</title>
+</svelte:head>
+
 <div class="page">
   <AppHeader />
 
@@ -150,6 +154,7 @@
               type="email"
               bind:value={loginValue}
               placeholder="you@example.com"
+              autocomplete="email"
             />
           </div>
           {#if fieldErrors.login}
@@ -170,6 +175,7 @@
               type="password" 
               bind:value={password} 
               placeholder="••••••••" 
+              autocomplete="current-password"
             />
           </div>
           {#if fieldErrors.password}

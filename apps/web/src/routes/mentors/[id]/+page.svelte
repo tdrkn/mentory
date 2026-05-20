@@ -87,7 +87,6 @@
   let error: string | null = null;
 
   // ── Sidebar state ──────────────────────────────────────────────
-  let sidebarTab: 'session' | 'subscription' = 'session';
   let selectedServiceId: string | null = null;
   let selectedPlanId: string | null = null;
   let nearestSlot: string | null = null;
@@ -95,8 +94,6 @@
   $: isOwnProfile = !!mentor && $user?.id === mentor.id;
   $: canBook = !!$user && $user.role !== 'mentor' && !isOwnProfile;
   $: isVerified = mentor?.mentorProfile?.verificationStatus === 'verified';
-  $: selectedService = mentor?.mentorServices?.find((s) => s.id === selectedServiceId) ?? null;
-  $: selectedPlan = mentor?.mentorPlans?.find((p) => p.id === selectedPlanId) ?? null;
   $: hasPlans = (mentor?.mentorPlans?.length ?? 0) > 0;
   $: hasServices = (mentor?.mentorServices?.length ?? 0) > 0;
 
@@ -115,14 +112,6 @@
   const normalizeRating = (value?: string | number | null) => {
     const numeric = Number(value || 0);
     return numeric > 0 ? numeric.toFixed(1) : '0.0';
-  };
-
-  const planFacts = (plan: MentorDetail['mentorPlans'][number]) => {
-    return [
-      `${Math.max(1, plan.billingIntervalMonths || 1) * 30} дней`,
-      plan.callsPerMonth ? `${plan.callsPerMonth} сессии` : null,
-      plan.sessionDurationMin ? `${plan.sessionDurationMin} мин` : null,
-    ].filter(Boolean) as string[];
   };
 
   const planFeatures = (plan: MentorDetail['mentorPlans'][number]) => {
@@ -181,11 +170,6 @@
         selectedPlanId = mentorData.mentorPlans[0].id;
       }
 
-      // Default to subscription tab if no services
-      if (!mentorData.mentorServices?.length && mentorData.mentorPlans?.length) {
-        sidebarTab = 'subscription';
-      }
-
       // Load nearest slot in parallel
       loadNearestSlot(id);
 
@@ -216,6 +200,10 @@
     loadMentor($page.params.id);
   });
 </script>
+
+<svelte:head>
+  <title>{mentor ? `${mentor.fullName} — Mentory` : 'Профиль ментора — Mentory'}</title>
+</svelte:head>
 
 <div class="page">
   <AppHeader />
@@ -375,102 +363,94 @@
         <!-- ── SIDEBAR ── -->
         <aside class="mentor-sidebar">
           <section class="profile-card booking-card">
-            <!-- Tab switcher -->
-            <div class="tab-row">
-              <button
-                class="tab-btn {sidebarTab === 'session' ? 'tab-active' : ''}"
-                on:click={() => (sidebarTab = 'session')}
-              >
-                <BriefcaseBusiness size={16} />
-                Сессия
-              </button>
-              <button
-                class="tab-btn {sidebarTab === 'subscription' ? 'tab-active' : ''}"
-                on:click={() => (sidebarTab = 'subscription')}
-              >
-                <Calendar size={16} />
-                Подписка
-              </button>
-            </div>
+            <h2 class="sidebar-title">
+              <Calendar size={18} />
+              Планы подписки
+            </h2>
 
-            <!-- SESSION tab -->
-            {#if sidebarTab === 'session'}
-              {#if hasServices}
-                <div class="option-list">
-                  {#each mentor.mentorServices as service}
-                    <button
-                      class="option-card {selectedServiceId === service.id ? 'option-selected' : ''}"
-                      on:click={() => (selectedServiceId = service.id)}
-                    >
-                      <span class="option-title">{service.title}</span>
-                      <div class="option-meta">
-                        <span class="option-price">{formatMoney(service.priceAmount, service.currency)}</span>
-                        <span class="option-dur">{service.durationMin} мин</span>
-                      </div>
-                    </button>
-                  {/each}
-                </div>
-
-                {#if nearestSlot}
-                  <p class="slot-hint">Ближайший свободный слот: {formatSlotHint(nearestSlot)}</p>
-                {:else}
-                  <p class="slot-hint slot-hint-none">Свободных слотов пока нет</p>
-                {/if}
-
-                {#if canBook}
+            {#if hasPlans}
+              <div class="option-list">
+                {#each mentor.mentorPlans as plan}
                   <button
-                    class="btn btn-primary cta-btn"
-                    on:click={handleBook}
-                    disabled={!selectedServiceId}
+                    class="option-card {selectedPlanId === plan.id ? 'option-selected' : ''}"
+                    on:click={() => (selectedPlanId = plan.id)}
                   >
-                    Забронировать
-                  </button>
-                  <p class="hold-notice">Слот удерживается 10 минут для оплаты</p>
-                {/if}
-              {:else}
-                <p class="plain-text tab-empty">У ментора пока нет разовых услуг.</p>
-              {/if}
-
-            <!-- SUBSCRIPTION tab -->
-            {:else}
-              {#if hasPlans}
-                <div class="option-list">
-                  {#each mentor.mentorPlans as plan}
-                    <button
-                      class="option-card {selectedPlanId === plan.id ? 'option-selected' : ''}"
-                      on:click={() => (selectedPlanId = plan.id)}
-                    >
-                      <span class="option-title">{plan.title}</span>
-                      <div class="option-meta">
-                        <span class="option-price">{formatMoney(plan.priceAmount, plan.currency)}</span>
-                        <span class="option-dur">
-                          {Math.max(1, plan.billingIntervalMonths || 1) * 30} дн
-                          {#if plan.callsPerMonth}· {plan.callsPerMonth} сессии{/if}
-                        </span>
-                      </div>
-                      {#if planFeatures(plan).length}
-                        <ul class="plan-features">
-                          {#each planFeatures(plan).slice(0, 3) as feat}
-                            <li>{feat}</li>
-                          {/each}
-                        </ul>
+                    <span class="option-title">{plan.title}</span>
+                    <div class="plan-facts">
+                      <span>{formatMoney(plan.priceAmount, plan.currency)}</span>
+                      <span>{Math.max(1, plan.billingIntervalMonths || 1) * 30} дней</span>
+                      {#if plan.callsPerMonth}
+                        <span>{plan.callsPerMonth} сессии</span>
                       {/if}
-                    </button>
-                  {/each}
-                </div>
-
-                {#if canBook}
-                  <button
-                    class="btn btn-primary cta-btn"
-                    on:click={handleSubscribe}
-                    disabled={!selectedPlanId}
-                  >
-                    Отправить запрос
+                      {#if plan.sessionDurationMin}
+                        <span>{plan.sessionDurationMin} мин</span>
+                      {/if}
+                    </div>
+                    {#if planFeatures(plan).length}
+                      <ul class="plan-features">
+                        {#each planFeatures(plan).slice(0, 3) as feat}
+                          <li>{feat}</li>
+                        {/each}
+                      </ul>
+                    {/if}
                   </button>
-                {/if}
-              {:else}
-                <p class="plain-text tab-empty">У ментора пока нет планов подписки.</p>
+                {/each}
+              </div>
+
+              {#if canBook}
+                <button
+                  class="btn btn-primary cta-btn"
+                  on:click={handleSubscribe}
+                  disabled={!selectedPlanId}
+                >
+                  Отправить запрос
+                </button>
               {/if}
+            {:else}
+              <p class="plain-text tab-empty">У ментора пока нет планов подписки.</p>
+            {/if}
+          </section>
+
+          <section class="profile-card booking-card">
+            <h2 class="sidebar-title">
+              <BriefcaseBusiness size={18} />
+              Разовые сессии и услуги
+            </h2>
+
+            {#if hasServices}
+              <div class="option-list">
+                {#each mentor.mentorServices as service}
+                  <button
+                    class="option-card {selectedServiceId === service.id ? 'option-selected' : ''}"
+                    on:click={() => (selectedServiceId = service.id)}
+                  >
+                    <span class="option-title">{service.title}</span>
+                    <div class="option-meta">
+                      <span class="option-price">{formatMoney(service.priceAmount, service.currency)}</span>
+                      <span class="option-dur">{service.durationMin} мин</span>
+                    </div>
+                  </button>
+                {/each}
+              </div>
+
+              {#if nearestSlot}
+                <p class="slot-hint">Ближайший свободный слот: {formatSlotHint(nearestSlot)}</p>
+              {:else}
+                <p class="slot-hint slot-hint-none">Свободных слотов пока нет</p>
+              {/if}
+
+              {#if canBook}
+                <button
+                  class="btn btn-primary cta-btn"
+                  on:click={handleBook}
+                  disabled={!selectedServiceId}
+                >
+                  Забронировать
+                </button>
+                <p class="hold-notice">Слот удерживается 10 минут для оплаты</p>
+              {/if}
+            {:else}
+              <p class="plain-text tab-empty">У ментора пока нет разовых услуг.</p>
             {/if}
           </section>
         </aside>
@@ -755,43 +735,19 @@
   /* ── Booking card (sidebar) ── */
   .booking-card {
     padding: 20px;
+  }
+
+  .mentor-sidebar {
     position: sticky;
     top: 24px;
   }
 
-  .tab-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    margin-bottom: 16px;
-  }
-
-  .tab-btn {
+  .sidebar-title {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 10px 14px;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--muted);
-    transition: all 0.15s ease;
-  }
-
-  .tab-btn:hover {
-    color: var(--accent);
-    background: var(--accent-muted);
-  }
-
-  .tab-btn.tab-active {
-    color: var(--accent);
-    background: var(--accent-muted);
+    gap: 10px;
+    margin-bottom: 16px;
+    font-size: 1.05rem;
   }
 
   .option-list {
@@ -836,6 +792,26 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+  }
+
+  .plan-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .plan-facts span {
+    min-height: 36px;
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    text-align: center;
   }
 
   .option-price {
@@ -903,7 +879,7 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .booking-card {
+    .mentor-sidebar {
       position: static;
     }
   }

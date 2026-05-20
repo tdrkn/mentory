@@ -409,6 +409,26 @@ export class TrustService {
     };
   }
 
+  async getAdminStats() {
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [mentorTotal, menteeTotal, mentorRecent, menteeRecent] = await Promise.all([
+      this.prisma.user.count({ where: { role: { in: ['mentor', 'both'] } } }),
+      this.prisma.user.count({ where: { role: { in: ['mentee', 'both'] } } }),
+      this.prisma.user.count({
+        where: { role: { in: ['mentor', 'both'] }, createdAt: { gte: dayAgo } },
+      }),
+      this.prisma.user.count({
+        where: { role: { in: ['mentee', 'both'] }, createdAt: { gte: dayAgo } },
+      }),
+    ]);
+    return {
+      mentorCount: mentorTotal,
+      menteeCount: menteeTotal,
+      mentorDelta24h: mentorRecent,
+      menteeDelta24h: menteeRecent,
+    };
+  }
+
   async getPlatformBalance() {
     const [fees, withdrawn] = await Promise.all([
       this.prisma.payment.aggregate({

@@ -17,6 +17,7 @@ build
 # IDE
 .idea
 .vscode
+.claude/
 *.swp
 *.swo
 
@@ -31,6 +32,10 @@ pnpm-debug.log*
 
 # Test
 coverage
+
+# Local QA/tool artifacts
+.playwright-mcp/
+tmp/pdfs/figma-basics/
 
 # Misc
 *.tsbuildinfo

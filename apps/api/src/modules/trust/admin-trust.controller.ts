@@ -81,6 +81,11 @@ export class AdminTrustController {
     return this.trustService.getPlatformBalance();
   }
 
+  @Get('stats')
+  async getStats() {
+    return this.trustService.getAdminStats();
+  }
+
   @Post('platform/withdraw')
   async withdrawPlatformFees(
     @CurrentUser('id') adminId: string,

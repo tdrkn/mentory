@@ -1,10 +1,11 @@
-# Frontend gap-анализ: DOCX-отчет vs текущий web UI
+# Frontend gap-анализ: DOCX/Figma vs текущий web UI
 
-Дата ревизии: 2026-05-19
+Дата ревизии: 2026-05-21
 
 Источник сравнения:
 
 - Последний отчет: `1-Отчет_обновленный.docx`.
+- Figma: `Figma basics.pdf` (72 экрана) и приложенные PNG-макеты профиля ментора.
 - Текущий frontend: `apps/web/src/routes`, `apps/web/src/lib`.
 
 ## Проверенные браузерные сценарии
@@ -53,6 +54,10 @@
 | Trust complaint | Работает: пользователь создает жалобу, она появляется в списке |
 | Admin trust | Работает после фикса API prefix: админ видит жалобы и платформенный баланс |
 | Mobile smoke | Работает после responsive-фикса admin/trust и trust grids; критичных JS-ошибок нет |
+| Mentor profile edit | Работает: есть `Основная информация`, `Фото профиля`, `Карьера`, `Навыки`, `Хобби`, `Достижения`; старого блока `Сертификаты` нет |
+| Mentor public profile | Работает: левая колонка с профилем/карьерой/навыками/хобби/достижениями/отзывами, правая колонка с отдельными блоками `Планы подписки` и `Разовые сессии и услуги` |
+| Mentor calendar | Работает: `/schedule/calendar` показывает weekly grid, свободные слоты и не дает горизонтального overflow на desktop/mobile |
+| Admin login/dashboard/trust | Работает: `/admin/login` обновляет auth store, `/admin` не уходит обратно на login, hash-вкладки `/admin/trust#...` переключаются корректно |
 
 ## Найденные и исправленные frontend/runtime дефекты
 
@@ -62,6 +67,13 @@
 | `GET /api/health/ready` был `degraded` в Docker из-за `REDIS_HOST=localhost` из `.env` | Исправлено | `apps/api/src/health/health.controller.ts`: readiness использует `REDIS_URL` с приоритетом |
 | Детальная страница сессии показывала raw status `booked` | Исправлено | `apps/web/src/routes/sessions/[id]/+page.svelte`: добавлен `statusLabel` |
 | Admin/trust и trust grids были слишком плотными на mobile из-за inline `grid-template-columns` | Исправлено | Добавлены responsive classes в `admin/trust` и `trust` routes |
+| `/admin/login` сохранял JWT в `localStorage`, но не обновлял Svelte auth store; после входа админ мог сразу вернуться на login | Исправлено | `apps/web/src/routes/admin/login/+page.svelte`: вход идет через общий `authLogin` |
+| `/admin/trust` зависел от состояния auth store в момент mount и ломал прямые hash-входы; после SSR фикса отдельно проверен `200 OK` | Исправлено | `apps/web/src/routes/admin/trust/+page.svelte`: загрузка привязана к завершению auth loading, hash sync защищен `browser` guard |
+| На admin/trust в блоке финансов были английские labels `Total fees`, `Total withdrawn`, `Available` | Исправлено | Labels переведены на `Всего комиссий`, `Выведено`, `Доступно к выводу` |
+| В SvelteKit live announcer попадал `untitled page`; это было видно в browser QA как технический артефакт | Исправлено | Добавлен default `<title>` в layout, page titles для ключевых экранов и visually-hidden стиль для `#svelte-announcer` |
+| Ссылки на `/uploads/*` в trust/admin открывались с web-host `:3000`, хотя файлы раздает API `:4000` | Исправлено | Добавлен `resolveFileUrl()` в trust/admin маршруты |
+| Публичный профиль ментора показывал старый таб-переключатель `Сессия/Подписка`, хотя последний макет требует два отдельных блока справа | Исправлено | `apps/web/src/routes/mentors/[id]/+page.svelte`: правый sidebar пересобран в `Планы подписки` + `Разовые сессии и услуги` |
+| На mobile `/admin/trust#database` вкладки давали небольшой body overflow | Исправлено | Tabs теперь wrap'ятся и уменьшают padding на narrow viewport |
 
 ## Frontend-расхождения с отчетом
 
@@ -76,6 +88,7 @@
 | Верификация регалий | Админ проверяет документы, ментор получает статус и причину | Upload/review/status есть; deep-link коммуникация по конкретной regalia-заявке ограничена | Частично |
 | Подбор по критериям | Стаж, компания, специализация, цели и др. | Каталог фильтрует topic/price/rating/education/workplace/hobby/skill; нет обязательных gender/stage fields из части NFR | Частично |
 | Payout admin processing | Отчет описывает контроль выплат и жалоб | Backend endpoint `process-ready` есть; отдельной UI-кнопки в admin panel нет | Gap |
+| Данные профилей в seed/runtime | Макеты показывают фото, навыки, хобби и достижения у демонстрационного ментора | Структурные блоки есть, но часть seed-профилей остается пустой (`Не указано`, placeholder avatar) | Data gap |
 
 ## Рекомендуемый frontend backlog
 
@@ -100,3 +113,7 @@
    - список ready payouts;
    - кнопка process-ready;
    - журнал ошибок.
+7. Донаполнить seed/demo profiles под Figma:
+   - avatar URL или локальный upload для демонстрационных менторов;
+   - skills/hobbies/achievements для обоих seed-менторов;
+   - согласовать валюту demo-планов с RUB-first интерфейсом.

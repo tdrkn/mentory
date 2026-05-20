@@ -11,6 +11,10 @@
   });
 </script>
 
+<svelte:head>
+  <title>Mentory</title>
+</svelte:head>
+
 <QueryClientProvider client={queryClient}>
   <slot />
 </QueryClientProvider>

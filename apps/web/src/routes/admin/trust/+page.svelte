@@ -1,10 +1,11 @@
 <script lang="ts">
-  import AppHeader from '$lib/components/AppHeader.svelte';
   import Loading from '$lib/components/Loading.svelte';
   import { api, ApiError } from '$lib/api';
-  import { onMount } from 'svelte';
+  import { browser } from '$app/environment';
+  import { getApiUrl } from '$lib/env';
+  import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { isAuthenticated, isLoading as authLoading, isAdmin } from '$lib/stores/auth';
+  import { isAuthenticated, isLoading as authLoading, isAdmin, logout } from '$lib/stores/auth';
 
   type ComplaintStatus = 'new' | 'in_progress' | 'resolved' | 'rejected';
   type ComplaintCategory =
@@ -87,6 +88,7 @@
 
   let isPageLoading = true;
   let isBusy = false;
+  let didLoad = false;
   let notice: string | null = null;
   let error: string | null = null;
 
@@ -166,6 +168,12 @@
     if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
     if (value >= 1024) return `${(value / 1024).toFixed(1)} KB`;
     return `${value} B`;
+  };
+
+  const resolveFileUrl = (value?: string | null) => {
+    if (!value) return '';
+    if (value.startsWith('http') || value.startsWith('data:') || value.startsWith('blob:')) return value;
+    return `${getApiUrl()}${value.startsWith('/') ? value : `/${value}`}`;
   };
 
   const withBusy = async (fn: () => Promise<void>) => {
@@ -318,21 +326,27 @@
   // Tab state — driven by URL hash if present
   let activeTab: 'verification' | 'support' | 'database' = 'support';
 
-  onMount(async () => {
-    if (!$isAuthenticated && !$authLoading) {
-      goto('/admin/login');
-      return;
-    }
-    if ($isAuthenticated && !$isAdmin) {
-      goto('/mentors');
-      return;
-    }
-
-    // Restore tab from hash
+  const syncTabFromHash = () => {
+    if (!browser) return;
     const hash = window.location.hash.replace('#', '');
     if (hash === 'verification' || hash === 'support' || hash === 'database') {
       activeTab = hash;
     }
+  };
+
+  $: if (browser && !$authLoading) {
+    if (!$isAuthenticated) {
+      goto('/admin/login');
+    } else if (!$isAdmin) {
+      goto('/mentors');
+    } else if (!didLoad) {
+      didLoad = true;
+      loadInitialData();
+    }
+  }
+
+  const loadInitialData = async () => {
+    syncTabFromHash();
 
     try {
       await refreshAll();
@@ -341,19 +355,47 @@
     } finally {
       isPageLoading = false;
     }
-  });
+  };
 
   const setTab = (tab: 'verification' | 'support' | 'database') => {
     activeTab = tab;
-    window.history.replaceState(null, '', `#${tab}`);
+    if (browser) {
+      window.history.replaceState(null, '', `#${tab}`);
+    }
   };
+
+  const handleLogout = () => {
+    logout(false);
+    goto('/admin/login');
+  };
+
+  onMount(() => {
+    window.addEventListener('hashchange', syncTabFromHash);
+  });
+
+  onDestroy(() => {
+    if (browser) {
+      window.removeEventListener('hashchange', syncTabFromHash);
+    }
+  });
 </script>
 
-<div class="page">
-  <AppHeader />
+<svelte:head>
+  <title>Управление платформой — Mentory</title>
+</svelte:head>
+
+<div class="admin-page">
+  <!-- Top bar -->
+  <div class="topbar">
+    <a href="/" class="brand">mentory</a>
+    <div class="topbar-actions">
+      <button class="topbar-btn" on:click={handleLogout}>Выйти из аккаунта</button>
+      <a class="topbar-btn" href="/">Вернуться на сайт</a>
+    </div>
+  </div>
 
   {#if $authLoading || isPageLoading}
-    <Loading />
+    <div class="loading-wrap"><Loading /></div>
   {:else}
     <main class="shell">
       <!-- Page header -->
@@ -362,7 +404,7 @@
           <a class="back-link" href="/admin">← Панель администратора</a>
           <h1 class="page-title">Управление платформой</h1>
         </div>
-        <button class="btn btn-outline" on:click={refreshAll} disabled={isBusy}>Обновить всё</button>
+        <button class="refresh-btn" on:click={refreshAll} disabled={isBusy}>Обновить всё</button>
       </div>
 
       {#if notice}
@@ -424,7 +466,7 @@
                 <div class="surface">
                   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
                     <div>
-                      <a href={item.fileUrl} target="_blank" rel="noreferrer"><strong>{item.fileName}</strong></a>
+                      <a href={resolveFileUrl(item.fileUrl)} target="_blank" rel="noreferrer"><strong>{item.fileName}</strong></a>
                       <div class="muted" style="font-size:0.84rem;">
                         {item.mentor?.fullName || '—'} ({item.mentor?.email || '—'})
                       </div>
@@ -443,7 +485,7 @@
                     {#if item.mentor?.id}
                       <a class="btn btn-outline btn-sm" href={`/mentors/${item.mentor.id}`}>Профиль</a>
                     {/if}
-                    <a class="btn btn-outline btn-sm" href={item.fileUrl} target="_blank" rel="noreferrer" download={item.fileName}>
+                    <a class="btn btn-outline btn-sm" href={resolveFileUrl(item.fileUrl)} target="_blank" rel="noreferrer" download={item.fileName}>
                       Скачать
                     </a>
                     <input
@@ -531,7 +573,7 @@
                   {#if selectedComplaint.attachments && selectedComplaint.attachments.length > 0}
                     <div class="stack-sm" style="margin-top:8px;">
                       {#each selectedComplaint.attachments as attachment}
-                        <a href={attachment.fileUrl} target="_blank" rel="noreferrer" style="word-break:break-all;">
+                        <a href={resolveFileUrl(attachment.fileUrl)} target="_blank" rel="noreferrer" style="word-break:break-all;">
                           {attachment.fileName} ({formatBytes(attachment.size ?? attachment.sizeBytes ?? 0)})
                         </a>
                       {/each}
@@ -621,15 +663,15 @@
             <div class="balance-grid">
               <div class="balance-cards">
                 <div class="balance-card">
-                  <div class="balance-label">Total fees</div>
+                  <div class="balance-label">Всего комиссий</div>
                   <div class="balance-value">{balance?.totalFees ?? 0} {balance?.currency ?? 'RUB'}</div>
                 </div>
                 <div class="balance-card">
-                  <div class="balance-label">Total withdrawn</div>
+                  <div class="balance-label">Выведено</div>
                   <div class="balance-value">{balance?.totalWithdrawn ?? 0} {balance?.currency ?? 'RUB'}</div>
                 </div>
                 <div class="balance-card balance-accent">
-                  <div class="balance-label">Available</div>
+                  <div class="balance-label">Доступно к выводу</div>
                   <div class="balance-value accent">{balance?.available ?? 0} {balance?.currency ?? 'RUB'}</div>
                 </div>
               </div>
@@ -664,18 +706,73 @@
           </section>
         </div>
       {/if}
+
+      <!-- Bottom navigation -->
+      <div class="bottom-nav">
+        <a class="bottom-btn" href="/admin">На главную</a>
+        {#if activeTab !== 'database'}
+          <button class="bottom-btn" on:click={() => setTab('database')}>В БД</button>
+        {/if}
+      </div>
     </main>
   {/if}
 </div>
 
 <style>
+  /* ── Dark admin chrome ───────────────────────────────── */
+  .admin-page {
+    min-height: 100vh;
+    background: #2a2a30;
+    color: #e5e7eb;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 28px;
+    background: #fff;
+    color: #111;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .brand {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #111;
+    text-decoration: none;
+  }
+  .topbar-actions { display: flex; gap: 10px; }
+  .topbar-btn {
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: #f3f4f6;
+    color: #111;
+    font-size: 0.85rem;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+  }
+  .topbar-btn:hover { background: #e5e7eb; }
+
+  .loading-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 0;
+  }
+
+  /* ── Shell ───────────────────────────────────────────── */
   .shell {
     max-width: 1100px;
     margin: 0 auto;
-    padding: 40px 20px 100px;
+    padding: 32px 20px 80px;
+    width: 100%;
+    box-sizing: border-box;
   }
 
-  /* Page header */
   .page-head {
     display: flex;
     align-items: flex-start;
@@ -687,49 +784,58 @@
 
   .back-link {
     font-size: 0.85rem;
-    color: var(--muted);
+    color: #a1a1aa;
     text-decoration: none;
     display: block;
     margin-bottom: 6px;
   }
-
-  .back-link:hover { color: var(--accent); }
+  .back-link:hover { color: #fff; }
 
   .page-title {
     font-size: 1.5rem;
-    font-weight: 800;
-    color: var(--ink);
+    font-weight: 700;
+    color: #fff;
     margin: 0;
   }
 
-  /* Notice banners */
+  .refresh-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    background: transparent;
+    color: #e5e7eb;
+    border: 1px solid #4a4a52;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  .refresh-btn:hover { border-color: #6b6b75; background: rgba(255,255,255,0.04); }
+  .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── Notices ─────────────────────────────────────────── */
   .notice {
-    border-radius: var(--radius-md);
+    border-radius: 8px;
     padding: 10px 14px;
     font-size: 0.88rem;
     margin-bottom: 16px;
   }
-
   .notice.success {
-    background: var(--status-success-bg);
-    border: 1px solid var(--status-success-border, #86efac);
-    color: var(--status-success-ink);
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    color: #86efac;
   }
-
   .notice.error {
-    background: var(--status-error-bg);
-    border: 1px solid var(--status-error-border, #fca5a5);
-    color: var(--status-error-ink);
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #fca5a5;
   }
 
-  /* Tabs */
+  /* ── Tabs ────────────────────────────────────────────── */
   .tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 4px;
-    border-bottom: 2px solid var(--border);
+    border-bottom: 2px solid #4a4a52;
     margin-bottom: 24px;
   }
-
   .tab {
     display: inline-flex;
     align-items: center;
@@ -739,38 +845,34 @@
     background: none;
     font-size: 0.9rem;
     font-weight: 600;
-    color: var(--muted);
+    color: #a1a1aa;
     cursor: pointer;
     border-bottom: 2px solid transparent;
     margin-bottom: -2px;
     transition: color 0.15s ease;
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    border-radius: 8px 8px 0 0;
   }
-
-  .tab:hover { color: var(--ink); }
-
+  .tab:hover { color: #fff; }
   .tab-active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
+    color: #fff;
+    border-bottom-color: #2563eb;
   }
-
   .tab-badge {
-    background: var(--status-warning-bg, #fef3c7);
-    color: var(--status-warning-ink, #d97706);
+    background: #2563eb;
+    color: #fff;
     border-radius: 999px;
     padding: 1px 7px;
     font-size: 0.72rem;
     font-weight: 700;
   }
 
-  /* Tab content */
+  /* ── Tab content ─────────────────────────────────────── */
   .tab-content {
     display: flex;
     flex-direction: column;
     gap: 20px;
   }
 
-  /* Section head */
   .section-head {
     display: flex;
     align-items: center;
@@ -779,94 +881,146 @@
     flex-wrap: wrap;
     margin-bottom: 16px;
   }
-
   .section-head h2 {
     font-size: 1.1rem;
     font-weight: 700;
-    color: var(--ink);
+    color: #fff;
     margin: 0;
   }
-
   .section-controls {
     display: flex;
     gap: 8px;
     align-items: center;
   }
 
-  /* Complaints layout */
+  /* ── Reset Skeleton variables inside dark admin ──────── */
+  .admin-page :global(.surface) {
+    background: #36363c;
+    border-color: #4a4a52;
+    color: #e5e7eb;
+    border-radius: 8px;
+  }
+  .admin-page :global(.surface:hover) {
+    background: #3f3f47;
+  }
+  .admin-page :global(.muted) { color: #a1a1aa; }
+  .admin-page :global(.input) {
+    background: #1f1f24;
+    color: #fff;
+    border: 1px solid #4a4a52;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.88rem;
+  }
+  .admin-page :global(.input::placeholder) { color: #6b7280; }
+  .admin-page :global(.input:focus) { border-color: #2563eb; outline: none; }
+  .admin-page :global(.badge) {
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+  .admin-page :global(.badge.success) {
+    background: rgba(34, 197, 94, 0.18);
+    color: #86efac;
+  }
+  .admin-page :global(.badge.warning) {
+    background: rgba(245, 158, 11, 0.18);
+    color: #fcd34d;
+  }
+  .admin-page :global(.badge.error) {
+    background: rgba(239, 68, 68, 0.18);
+    color: #fca5a5;
+  }
+  .admin-page :global(.badge.info) {
+    background: rgba(59, 130, 246, 0.18);
+    color: #93c5fd;
+  }
+  .admin-page :global(.btn) {
+    border-radius: 6px;
+    font-size: 0.85rem;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+  .admin-page :global(.btn-primary) {
+    background: #2563eb;
+    color: #fff;
+    border: none;
+  }
+  .admin-page :global(.btn-primary:hover) { background: #1d4ed8; }
+  .admin-page :global(.btn-outline) {
+    background: transparent;
+    color: #e5e7eb;
+    border: 1px solid #4a4a52;
+  }
+  .admin-page :global(.btn-outline:hover) { border-color: #6b6b75; }
+  .admin-page :global(.btn-ghost) {
+    background: transparent;
+    color: #e5e7eb;
+    border: none;
+  }
+  .admin-page :global(.btn-sm) { padding: 5px 10px; font-size: 0.8rem; }
+  .admin-page :global(.btn:disabled) { opacity: 0.5; cursor: not-allowed; }
+  .admin-page :global(h2), .admin-page :global(h3), .admin-page :global(strong) {
+    color: #fff;
+  }
+  .admin-page :global(a) { color: #93c5fd; }
+  .admin-page :global(a:hover) { color: #bfdbfe; }
+
+  /* ── Complaints layout ───────────────────────────────── */
   .complaints-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
     gap: 18px;
   }
-
   .complaints-list {
     max-height: 600px;
     overflow-y: auto;
   }
-
   .complaint-btn {
     text-align: left;
     width: 100%;
     cursor: pointer;
   }
 
-  /* Database tab */
+  /* ── Database tab ────────────────────────────────────── */
   .db-section {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    background: #36363c;
+    border: 1px solid #4a4a52;
+    border-radius: 12px;
     padding: 22px 24px;
   }
-
   .db-section h2 {
     font-size: 1.05rem;
     font-weight: 700;
-    color: var(--ink);
+    color: #fff;
     margin: 0 0 18px;
   }
-
   .db-actions-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
   }
-
-  /* Balance */
   .balance-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
   }
-
   .balance-cards {
     display: flex;
     flex-direction: column;
     gap: 10px;
   }
-
   .balance-card {
-    background: var(--bg-alt);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    background: #1f1f24;
+    border: 1px solid #4a4a52;
+    border-radius: 8px;
     padding: 12px 16px;
   }
+  .balance-label { font-size: 0.8rem; color: #a1a1aa; margin-bottom: 4px; }
+  .balance-value { font-size: 1.2rem; font-weight: 700; color: #fff; }
+  .balance-value.accent { color: #93c5fd; }
 
-  .balance-label {
-    font-size: 0.8rem;
-    color: var(--muted);
-    margin-bottom: 4px;
-  }
-
-  .balance-value {
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: var(--ink);
-  }
-
-  .balance-value.accent { color: var(--accent); }
-
-  /* Audit rows */
   .audit-row {
     display: flex;
     justify-content: space-between;
@@ -874,24 +1028,42 @@
     gap: 12px;
     flex-wrap: wrap;
   }
-
-  .audit-main {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
+  .audit-main { display: flex; flex-direction: column; gap: 2px; }
   .audit-action { font-size: 0.9rem; }
   .audit-meta { font-size: 0.82rem; }
   .audit-time { font-size: 0.8rem; white-space: nowrap; }
 
+  /* ── Bottom nav buttons ──────────────────────────────── */
+  .bottom-nav {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 40px;
+  }
+  .bottom-btn {
+    background: #3a3f5c;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 32px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 160px;
+  }
+  .bottom-btn:hover { background: #444a72; color: #fff; }
+
+  /* ── Responsive ──────────────────────────────────────── */
   @media (max-width: 800px) {
     .complaints-layout,
     .db-actions-grid,
     .balance-grid {
       grid-template-columns: 1fr;
     }
-
     .complaints-list {
       max-height: 300px;
     }
@@ -899,7 +1071,16 @@
 
   @media (max-width: 480px) {
     .shell {
-      padding: 24px 16px 80px;
+      padding: 20px 16px 60px;
+    }
+    .topbar {
+      padding: 10px 16px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tab {
+      padding-inline: 12px;
+      font-size: 0.84rem;
     }
   }
 </style>

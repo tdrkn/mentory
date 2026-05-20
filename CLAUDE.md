@@ -31,6 +31,16 @@ Known alignment decisions:
 - Dev infra includes MinIO, but the as-is upload strategy is a local `FileStorageService` adapter: data URLs are stored under `UPLOADS_DIR`/`./uploads`, and DB records keep `/uploads/*` URLs.
 - Push notifications, DWH export, retention policy, load-test evidence, and formal SLO/RTO/RPO controls are target/backlog items.
 
+## Figma/UI Alignment Notes
+
+Use `product/figma-alignment-plan.md` and `product/frontend-gap.md` before changing major UI flows. The latest Figma/PDF/PNG alignment decisions are:
+
+- Mentor profile edit must keep the section names from the PNG: `Основная информация`, `Фото профиля`, `Карьера`, `Навыки`, `Хобби`, `Достижения`.
+- Public mentor profile must show separate right-column blocks `Планы подписки` and `Разовые сессии и услуги`. Do not restore the old `Сессия/Подписка` tab switcher unless product explicitly changes this.
+- Admin pages are custom Svelte routes (`/admin/login`, `/admin`, `/admin/trust`) plus AdminJS fallback at API `/admin`; keep custom admin routes under the web app.
+- Uploaded `/uploads/*` links must be resolved through the API origin (`getApiUrl()`), because web dev runs on `:3000` and API serves uploads on `:4000`.
+- After frontend work, smoke-test the affected route in browser at desktop and mobile widths and check for horizontal overflow.
+
 ## Commands
 
 ### Development
@@ -102,7 +112,7 @@ cd apps/api && pnpm test -- auth.service.spec.ts
 | MailHog | http://localhost:8025 |
 | MinIO Console | http://localhost:9001 |
 
-Test accounts (after seed): `maria.mentor@example.com / password123`, `ivan.mentee@example.com / password123`
+Test accounts (after seed): `maria.mentor@example.com / password123`, `ivan.mentee@example.com / password123`; admin in dev: `admin@mentory.local / change-me-admin`.
 
 ## Architecture
 
