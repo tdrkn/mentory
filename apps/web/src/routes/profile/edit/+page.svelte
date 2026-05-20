@@ -89,6 +89,20 @@
   let skillSearch = '';
   let hobbySearch = '';
 
+  // Goals management (for mentees)
+  let newGoalInput = '';
+
+  const addGoal = () => {
+    const trimmed = newGoalInput.trim();
+    if (!trimmed) return;
+    formData.update((f) => ({ ...f, goals: [...(f.goals || []), trimmed] }));
+    newGoalInput = '';
+  };
+
+  const removeGoal = (index: number) => {
+    formData.update((f) => ({ ...f, goals: (f.goals || []).filter((_, i) => i !== index) }));
+  };
+
   let services: Service[] = [];
   let newService = { title: '', durationMin: 60, priceAmount: '0', currency: 'RUB' };
 
@@ -219,7 +233,9 @@
       const menteeProfile = await api.get<any>('/profile/mentee');
       nextForm.age = menteeProfile.age ?? null;
       nextForm.education = menteeProfile.education || '';
+      nextForm.position = menteeProfile.position || '';
       nextForm.workplace = menteeProfile.workplace || '';
+      nextForm.activityFields = menteeProfile.activityFields || [];
       nextForm.background = menteeProfile.background || '';
       nextForm.goals = Array.isArray(menteeProfile.goals)
         ? menteeProfile.goals
@@ -283,9 +299,11 @@
         await api.patch('/profile/mentee', {
           age: $formData.age,
           education: $formData.education,
+          position: $formData.position,
           workplace: $formData.workplace,
+          activityFields: preparedActivityFields,
           background: $formData.background,
-          goals: [],
+          goals: normalizeStringArray($formData.goals || []),
           hobbies: preparedHobbies,
           certificates: [],
           skills: preparedSkills,
@@ -465,11 +483,10 @@
             </label>
           </section>
 
-          {#if isProfileMentor}
           <section class="profile-card">
             <h2>Карьера</h2>
             <label class="field">
-              <span>Образование*</span>
+              <span>Образование{isProfileMentor ? '*' : ''}</span>
               <input class="input" bind:value={$formData.education} />
             </label>
             <label class="field">
@@ -481,7 +498,7 @@
               <input class="input" bind:value={$formData.workplace} />
             </label>
             <label class="field">
-              <span>Сфера деятельности*</span>
+              <span>Сфера деятельности{isProfileMentor ? '*' : ''}</span>
               <input class="input" bind:value={selectedActivitySearch} placeholder="Найти сферу деятельности в поиске" />
             </label>
             <div class="selection-grid compact">
@@ -489,36 +506,25 @@
                 <label class="select-item">
                   <input
                     type="checkbox"
-                    checked={$formData.activityFields.includes(activity)}
+                    checked={($formData.activityFields || []).includes(activity)}
                     on:change={(event) => toggleSelectable('activityFields', activity, inputChecked(event))}
                   />
                   <span>{activity}</span>
                 </label>
               {/each}
             </div>
+            {#if !isProfileMentor}
+              <label class="field" style="margin-top:14px;">
+                <span>Контекст и цели</span>
+                <textarea
+                  class="input"
+                  rows="3"
+                  bind:value={$formData.background}
+                  placeholder="Чему хотите научиться, какой опыт уже есть"
+                ></textarea>
+              </label>
+            {/if}
           </section>
-          {:else}
-          <section class="profile-card">
-            <h2>Образование и опыт</h2>
-            <label class="field">
-              <span>Образование</span>
-              <input class="input" bind:value={$formData.education} />
-            </label>
-            <label class="field">
-              <span>Место учёбы / работы</span>
-              <input class="input" bind:value={$formData.workplace} />
-            </label>
-            <label class="field">
-              <span>Контекст и цели</span>
-              <textarea
-                class="input"
-                rows="3"
-                bind:value={$formData.background}
-                placeholder="Чему хотите научиться, какой опыт уже есть"
-              ></textarea>
-            </label>
-          </section>
-          {/if}
 
           <section class="profile-card">
             <h2>Навыки{isProfileMentor ? '*' : ''}</h2>
@@ -660,6 +666,61 @@
                     <span>{plan.title}</span>
                   {/each}
                 </div>
+              {/if}
+            </section>
+          </aside>
+        {:else}
+          <!-- Mentee right column -->
+          <aside class="right-column">
+            <!-- Avatar upload -->
+            <section class="profile-card">
+              <h2>Фото профиля</h2>
+              <div class="avatar-preview">
+                {#if avatarUrl}
+                  <img src={resolveFileUrl(avatarUrl)} alt="Фото профиля" />
+                {:else}
+                  <span>{$formData.fullName?.slice(0, 1) || '?'}</span>
+                {/if}
+              </div>
+              <input
+                bind:this={avatarInput}
+                class="sr-only"
+                type="file"
+                accept=".png,.jpg,.jpeg"
+                on:change={uploadAvatar}
+              />
+              <div class="upload-row">
+                <button class="btn btn-primary" on:click={() => avatarInput?.click()} disabled={isUploadingAvatar}>
+                  {isUploadingAvatar ? 'Загрузка...' : 'Загрузить фото'}
+                </button>
+                <span>(.png, .jpg; до 20MB)</span>
+              </div>
+            </section>
+
+            <!-- Goals management -->
+            <section class="profile-card">
+              <h2>Добавить цели</h2>
+              <p class="goal-hint">Укажите, чему хотите научиться или чего достичь с ментором.</p>
+              <div class="goal-input-row">
+                <input
+                  class="input"
+                  bind:value={newGoalInput}
+                  placeholder="Например: освоить Python за 3 месяца"
+                  on:keydown={(e) => e.key === 'Enter' && addGoal()}
+                />
+                <button class="btn btn-primary" on:click={addGoal}>+</button>
+              </div>
+              {#if ($formData.goals || []).length > 0}
+                <div class="goal-list">
+                  {#each ($formData.goals || []) as goal, i}
+                    <div class="goal-item">
+                      <span class="goal-text">{goal}</span>
+                      <button class="btn btn-ghost btn-sm goal-remove" on:click={() => removeGoal(i)}>×</button>
+                    </div>
+                  {/each}
+                </div>
+              {:else}
+                <p class="empty-hint">Цели не добавлены</p>
               {/if}
             </section>
           </aside>
@@ -887,6 +948,65 @@
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+  }
+
+  /* Goals */
+  .goal-hint {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+
+  .goal-input-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .goal-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  .goal-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--accent-muted);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-md);
+  }
+
+  .goal-text {
+    font-size: 0.9rem;
+    color: var(--ink);
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  .goal-remove {
+    flex-shrink: 0;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 2px 8px;
+    color: var(--muted);
+  }
+
+  .goal-remove:hover {
+    color: var(--status-error-ink);
+  }
+
+  .empty-hint {
+    font-size: 0.88rem;
+    color: var(--muted);
+    margin: 10px 0 0;
+    text-align: center;
   }
 
   @media (max-width: 900px) {

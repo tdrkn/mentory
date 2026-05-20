@@ -13,7 +13,16 @@ export class UpdateMenteeProfileDto {
 
   @IsOptional()
   @IsString()
+  position?: string;
+
+  @IsOptional()
+  @IsString()
   workplace?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  activityFields?: string[];
 
   @IsOptional()
   @IsString()
