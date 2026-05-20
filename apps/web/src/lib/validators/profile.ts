@@ -3,6 +3,7 @@ import { z } from 'zod/v3';
 export const profileSchema = z.object({
   fullName: z.string().min(2, 'Укажите полное имя'),
   timezone: z.string().min(1, 'Укажите часовой пояс'),
+  birthDate: z.string().optional(),
   age: z
     .number({ invalid_type_error: 'Возраст должен быть числом' })
     .int('Возраст должен быть целым числом')
@@ -10,7 +11,9 @@ export const profileSchema = z.object({
     .max(120, 'Возраст должен быть не больше 120 лет')
     .nullable(),
   education: z.string().optional(),
+  position: z.string().optional(),
   workplace: z.string().optional(),
+  activityFields: z.array(z.string()).default([]),
   goals: z.array(z.string()).default([]),
   hobbies: z.array(z.string()).default([]),
   certificates: z.array(z.string()).default([]),

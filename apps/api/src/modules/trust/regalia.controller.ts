@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard, RolesGuard } from '../auth/guards';
 import { CurrentUser, Roles } from '../auth/decorators';
 import { TrustService } from './trust.service';
@@ -21,5 +21,10 @@ export class RegaliaController {
     @Body() dto: UploadRegaliaDto,
   ) {
     return this.trustService.uploadRegalia(mentorId, dto);
+  }
+
+  @Delete(':id')
+  async delete(@CurrentUser('id') mentorId: string, @Param('id') regaliaId: string) {
+    return this.trustService.deleteRegalia(mentorId, regaliaId);
   }
 }

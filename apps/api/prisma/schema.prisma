@@ -170,8 +170,11 @@ model User {
 model MentorProfile {
   userId             String   @id @map("user_id") @db.Uuid
   age                Int?
+  birthDate          DateTime? @map("birth_date") @db.Date
   education          String?
+  position           String?
   workplace          String?
+  activityFields     String[] @default([]) @map("activity_fields")
   goals              String[] @default([])
   hobbies            String[] @default([])
   certificates       String[] @default([])
@@ -774,6 +777,7 @@ model ComplaintAttachment {
 model MentorRegalia {
   id              String    @id @default(uuid()) @db.Uuid
   mentorId        String    @map("mentor_id") @db.Uuid
+  title           String?
   fileUrl         String    @map("file_url")
   fileName        String    @map("file_name")
   mimeType        String?   @map("mime_type")

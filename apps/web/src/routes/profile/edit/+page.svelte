@@ -2,6 +2,7 @@
   import AppHeader from '$lib/components/AppHeader.svelte';
   import Loading from '$lib/components/Loading.svelte';
   import { api } from '$lib/api';
+  import { getApiUrl } from '$lib/env';
   import { onMount } from 'svelte';
   import { isAuthenticated, isLoading as authLoading, isMentor } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
@@ -9,16 +10,10 @@
   import { zodClient } from 'sveltekit-superforms/adapters';
   import { profileSchema, type ProfileForm } from '$lib/validators/profile';
   import {
-    EDUCATION_SUGGESTIONS,
+    ACTIVITY_FIELD_OPTIONS,
     HOBBY_OPTIONS,
     SKILL_OPTIONS,
-    WORKPLACE_SUGGESTIONS,
   } from '$lib/constants/profile-options';
-
-  interface Topic {
-    id: string;
-    name: string;
-  }
 
   interface Service {
     id: string;
@@ -29,17 +24,43 @@
     isActive: boolean;
   }
 
+  interface RegaliaItem {
+    id: string;
+    title?: string | null;
+    fileName: string;
+    fileUrl: string;
+    status: string;
+  }
+
+  interface MentorshipPlan {
+    id: string;
+    title: string;
+    description?: string | null;
+    priceAmount: string;
+    currency: string;
+  }
+
   let isLoading = true;
   let saving = false;
+  let isUploadingAvatar = false;
+  let isUploadingAchievement = false;
   let message: string | null = null;
+  let profileEmail = '';
+  let profileRole = '';
+  let avatarUrl: string | null = null;
+  let avatarInput: HTMLInputElement;
+  let achievementInput: HTMLInputElement;
 
   const form = superForm<ProfileForm>(
     {
       fullName: '',
-      timezone: 'UTC',
+      timezone: 'Europe/Moscow',
+      birthDate: '',
       age: null,
       education: '',
+      position: '',
       workplace: '',
+      activityFields: [],
       goals: [],
       hobbies: [],
       certificates: [],
@@ -59,57 +80,39 @@
 
   const { form: formData, errors } = form;
   const errorMessage = (err: unknown) => (Array.isArray(err) ? err[0] : err);
+  $: isProfileMentor = $isMentor || profileRole === 'mentor' || profileRole === 'both';
 
-  let topics: Topic[] = [];
   let selectedTopicIds: string[] = [];
+  let selectedActivitySearch = '';
+  let skillSearch = '';
+  let hobbySearch = '';
 
   let services: Service[] = [];
   let newService = { title: '', durationMin: 60, priceAmount: '0', currency: 'RUB' };
 
-  let hobbySearch = '';
-  let skillSearch = '';
+  let regalia: RegaliaItem[] = [];
+  let achievementTitle = '';
+  let achievementFile: File | null = null;
+
+  let plans: MentorshipPlan[] = [];
+  let newPlan = {
+    title: '',
+    callsPerMonth: 4,
+    sessionDurationMin: 60,
+    durationDays: 30,
+    currency: 'RUB',
+    priceAmount: '0',
+    description: '',
+  };
 
   const normalizeStringArray = (items: string[]) => items.map((item) => item.trim()).filter(Boolean);
-  const inputValue = (event: Event) => (event.currentTarget as HTMLInputElement | null)?.value || '';
   const inputChecked = (event: Event) => !!(event.currentTarget as HTMLInputElement | null)?.checked;
 
-  const addGoal = () => {
-    formData.update((current) => ({ ...current, goals: [...current.goals, ''] }));
-  };
-
-  const updateGoal = (index: number, value: string) => {
-    formData.update((current) => ({
-      ...current,
-      goals: current.goals.map((goal, i) => (i === index ? value : goal)),
-    }));
-  };
-
-  const removeGoal = (index: number) => {
-    formData.update((current) => ({
-      ...current,
-      goals: current.goals.filter((_, i) => i !== index),
-    }));
-  };
-
-  const addCertificate = () => {
-    formData.update((current) => ({ ...current, certificates: [...current.certificates, ''] }));
-  };
-
-  const updateCertificate = (index: number, value: string) => {
-    formData.update((current) => ({
-      ...current,
-      certificates: current.certificates.map((certificate, i) => (i === index ? value : certificate)),
-    }));
-  };
-
-  const removeCertificate = (index: number) => {
-    formData.update((current) => ({
-      ...current,
-      certificates: current.certificates.filter((_, i) => i !== index),
-    }));
-  };
-
-  const toggleSelectable = (field: 'hobbies' | 'skills', value: string, checked: boolean) => {
+  const toggleSelectable = (
+    field: 'activityFields' | 'hobbies' | 'skills',
+    value: string,
+    checked: boolean,
+  ) => {
     formData.update((current) => {
       const currentValues = current[field] || [];
       if (checked && !currentValues.includes(value)) {
@@ -122,22 +125,63 @@
     });
   };
 
-  $: filteredHobbyOptions = HOBBY_OPTIONS.filter((item) =>
-    item.toLowerCase().includes(hobbySearch.trim().toLowerCase()),
+  const fileToDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error || new Error('Не удалось прочитать файл.'));
+      reader.readAsDataURL(file);
+    });
+
+  const resolveFileUrl = (value?: string | null) => {
+    if (!value) return '';
+    if (value.startsWith('http') || value.startsWith('data:')) return value;
+    return `${getApiUrl()}${value}`;
+  };
+
+  const formatBirthDate = (value?: string | null) => {
+    if (!value) return '';
+    return value.slice(0, 10);
+  };
+
+  const calculateAge = (birthDate: string) => {
+    if (!birthDate) return null;
+    const born = new Date(birthDate);
+    if (Number.isNaN(born.getTime())) return null;
+    const now = new Date();
+    let age = now.getFullYear() - born.getFullYear();
+    const monthDelta = now.getMonth() - born.getMonth();
+    if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < born.getDate())) age -= 1;
+    return age;
+  };
+
+  $: filteredActivityOptions = ACTIVITY_FIELD_OPTIONS.filter((item) =>
+    item.toLowerCase().includes(selectedActivitySearch.trim().toLowerCase()),
   );
 
   $: filteredSkillOptions = SKILL_OPTIONS.filter((item) =>
     item.toLowerCase().includes(skillSearch.trim().toLowerCase()),
   );
 
+  $: filteredHobbyOptions = HOBBY_OPTIONS.filter((item) =>
+    item.toLowerCase().includes(hobbySearch.trim().toLowerCase()),
+  );
+
   const loadProfile = async () => {
     const profile = await api.get<any>('/profile');
+    profileEmail = profile.email || '';
+    profileRole = profile.role || '';
+    avatarUrl = profile.avatarUrl || null;
+
     const nextForm: ProfileForm = {
       fullName: profile.fullName || '',
-      timezone: profile.timezone || 'UTC',
+      timezone: profile.timezone || 'Europe/Moscow',
+      birthDate: '',
       age: null,
       education: '',
+      position: '',
       workplace: '',
+      activityFields: [],
       goals: [],
       hobbies: [],
       certificates: [],
@@ -149,11 +193,14 @@
       interests: '',
     };
 
-    if ($isMentor) {
+    if (profile.role === 'mentor' || profile.role === 'both') {
       const mentorProfile = await api.get<any>('/profile/mentor');
       nextForm.age = mentorProfile.age ?? null;
+      nextForm.birthDate = formatBirthDate(mentorProfile.birthDate);
       nextForm.education = mentorProfile.education || '';
+      nextForm.position = mentorProfile.position || '';
       nextForm.workplace = mentorProfile.workplace || '';
+      nextForm.activityFields = mentorProfile.activityFields || [];
       nextForm.goals = mentorProfile.goals || [];
       nextForm.hobbies = mentorProfile.hobbies || [];
       nextForm.certificates = mentorProfile.certificates || [];
@@ -163,6 +210,8 @@
       nextForm.languages = (mentorProfile.languages || []).join(', ');
       selectedTopicIds = (mentorProfile.topics || []).map((t: any) => t.topic?.id || t.topicId).filter(Boolean);
       services = await api.get<Service[]>('/services');
+      regalia = await api.get<RegaliaItem[]>('/regalia/mine');
+      plans = await api.get<MentorshipPlan[]>('/subscriptions/plans/me');
     } else {
       const menteeProfile = await api.get<any>('/profile/mentee');
       nextForm.age = menteeProfile.age ?? null;
@@ -181,19 +230,16 @@
     }
 
     formData.set(nextForm);
-    topics = await api.get<Topic[]>('/topics');
   };
 
   const saveProfile = async () => {
-    const preparedGoals = normalizeStringArray($formData.goals || []);
-    const preparedCertificates = normalizeStringArray($formData.certificates || []);
+    const preparedActivityFields = normalizeStringArray($formData.activityFields || []);
     const preparedHobbies = normalizeStringArray($formData.hobbies || []);
     const preparedSkills = normalizeStringArray($formData.skills || []);
 
     formData.update((current) => ({
       ...current,
-      goals: preparedGoals,
-      certificates: preparedCertificates,
+      activityFields: preparedActivityFields,
       hobbies: preparedHobbies,
       skills: preparedSkills,
     }));
@@ -208,21 +254,26 @@
     message = null;
 
     try {
-      await api.patch('/profile', { fullName: $formData.fullName, timezone: $formData.timezone });
+      await api.patch('/profile', {
+        fullName: $formData.fullName,
+        timezone: $formData.timezone || 'Europe/Moscow',
+      });
 
-      if ($isMentor) {
+      if (isProfileMentor) {
         await api.patch('/profile/mentor', {
-          age: $formData.age,
+          age: $formData.birthDate ? calculateAge($formData.birthDate) : $formData.age,
+          birthDate: $formData.birthDate || undefined,
           education: $formData.education,
+          position: $formData.position,
           workplace: $formData.workplace,
-          goals: preparedGoals,
+          activityFields: preparedActivityFields,
           hobbies: preparedHobbies,
-          certificates: preparedCertificates,
+          certificates: [],
           skills: preparedSkills,
           headline: $formData.headline,
           bio: $formData.bio,
           languages: $formData.languages.split(',').map((l) => l.trim()).filter(Boolean),
-          timezone: $formData.timezone,
+          timezone: $formData.timezone || 'Europe/Moscow',
         });
         await api.put('/profile/mentor/topics', { topicIds: selectedTopicIds });
       } else {
@@ -231,9 +282,9 @@
           education: $formData.education,
           workplace: $formData.workplace,
           background: $formData.background,
-          goals: preparedGoals,
+          goals: [],
           hobbies: preparedHobbies,
-          certificates: preparedCertificates,
+          certificates: [],
           skills: preparedSkills,
           interests: $formData.interests.split(',').map((i) => i.trim()).filter(Boolean),
         });
@@ -242,6 +293,31 @@
       message = 'Изменения сохранены.';
     } finally {
       saving = false;
+    }
+  };
+
+  const uploadAvatar = async (event: Event) => {
+    const file = (event.currentTarget as HTMLInputElement).files?.[0];
+    if (!file) return;
+    if (!['image/png', 'image/jpeg'].includes(file.type) || file.size > 20 * 1024 * 1024) {
+      message = 'Фото должно быть в формате PNG/JPG и не больше 20MB.';
+      return;
+    }
+
+    isUploadingAvatar = true;
+    try {
+      const fileUrl = await fileToDataUrl(file);
+      const updated = await api.patch<{ avatarUrl: string }>('/profile', {
+        avatarUrl: fileUrl,
+        avatarFileName: file.name,
+        avatarMimeType: file.type,
+        avatarSize: file.size,
+      });
+      avatarUrl = updated.avatarUrl;
+      message = 'Фото профиля обновлено.';
+    } finally {
+      isUploadingAvatar = false;
+      if (avatarInput) avatarInput.value = '';
     }
   };
 
@@ -255,29 +331,74 @@
     newService = { title: '', durationMin: 60, priceAmount: '0', currency: 'RUB' };
   };
 
-  const updateService = async (service: Service) => {
-    await api.patch(`/services/${service.id}`, {
-      title: service.title,
-      durationMin: Number(service.durationMin),
-      priceAmount: Number(service.priceAmount),
-      currency: service.currency,
+  const createPlan = async () => {
+    const created = await api.post<MentorshipPlan>('/subscriptions/plans', {
+      title: newPlan.title,
+      description: newPlan.description,
+      callsPerMonth: Number(newPlan.callsPerMonth),
+      sessionDurationMin: Number(newPlan.sessionDurationMin),
+      billingIntervalMonths: Math.max(1, Math.min(12, Math.ceil(Number(newPlan.durationDays || 30) / 30))),
+      currency: newPlan.currency,
+      priceAmount: Number(newPlan.priceAmount),
     });
-    message = 'Услуга обновлена.';
+    plans = [created, ...plans];
+    newPlan = {
+      title: '',
+      callsPerMonth: 4,
+      sessionDurationMin: 60,
+      durationDays: 30,
+      currency: 'RUB',
+      priceAmount: '0',
+      description: '',
+    };
+    message = 'План подписки добавлен.';
   };
 
-  const removeService = async (serviceId: string) => {
-    await api.delete(`/services/${serviceId}`);
-    services = services.filter((s) => s.id !== serviceId);
+  const handleAchievementFile = (event: Event) => {
+    achievementFile = (event.currentTarget as HTMLInputElement).files?.[0] || null;
   };
 
-  const toggleTopic = (event: Event, topicId: string) => {
-    const target = event.currentTarget as HTMLInputElement | null;
-    const checked = !!target?.checked;
-    if (checked) {
-      selectedTopicIds = [...selectedTopicIds, topicId];
-    } else {
-      selectedTopicIds = selectedTopicIds.filter((id) => id !== topicId);
+  const clearAchievementDraft = () => {
+    achievementTitle = '';
+    achievementFile = null;
+    if (achievementInput) achievementInput.value = '';
+  };
+
+  const uploadAchievement = async () => {
+    if (!achievementTitle.trim()) {
+      message = 'Укажите название достижения.';
+      return;
     }
+    if (!achievementFile) {
+      message = 'Выберите файл достижения.';
+      return;
+    }
+    if (!['image/png', 'image/jpeg', 'application/pdf'].includes(achievementFile.type) || achievementFile.size > 20 * 1024 * 1024) {
+      message = 'Файл должен быть PNG, JPG или PDF и не больше 20MB.';
+      return;
+    }
+
+    isUploadingAchievement = true;
+    try {
+      const fileUrl = await fileToDataUrl(achievementFile);
+      await api.post('/regalia', {
+        title: achievementTitle.trim(),
+        fileUrl,
+        fileName: achievementFile.name,
+        mimeType: achievementFile.type,
+        size: achievementFile.size,
+      });
+      regalia = await api.get<RegaliaItem[]>('/regalia/mine');
+      clearAchievementDraft();
+      message = 'Достижение отправлено на проверку.';
+    } finally {
+      isUploadingAchievement = false;
+    }
+  };
+
+  const removeAchievement = async (id: string) => {
+    await api.delete(`/regalia/${id}`);
+    regalia = regalia.filter((item) => item.id !== id);
   };
 
   onMount(async () => {
@@ -297,290 +418,223 @@
   {#if $authLoading || isLoading}
     <Loading />
   {:else}
-    <main class="container section" style="max-width:980px;">
-      <datalist id="education-suggestions">
-        {#each EDUCATION_SUGGESTIONS as education}
-          <option value={education}></option>
-        {/each}
-      </datalist>
-
-      <datalist id="workplace-suggestions">
-        {#each WORKPLACE_SUGGESTIONS as workplace}
-          <option value={workplace}></option>
-        {/each}
-      </datalist>
-
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-        <h1 class="section-title">Редактирование профиля</h1>
+    <main class="profile-edit-shell">
+      <div class="profile-edit-header">
+        <div class="title-row">
+          <h1>Редактирование профиля</h1>
+          {#if isProfileMentor}
+            <span class="verified-badge">Профиль верифицирован</span>
+          {/if}
+        </div>
         <button class="btn btn-primary" on:click={saveProfile} disabled={saving}>
           {saving ? 'Сохранение...' : 'Сохранить'}
         </button>
       </div>
 
       {#if message}
-        <div class="surface" style="margin-top:12px;background:var(--status-success-bg);border-color:var(--status-success-border);color:var(--status-success-ink);">
-          {message}
-        </div>
+        <div class="notice">{message}</div>
       {/if}
 
-      <div class="grid" style="grid-template-columns:1.2fr 1fr;gap:20px;">
-        <div class="stack">
-          <div class="card">
-            <h2 class="section-title">Основная информация</h2>
-            <label>
-              <div class="muted" style="margin-bottom:6px;">Полное имя</div>
+      <div class="profile-grid">
+        <div class="left-column">
+          <section class="profile-card">
+            <h2>Основная информация</h2>
+            <label class="field">
+              <span>ФИО*</span>
               <input class="input" bind:value={$formData.fullName} />
               {#if $errors.fullName}
-                <div class="muted" style="font-size:0.8rem;color:var(--status-warning-ink);">{errorMessage($errors.fullName)}</div>
+                <small>{errorMessage($errors.fullName)}</small>
               {/if}
             </label>
-            <label style="margin-top:12px;display:block;">
-              <div class="muted" style="margin-bottom:6px;">Часовой пояс</div>
-              <input class="input" bind:value={$formData.timezone} placeholder="Europe/Moscow" />
-              {#if $errors.timezone}
-                <div class="muted" style="font-size:0.8rem;color:var(--status-warning-ink);">{errorMessage($errors.timezone)}</div>
-              {/if}
+            <label class="field">
+              <span>Дата рождения</span>
+              <input class="input" type="date" bind:value={$formData.birthDate} />
             </label>
-            <label style="margin-top:12px;display:block;">
-              <div class="muted" style="margin-bottom:6px;">Возраст</div>
-              <input class="input" type="number" min="18" max="120" bind:value={$formData.age} />
-              {#if $errors.age}
-                <div class="muted" style="font-size:0.8rem;color:var(--status-warning-ink);">{errorMessage($errors.age)}</div>
-              {/if}
+            <label class="field">
+              <span>О себе</span>
+              <input class="input" bind:value={$formData.bio} placeholder="Коротко о себе" />
             </label>
-            <label style="margin-top:12px;display:block;">
-              <div class="muted" style="margin-bottom:6px;">Образование</div>
-              <input
-                class="input"
-                list="education-suggestions"
-                bind:value={$formData.education}
-                placeholder="Начните вводить и выберите подсказку"
-              />
+            <label class="field">
+              <span>Email*</span>
+              <input class="input" value={profileEmail} disabled />
             </label>
-            <label style="margin-top:12px;display:block;">
-              <div class="muted" style="margin-bottom:6px;">Место работы</div>
-              <input
-                class="input"
-                list="workplace-suggestions"
-                bind:value={$formData.workplace}
-                placeholder="Начните вводить и выберите подсказку"
-              />
-            </label>
-          </div>
+          </section>
 
-          <div class="card">
-            <h2 class="section-title">Цели</h2>
-            <p class="muted" style="margin-bottom:10px;">Добавляйте отдельные цели в разных полях.</p>
-            <div class="stack" style="gap:8px;">
-              {#if $formData.goals.length === 0}
-                <div class="muted">Пока нет целей.</div>
-              {/if}
-              {#each $formData.goals as goal, goalIndex}
-                <div class="list-field-row">
-                  <input
-                    class="input"
-                    value={goal}
-                    on:input={(event) => updateGoal(goalIndex, inputValue(event))}
-                    placeholder="Например: Подготовиться к собеседованию"
-                  />
-                  <button class="btn btn-ghost" on:click={() => removeGoal(goalIndex)}>Удалить</button>
-                </div>
-              {/each}
-            </div>
-            <button class="btn btn-outline" style="margin-top:12px;" on:click={addGoal}>Добавить цель</button>
-          </div>
-
-          <div class="card">
-            <h2 class="section-title">Хобби (выбор и поиск)</h2>
-            <input
-              class="input"
-              bind:value={hobbySearch}
-              placeholder="Найти хобби в списке"
-              style="margin-bottom:10px;"
-            />
-            <div class="chips">
-              {#each $formData.hobbies as hobby}
-                <button
-                  class="chip selected"
-                  on:click={() => toggleSelectable('hobbies', hobby, false)}
-                  title="Убрать"
-                >
-                  {hobby}
-                </button>
-              {/each}
-            </div>
-            <div class="selection-grid" style="margin-top:10px;">
-              {#if filteredHobbyOptions.length === 0}
-                <div class="muted">Ничего не найдено.</div>
-              {/if}
-              {#each filteredHobbyOptions as hobbyOption}
-                <label class="surface select-item">
+          <section class="profile-card">
+            <h2>Карьера</h2>
+            <label class="field">
+              <span>Образование*</span>
+              <input class="input" bind:value={$formData.education} />
+            </label>
+            <label class="field">
+              <span>Должность</span>
+              <input class="input" bind:value={$formData.position} />
+            </label>
+            <label class="field">
+              <span>Место работы</span>
+              <input class="input" bind:value={$formData.workplace} />
+            </label>
+            <label class="field">
+              <span>Сфера деятельности*</span>
+              <input class="input" bind:value={selectedActivitySearch} placeholder="Найти сферу деятельности в поиске" />
+            </label>
+            <div class="selection-grid compact">
+              {#each filteredActivityOptions as activity}
+                <label class="select-item">
                   <input
                     type="checkbox"
-                    checked={$formData.hobbies.includes(hobbyOption)}
-                    on:change={(event) =>
-                      toggleSelectable(
-                        'hobbies',
-                        hobbyOption,
-                        inputChecked(event),
-                      )}
+                    checked={$formData.activityFields.includes(activity)}
+                    on:change={(event) => toggleSelectable('activityFields', activity, inputChecked(event))}
                   />
-                  <span>{hobbyOption}</span>
+                  <span>{activity}</span>
                 </label>
               {/each}
             </div>
-          </div>
+          </section>
 
-          <div class="card">
-            <h2 class="section-title">Навыки (выбор и поиск)</h2>
-            <input
-              class="input"
-              bind:value={skillSearch}
-              placeholder="Найти навык в списке"
-              style="margin-bottom:10px;"
-            />
-            <div class="chips">
-              {#each $formData.skills as skill}
-                <button
-                  class="chip selected"
-                  on:click={() => toggleSelectable('skills', skill, false)}
-                  title="Убрать"
-                >
-                  {skill}
-                </button>
-              {/each}
-            </div>
-            <div class="selection-grid" style="margin-top:10px;">
-              {#if filteredSkillOptions.length === 0}
-                <div class="muted">Ничего не найдено.</div>
-              {/if}
-              {#each filteredSkillOptions as skillOption}
-                <label class="surface select-item">
+          <section class="profile-card">
+            <h2>Навыки*</h2>
+            <input class="input" bind:value={skillSearch} placeholder="Найти навык в поиске" />
+            <div class="selection-grid">
+              {#each filteredSkillOptions as skill}
+                <label class="select-item">
                   <input
                     type="checkbox"
-                    checked={$formData.skills.includes(skillOption)}
-                    on:change={(event) =>
-                      toggleSelectable(
-                        'skills',
-                        skillOption,
-                        inputChecked(event),
-                      )}
+                    checked={$formData.skills.includes(skill)}
+                    on:change={(event) => toggleSelectable('skills', skill, inputChecked(event))}
                   />
-                  <span>{skillOption}</span>
+                  <span>{skill}</span>
                 </label>
               {/each}
             </div>
-          </div>
+          </section>
 
-          <div class="card">
-            <h2 class="section-title">Сертификаты и дипломы</h2>
-            <div class="stack" style="gap:8px;">
-              {#if $formData.certificates.length === 0}
-                <div class="muted">Пока не добавлены.</div>
-              {/if}
-              {#each $formData.certificates as certificate, certificateIndex}
-                <div class="list-field-row">
+          <section class="profile-card">
+            <h2>Хобби</h2>
+            <input class="input" bind:value={hobbySearch} placeholder="Найти хобби в списке" />
+            <div class="selection-grid">
+              {#each filteredHobbyOptions as hobby}
+                <label class="select-item">
                   <input
-                    class="input"
-                    value={certificate}
-                    on:input={(event) => updateCertificate(certificateIndex, inputValue(event))}
-                    placeholder="Например: Google Professional Cloud Architect"
+                    type="checkbox"
+                    checked={$formData.hobbies.includes(hobby)}
+                    on:change={(event) => toggleSelectable('hobbies', hobby, inputChecked(event))}
                   />
-                  <button class="btn btn-ghost" on:click={() => removeCertificate(certificateIndex)}>Удалить</button>
-                </div>
+                  <span>{hobby}</span>
+                </label>
               {/each}
             </div>
-            <button class="btn btn-outline" style="margin-top:12px;" on:click={addCertificate}>
-              Добавить сертификат/диплом
+          </section>
+
+          <section class="profile-card">
+            <h2>Достижения</h2>
+            <label class="field">
+              <span>Название</span>
+              <div class="achievement-row">
+                <input class="input" bind:value={achievementTitle} placeholder="Диплом" />
+                <input
+                  bind:this={achievementInput}
+                  class="sr-only"
+                  type="file"
+                  accept=".png,.jpg,.jpeg,.pdf"
+                  on:change={handleAchievementFile}
+                />
+                <button class="btn btn-primary" on:click={() => achievementInput?.click()}>
+                  Загрузить файл
+                </button>
+                <button class="btn btn-ghost" on:click={clearAchievementDraft}>Удалить</button>
+              </div>
+            </label>
+            <div class="file-hint">
+              {achievementFile ? achievementFile.name : '(.png, .jpg, .pdf; до 20MB)'}
+            </div>
+            <button class="btn btn-primary" on:click={uploadAchievement} disabled={isUploadingAchievement}>
+              {isUploadingAchievement ? 'Загрузка...' : 'Добавить достижение'}
             </button>
-          </div>
 
-          {#if $isMentor}
-            <div class="card">
-              <h2 class="section-title">Профиль ментора</h2>
-              <label>
-                <div class="muted" style="margin-bottom:6px;">Заголовок</div>
-                <input class="input" bind:value={$formData.headline} />
-              </label>
-              <label style="margin-top:12px;display:block;">
-                <div class="muted" style="margin-bottom:6px;">О себе</div>
-                <textarea class="textarea" bind:value={$formData.bio}></textarea>
-              </label>
-              <label style="margin-top:12px;display:block;">
-                <div class="muted" style="margin-bottom:6px;">Языки (через запятую)</div>
-                <input class="input" bind:value={$formData.languages} placeholder="Русский, English" />
-              </label>
-            </div>
-
-            <div class="card">
-              <h2 class="section-title">Темы менторства</h2>
-              <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;">
-                {#each topics as topic}
-                  <label class="surface" style={`border:2px solid ${selectedTopicIds.includes(topic.id) ? 'var(--accent)' : 'transparent'};`}>
-                    <input
-                      type="checkbox"
-                      checked={selectedTopicIds.includes(topic.id)}
-                      on:change={(e) => toggleTopic(e, topic.id)}
-                    />
-                    <span style="margin-left:8px;">{topic.name}</span>
-                  </label>
+            {#if regalia.length > 0}
+              <div class="achievement-list">
+                {#each regalia as item}
+                  <div class="achievement-item">
+                    <a href={resolveFileUrl(item.fileUrl)} target="_blank" rel="noreferrer">
+                      {item.title || item.fileName}
+                    </a>
+                    <span>{item.status}</span>
+                    <button class="btn btn-ghost btn-sm" on:click={() => removeAchievement(item.id)}>Удалить</button>
+                  </div>
                 {/each}
               </div>
-            </div>
-          {:else}
-            <div class="card">
-              <h2 class="section-title">Профиль менти</h2>
-              <label>
-                <div class="muted" style="margin-bottom:6px;">Бэкграунд</div>
-                <textarea class="textarea" bind:value={$formData.background}></textarea>
-              </label>
-              <label style="margin-top:12px;display:block;">
-                <div class="muted" style="margin-bottom:6px;">Интересы (через запятую)</div>
-                <input class="input" bind:value={$formData.interests} />
-              </label>
-            </div>
-          {/if}
+            {/if}
+          </section>
         </div>
 
-        {#if $isMentor}
-          <div class="stack">
-            <div class="card">
-              <h2 class="section-title">Услуги и тарифы</h2>
-              {#if services.length === 0}
-                <p class="muted">Услуги пока не добавлены.</p>
-              {:else}
-                <div class="stack">
+        {#if isProfileMentor}
+          <aside class="right-column">
+            <section class="profile-card">
+              <h2>Фото профиля</h2>
+              <div class="avatar-preview">
+                {#if avatarUrl}
+                  <img src={resolveFileUrl(avatarUrl)} alt="Фото профиля" />
+                {:else}
+                  <span>{$formData.fullName?.slice(0, 1) || 'M'}</span>
+                {/if}
+              </div>
+              <input
+                bind:this={avatarInput}
+                class="sr-only"
+                type="file"
+                accept=".png,.jpg,.jpeg"
+                on:change={uploadAvatar}
+              />
+              <div class="upload-row">
+                <button class="btn btn-primary" on:click={() => avatarInput?.click()} disabled={isUploadingAvatar}>
+                  {isUploadingAvatar ? 'Загрузка...' : 'Загрузить фото'}
+                </button>
+                <span>(.png, .jpg; до 20MB)</span>
+              </div>
+            </section>
+
+            <section class="profile-card">
+              <h2>Добавить услугу</h2>
+              <input class="input" bind:value={newService.title} placeholder="Название услуги (разовая сессия)" />
+              <div class="two-fields">
+                <input class="input" type="number" min="15" bind:value={newService.durationMin} placeholder="Продолжительность" />
+                <input class="input" type="number" min="0" bind:value={newService.priceAmount} placeholder="Цена" />
+              </div>
+              <input class="input" bind:value={newService.currency} />
+              <button class="btn btn-primary" on:click={addService}>Добавить</button>
+              {#if services.length > 0}
+                <div class="compact-list">
                   {#each services as service}
-                    <div class="surface">
-                      <input class="input" bind:value={service.title} placeholder="Название" />
-                      <div class="grid" style="grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
-                        <input class="input" type="number" min="15" bind:value={service.durationMin} />
-                        <input class="input" type="number" min="0" bind:value={service.priceAmount} />
-                      </div>
-                      <div class="grid" style="grid-template-columns:1fr auto;gap:8px;margin-top:8px;">
-                        <input class="input" bind:value={service.currency} />
-                        <button class="btn btn-ghost" on:click={() => removeService(service.id)}>Удалить</button>
-                      </div>
-                      <button class="btn btn-outline" style="margin-top:8px;" on:click={() => updateService(service)}>
-                        Сохранить
-                      </button>
-                    </div>
+                    <span>{service.title}</span>
                   {/each}
                 </div>
               {/if}
-            </div>
+            </section>
 
-            <div class="card">
-              <h2 class="section-title">Добавить услугу</h2>
-              <input class="input" bind:value={newService.title} placeholder="Название услуги" />
-              <div class="grid" style="grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
-                <input class="input" type="number" min="15" bind:value={newService.durationMin} />
-                <input class="input" type="number" min="0" bind:value={newService.priceAmount} />
+            <section class="profile-card">
+              <h2>Добавить план подписки</h2>
+              <input class="input" bind:value={newPlan.title} placeholder="Название плана подписки" />
+              <div class="two-fields">
+                <input class="input" type="number" min="1" bind:value={newPlan.callsPerMonth} placeholder="Количество сессий" />
+                <input class="input" type="number" min="15" bind:value={newPlan.sessionDurationMin} placeholder="Продолжительность" />
               </div>
-              <input class="input" style="margin-top:8px;" bind:value={newService.currency} />
-              <button class="btn btn-primary" style="margin-top:10px;" on:click={addService}>Добавить</button>
-            </div>
-          </div>
+              <input class="input" type="number" min="1" bind:value={newPlan.durationDays} placeholder="Срок действия подписки в днях" />
+              <div class="two-fields">
+                <input class="input" bind:value={newPlan.currency} />
+                <input class="input" type="number" min="0" bind:value={newPlan.priceAmount} placeholder="Цена" />
+              </div>
+              <input class="input" bind:value={newPlan.description} placeholder="Описание подписки" />
+              <button class="btn btn-primary" on:click={createPlan}>Добавить</button>
+              {#if plans.length > 0}
+                <div class="compact-list">
+                  {#each plans as plan}
+                    <span>{plan.title}</span>
+                  {/each}
+                </div>
+              {/if}
+            </section>
+          </aside>
         {/if}
       </div>
     </main>
@@ -588,48 +642,237 @@
 </div>
 
 <style>
-  .list-field-row {
+  .profile-edit-shell {
+    width: 100%;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 60px 20px;
+  }
+
+  .profile-edit-header,
+  .title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  h1,
+  h2 {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.15;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 800;
+  }
+
+  h2 {
+    font-size: 1.45rem;
+    font-weight: 800;
+  }
+
+  .verified-badge {
+    border: 1px solid var(--status-success-border);
+    color: var(--status-success-ink);
+    background: var(--surface);
+    border-radius: var(--radius-md);
+    padding: 12px 18px;
+    font-weight: 600;
+  }
+
+  .notice {
+    margin-top: 16px;
+    padding: 14px 18px;
+    border: 1px solid var(--status-success-border);
+    border-radius: var(--radius-md);
+    background: var(--status-success-bg);
+    color: var(--status-success-ink);
+  }
+
+  .profile-grid {
     display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 8px;
+    grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
+    gap: 20px;
+    margin-top: 16px;
+    align-items: start;
+  }
+
+  .left-column,
+  .right-column {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  .profile-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+  }
+
+  .field {
+    display: block;
+    margin-top: 14px;
+  }
+
+  .field span,
+  .file-hint {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .field small {
+    color: var(--status-warning-ink);
+    display: block;
+    margin-top: 4px;
   }
 
   .selection-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+    margin-top: 16px;
+  }
+
+  .selection-grid.compact {
+    margin-top: 8px;
   }
 
   .select-item {
     display: flex;
     align-items: center;
     gap: 8px;
+    min-height: 44px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
   }
 
-  .chips {
+  .avatar-preview {
+    width: 240px;
+    max-width: 100%;
+    aspect-ratio: 1;
+    margin: 16px auto 16px;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    background: var(--accent-soft);
     display: flex;
-    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    font-size: 4rem;
+    font-weight: 800;
+  }
+
+  .avatar-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .upload-row,
+  .achievement-row,
+  .two-fields {
+    display: grid;
     gap: 8px;
   }
 
-  .chip {
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--surface);
-    color: var(--ink-secondary);
-    font-size: 0.8rem;
-    padding: 5px 10px;
+  .upload-row {
+    grid-template-columns: 1fr auto;
+    align-items: center;
   }
 
-  .chip.selected {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  .upload-row span {
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .achievement-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+  }
+
+  .two-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 8px;
+  }
+
+  .right-column .input,
+  .right-column .btn {
+    margin-top: 8px;
+  }
+
+  .achievement-list,
+  .compact-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .achievement-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 8px;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+
+  .achievement-item a {
+    color: var(--accent-link);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .achievement-item span,
+  .compact-list span {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   @media (max-width: 900px) {
-    .list-field-row {
-      grid-template-columns: 1fr;
+    .profile-grid,
+    .achievement-row,
+    .upload-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 560px) {
+    .profile-edit-shell {
+      padding: 32px 20px;
+    }
+
+    .selection-grid,
+    .two-fields,
+    .achievement-item {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 </style>

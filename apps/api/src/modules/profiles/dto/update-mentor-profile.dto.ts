@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, IsInt, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsInt, Min, Max, IsDateString } from 'class-validator';
 
 export class UpdateMentorProfileDto {
   @IsOptional()
@@ -8,12 +8,25 @@ export class UpdateMentorProfileDto {
   age?: number;
 
   @IsOptional()
+  @IsDateString()
+  birthDate?: string;
+
+  @IsOptional()
   @IsString()
   education?: string;
 
   @IsOptional()
   @IsString()
+  position?: string;
+
+  @IsOptional()
+  @IsString()
   workplace?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  activityFields?: string[];
 
   @IsOptional()
   @IsArray()

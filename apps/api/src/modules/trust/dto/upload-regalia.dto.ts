@@ -1,6 +1,11 @@
-import { IsInt, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class UploadRegaliaDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  title?: string;
+
   @IsString()
   fileUrl: string;
 

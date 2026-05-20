@@ -241,6 +241,7 @@ export class TrustService {
     const regalia = await this.prisma.mentorRegalia.create({
       data: {
         mentorId,
+        title: dto.title?.trim() || dto.fileName,
         fileUrl,
         fileName: dto.fileName,
         mimeType: dto.mimeType,
@@ -262,6 +263,16 @@ export class TrustService {
       orderBy: { createdAt: 'desc' },
     });
     return regalia.map((item) => this.serializeRegalia(item));
+  }
+
+  async deleteRegalia(mentorId: string, regaliaId: string) {
+    const regalia = await this.prisma.mentorRegalia.findFirst({
+      where: { id: regaliaId, mentorId },
+    });
+    if (!regalia) throw new NotFoundException('Regalia not found');
+
+    await this.prisma.mentorRegalia.delete({ where: { id: regaliaId } });
+    return { deleted: true };
   }
 
   async adminListRegalia(status?: string) {

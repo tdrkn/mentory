@@ -8,10 +8,11 @@ import { ProfilesController } from './profiles.controller';
 import { MentorProfileController } from './mentor-profile.controller';
 import { MenteeProfileController } from './mentee-profile.controller';
 import { ProfilesService } from './profiles.service';
+import { FileStorageService } from '../../common/file-storage.service';
 
 @Module({
   controllers: [ProfilesController, MentorProfileController, MenteeProfileController],
-  providers: [ProfilesService],
+  providers: [ProfilesService, FileStorageService],
   exports: [ProfilesService],
 })
 export class ProfilesModule {}

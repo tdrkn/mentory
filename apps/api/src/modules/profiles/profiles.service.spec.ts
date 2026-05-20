@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { ProfilesService } from './profiles.service';
 import { PrismaService } from '../../prisma';
+import { FileStorageService } from '../../common/file-storage.service';
 
 describe('ProfilesService', () => {
   let service: ProfilesService;
@@ -26,12 +27,16 @@ describe('ProfilesService', () => {
       createMany: jest.fn(),
     },
   };
+  const mockFileStorageService = {
+    storeDataUrlIfNeeded: jest.fn((fileUrl: string) => Promise.resolve(fileUrl)),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProfilesService,
         { provide: PrismaService, useValue: mockPrismaService },
+        { provide: FileStorageService, useValue: mockFileStorageService },
       ],
     }).compile();
 

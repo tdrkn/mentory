@@ -3,10 +3,14 @@ import { PrismaService } from '../../prisma';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateMentorProfileDto } from './dto/update-mentor-profile.dto';
 import { UpdateMenteeProfileDto } from './dto/update-mentee-profile.dto';
+import { FileStorageService } from '../../common/file-storage.service';
 
 @Injectable()
 export class ProfilesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly fileStorage: FileStorageService,
+  ) {}
 
   async getFullProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -31,13 +35,25 @@ export class ProfilesService {
   }
 
   async updateUser(userId: string, dto: UpdateUserDto) {
+    const { avatarFileName, avatarMimeType, avatarSize, ...data } = dto;
+
+    if (data.avatarUrl) {
+      data.avatarUrl = await this.fileStorage.storeDataUrlIfNeeded(data.avatarUrl, {
+        scope: 'avatars',
+        fileName: avatarFileName || 'avatar.png',
+        mimeType: avatarMimeType || 'image/png',
+        sizeBytes: avatarSize,
+      });
+    }
+
     return this.prisma.user.update({
       where: { id: userId },
-      data: dto,
+      data,
       select: {
         id: true,
         email: true,
         fullName: true,
+        avatarUrl: true,
         timezone: true,
         role: true,
       },
@@ -56,6 +72,7 @@ export class ProfilesService {
             id: true,
             email: true,
             fullName: true,
+            avatarUrl: true,
             timezone: true,
           },
         },
@@ -70,9 +87,14 @@ export class ProfilesService {
   }
 
   async updateMentorProfile(userId: string, dto: UpdateMentorProfileDto) {
+    const data = {
+      ...dto,
+      birthDate: dto.birthDate ? new Date(dto.birthDate) : dto.birthDate,
+    };
+
     return this.prisma.mentorProfile.update({
       where: { userId },
-      data: dto,
+      data,
     });
   }
 

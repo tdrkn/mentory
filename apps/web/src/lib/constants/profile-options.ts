@@ -23,6 +23,21 @@ export const WORKPLACE_SUGGESTIONS = [
   'Без опыта / в поиске',
 ];
 
+export const ACTIVITY_FIELD_OPTIONS = [
+  'Производство',
+  'Логистика',
+  'IT',
+  'Финансы',
+  'EdTech',
+  'FinTech',
+  'Маркетинг',
+  'Продажи',
+  'Продукт',
+  'Консалтинг',
+  'HR',
+  'Дизайн',
+];
+
 export const HOBBY_OPTIONS = [
   'Чтение',
   'Путешествия',
