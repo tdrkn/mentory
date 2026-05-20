@@ -86,18 +86,19 @@
   let isLoading = true;
   let error: string | null = null;
 
-  let bookingService: MentorDetail['mentorServices'][number] | null = null;
-  let bookingSlots: Slot[] = [];
-  let bookingSelectedSlotId: string | null = null;
-  let bookingGoal = '';
-  let bookingMotivation = '';
-  let bookingError: string | null = null;
-  let isLoadingSlots = false;
-  let isHolding = false;
+  // ── Sidebar state ──────────────────────────────────────────────
+  let sidebarTab: 'session' | 'subscription' = 'session';
+  let selectedServiceId: string | null = null;
+  let selectedPlanId: string | null = null;
+  let nearestSlot: string | null = null;
 
   $: isOwnProfile = !!mentor && $user?.id === mentor.id;
   $: canBook = !!$user && $user.role !== 'mentor' && !isOwnProfile;
   $: isVerified = mentor?.mentorProfile?.verificationStatus === 'verified';
+  $: selectedService = mentor?.mentorServices?.find((s) => s.id === selectedServiceId) ?? null;
+  $: selectedPlan = mentor?.mentorPlans?.find((p) => p.id === selectedPlanId) ?? null;
+  $: hasPlans = (mentor?.mentorPlans?.length ?? 0) > 0;
+  $: hasServices = (mentor?.mentorServices?.length ?? 0) > 0;
 
   const resolveFileUrl = (value?: string | null) => {
     if (!value) return '';
@@ -117,13 +118,11 @@
   };
 
   const planFacts = (plan: MentorDetail['mentorPlans'][number]) => {
-    const facts = [
+    return [
       `${Math.max(1, plan.billingIntervalMonths || 1) * 30} дней`,
       plan.callsPerMonth ? `${plan.callsPerMonth} сессии` : null,
       plan.sessionDurationMin ? `${plan.sessionDurationMin} мин` : null,
     ].filter(Boolean) as string[];
-
-    return facts;
   };
 
   const planFeatures = (plan: MentorDetail['mentorPlans'][number]) => {
@@ -147,10 +146,48 @@
     return profile.topics?.map((item) => item.topic.name) || [];
   };
 
+  const formatSlotHint = (isoString: string) => {
+    return new Date(isoString).toLocaleString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const loadNearestSlot = async (id: string) => {
+    try {
+      const data = await api.get<{ slots?: Slot[] }>(`/scheduling/mentors/${id}/slots`);
+      const slots: Slot[] = data.slots || (Array.isArray(data) ? (data as unknown as Slot[]) : []);
+      const free = slots
+        .filter((s) => s.status === 'free')
+        .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+      nearestSlot = free.length ? free[0].startAt : null;
+    } catch {
+      nearestSlot = null;
+    }
+  };
+
   const loadMentor = async (id: string) => {
     try {
       const mentorData = await api.get<MentorDetail>(`/mentors/${id}`);
       mentor = mentorData;
+
+      // Pre-select first service and plan
+      if (mentorData.mentorServices?.length) {
+        selectedServiceId = mentorData.mentorServices[0].id;
+      }
+      if (mentorData.mentorPlans?.length) {
+        selectedPlanId = mentorData.mentorPlans[0].id;
+      }
+
+      // Default to subscription tab if no services
+      if (!mentorData.mentorServices?.length && mentorData.mentorPlans?.length) {
+        sidebarTab = 'subscription';
+      }
+
+      // Load nearest slot in parallel
+      loadNearestSlot(id);
 
       try {
         const reviewData = await api.get<{ data: ReviewItem[] }>(`/mentors/${id}/reviews?limit=3`);
@@ -165,65 +202,14 @@
     }
   };
 
-  const formatSlotLabel = (slot: Slot) => {
-    const start = new Date(slot.startAt);
-    return start.toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  const handleBook = () => {
+    if (!mentor || !selectedServiceId) return;
+    goto(`/booking/new?serviceId=${selectedServiceId}&mentorId=${mentor.id}`);
   };
 
-  const openBooking = async (service: MentorDetail['mentorServices'][number]) => {
-    if (!mentor || !canBook) return;
-    bookingService = service;
-    bookingSelectedSlotId = null;
-    bookingGoal = '';
-    bookingMotivation = '';
-    bookingError = null;
-    bookingSlots = [];
-    isLoadingSlots = true;
-    try {
-      const data = await api.get<{ slots: Slot[] }>(`/scheduling/mentors/${mentor.id}/slots`);
-      bookingSlots = (data.slots || []).filter((slot) => slot.status === 'free');
-    } catch {
-      bookingError = 'Не удалось загрузить свободные слоты.';
-    } finally {
-      isLoadingSlots = false;
-    }
-  };
-
-  const closeBooking = () => {
-    bookingService = null;
-    bookingSlots = [];
-    bookingSelectedSlotId = null;
-    bookingError = null;
-  };
-
-  const submitBooking = async () => {
-    if (!bookingService || !bookingSelectedSlotId) {
-      bookingError = 'Выберите слот.';
-      return;
-    }
-    isHolding = true;
-    bookingError = null;
-    try {
-      const result = await api.post<{ session: { id: string } }>('/booking/hold', {
-        slotId: bookingSelectedSlotId,
-        serviceId: bookingService.id,
-        requestGoal: bookingGoal.trim() || undefined,
-        requestMotivation: bookingMotivation.trim() || undefined,
-      });
-      const sessionId = result.session.id;
-      closeBooking();
-      goto(`/checkout/${sessionId}`);
-    } catch (err: any) {
-      bookingError = err?.data?.message || 'Не удалось зарезервировать слот.';
-    } finally {
-      isHolding = false;
-    }
+  const handleSubscribe = () => {
+    if (!mentor || !selectedPlanId) return;
+    goto(`/subscriptions/new?planId=${selectedPlanId}`);
   };
 
   onMount(() => {
@@ -386,133 +372,110 @@
           </section>
         </div>
 
+        <!-- ── SIDEBAR ── -->
         <aside class="mentor-sidebar">
-          <section class="profile-card sidebar-card">
-            <h3>
-              <Calendar size={18} />
-              Планы подписки
-            </h3>
-            {#if mentor.mentorPlans?.length}
-              <div class="side-list">
-                {#each mentor.mentorPlans as plan}
-                  <article class="offer-card">
-                    <h4>{plan.title}</h4>
-                    <div class="offer-grid">
-                      <span>{formatMoney(plan.priceAmount, plan.currency)}</span>
-                      {#each planFacts(plan) as fact}
-                        <span>{fact}</span>
-                      {/each}
-                    </div>
-                    <ul>
-                      {#each planFeatures(plan) as feature}
-                        <li>{feature}</li>
-                      {/each}
-                    </ul>
-                  </article>
-                {/each}
-              </div>
-            {:else}
-              <p class="plain-text">Планы пока не добавлены.</p>
-            {/if}
-          </section>
+          <section class="profile-card booking-card">
+            <!-- Tab switcher -->
+            <div class="tab-row">
+              <button
+                class="tab-btn {sidebarTab === 'session' ? 'tab-active' : ''}"
+                on:click={() => (sidebarTab = 'session')}
+              >
+                <BriefcaseBusiness size={16} />
+                Сессия
+              </button>
+              <button
+                class="tab-btn {sidebarTab === 'subscription' ? 'tab-active' : ''}"
+                on:click={() => (sidebarTab = 'subscription')}
+              >
+                <Calendar size={16} />
+                Подписка
+              </button>
+            </div>
 
-          <section class="profile-card sidebar-card">
-            <h3>
-              <BriefcaseBusiness size={18} />
-              Разовые сессии и услуги
-            </h3>
-            {#if mentor.mentorServices?.length}
-              <div class="side-list">
-                {#each mentor.mentorServices as service}
-                  <article class="offer-card service-offer">
-                    <h4>{service.title}</h4>
-                    <div class="offer-grid">
-                      <span>{formatMoney(service.priceAmount, service.currency)}</span>
-                      <span>{service.durationMin} мин</span>
-                    </div>
-                    {#if canBook}
-                      <button class="btn btn-primary btn-block" on:click={() => openBooking(service)}>
-                        Записаться
-                      </button>
-                    {/if}
-                  </article>
-                {/each}
-              </div>
+            <!-- SESSION tab -->
+            {#if sidebarTab === 'session'}
+              {#if hasServices}
+                <div class="option-list">
+                  {#each mentor.mentorServices as service}
+                    <button
+                      class="option-card {selectedServiceId === service.id ? 'option-selected' : ''}"
+                      on:click={() => (selectedServiceId = service.id)}
+                    >
+                      <span class="option-title">{service.title}</span>
+                      <div class="option-meta">
+                        <span class="option-price">{formatMoney(service.priceAmount, service.currency)}</span>
+                        <span class="option-dur">{service.durationMin} мин</span>
+                      </div>
+                    </button>
+                  {/each}
+                </div>
+
+                {#if nearestSlot}
+                  <p class="slot-hint">Ближайший свободный слот: {formatSlotHint(nearestSlot)}</p>
+                {:else}
+                  <p class="slot-hint slot-hint-none">Свободных слотов пока нет</p>
+                {/if}
+
+                {#if canBook}
+                  <button
+                    class="btn btn-primary cta-btn"
+                    on:click={handleBook}
+                    disabled={!selectedServiceId}
+                  >
+                    Забронировать
+                  </button>
+                  <p class="hold-notice">Слот удерживается 10 минут для оплаты</p>
+                {/if}
+              {:else}
+                <p class="plain-text tab-empty">У ментора пока нет разовых услуг.</p>
+              {/if}
+
+            <!-- SUBSCRIPTION tab -->
             {:else}
-              <p class="plain-text">Услуги пока не добавлены.</p>
+              {#if hasPlans}
+                <div class="option-list">
+                  {#each mentor.mentorPlans as plan}
+                    <button
+                      class="option-card {selectedPlanId === plan.id ? 'option-selected' : ''}"
+                      on:click={() => (selectedPlanId = plan.id)}
+                    >
+                      <span class="option-title">{plan.title}</span>
+                      <div class="option-meta">
+                        <span class="option-price">{formatMoney(plan.priceAmount, plan.currency)}</span>
+                        <span class="option-dur">
+                          {Math.max(1, plan.billingIntervalMonths || 1) * 30} дн
+                          {#if plan.callsPerMonth}· {plan.callsPerMonth} сессии{/if}
+                        </span>
+                      </div>
+                      {#if planFeatures(plan).length}
+                        <ul class="plan-features">
+                          {#each planFeatures(plan).slice(0, 3) as feat}
+                            <li>{feat}</li>
+                          {/each}
+                        </ul>
+                      {/if}
+                    </button>
+                  {/each}
+                </div>
+
+                {#if canBook}
+                  <button
+                    class="btn btn-primary cta-btn"
+                    on:click={handleSubscribe}
+                    disabled={!selectedPlanId}
+                  >
+                    Отправить запрос
+                  </button>
+                {/if}
+              {:else}
+                <p class="plain-text tab-empty">У ментора пока нет планов подписки.</p>
+              {/if}
             {/if}
           </section>
         </aside>
       </div>
     </main>
-
-    {#if bookingService}
-      <div class="booking-overlay" role="dialog" aria-modal="true">
-        <div class="booking-modal">
-          <header class="booking-modal-header">
-            <h3>Записаться на «{bookingService.title}»</h3>
-            <button class="btn btn-ghost" on:click={closeBooking} aria-label="Закрыть">✕</button>
-          </header>
-
-          <div class="booking-modal-body">
-            <p class="muted">
-              {formatMoney(bookingService.priceAmount, bookingService.currency)} · {bookingService.durationMin} мин
-            </p>
-
-            <label class="field">
-              <span>Свободный слот</span>
-              {#if isLoadingSlots}
-                <p class="muted">Загрузка…</p>
-              {:else if bookingSlots.length === 0}
-                <p class="muted">У ментора пока нет свободных слотов.</p>
-              {:else}
-                <select bind:value={bookingSelectedSlotId} class="input">
-                  <option value={null} disabled>Выберите слот</option>
-                  {#each bookingSlots as slot}
-                    <option value={slot.id}>{formatSlotLabel(slot)}</option>
-                  {/each}
-                </select>
-              {/if}
-            </label>
-
-            <label class="field">
-              <span>Цель встречи</span>
-              <textarea
-                class="input"
-                rows="2"
-                bind:value={bookingGoal}
-                placeholder="Что хотите получить от сессии"
-              ></textarea>
-            </label>
-
-            <label class="field">
-              <span>Мотивация</span>
-              <textarea
-                class="input"
-                rows="3"
-                bind:value={bookingMotivation}
-                placeholder="Коротко о вашем контексте"
-              ></textarea>
-            </label>
-
-            {#if bookingError}
-              <p class="booking-error">{bookingError}</p>
-            {/if}
-          </div>
-
-          <footer class="booking-modal-footer">
-            <button class="btn btn-ghost" on:click={closeBooking} disabled={isHolding}>Отмена</button>
-            <button
-              class="btn btn-primary"
-              on:click={submitBooking}
-              disabled={isHolding || !bookingSelectedSlotId}
-            >
-              {isHolding ? 'Резервирование…' : 'Зарезервировать и перейти к оплате'}
-            </button>
-          </footer>
-        </div>
-      </div>
-    {/if}
   {/if}
 </div>
 
@@ -539,16 +502,12 @@
 
   h1,
   h2,
-  h3,
-  h4,
   p {
     margin: 0;
   }
 
   h1,
-  h2,
-  h3,
-  h4 {
+  h2 {
     color: var(--ink);
     font-family: var(--font-body);
     line-height: 1.15;
@@ -562,19 +521,6 @@
   h2 {
     font-size: 1.5rem;
     font-weight: 800;
-  }
-
-  h3 {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 1.05rem;
-    font-weight: 700;
-  }
-
-  h3 :global(svg),
-  .section-title :global(svg) {
-    color: var(--accent);
   }
 
   .verified-badge {
@@ -596,7 +542,6 @@
 
   .mentor-main,
   .mentor-sidebar,
-  .side-list,
   .review-list,
   .achievement-list {
     display: flex;
@@ -746,8 +691,7 @@
   }
 
   .achievement-list,
-  .review-list,
-  .side-list {
+  .review-list {
     gap: 12px;
   }
 
@@ -808,126 +752,137 @@
     gap: 4px;
   }
 
-  .sidebar-card {
-    padding: 22px;
+  /* ── Booking card (sidebar) ── */
+  .booking-card {
+    padding: 20px;
+    position: sticky;
+    top: 24px;
   }
 
-  .offer-card {
-    background: var(--bg-alt);
-    border-radius: var(--radius-md);
-    padding: 18px;
-  }
-
-  .offer-card h4 {
-    color: var(--accent);
-    font-size: 0.98rem;
-    margin-bottom: 12px;
-  }
-
-  .offer-grid {
+  .tab-row {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-
-  .offer-grid span {
-    min-height: 44px;
-    border-radius: var(--radius-md);
-    background: var(--surface);
-    color: var(--accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 10px;
-    font-weight: 800;
-    text-align: center;
-  }
-
-  .offer-card ul {
-    margin: 14px 0 0;
-    padding-left: 18px;
-    color: var(--accent);
-    font-weight: 700;
-  }
-
-  .service-offer h4 {
-    line-height: 1.35;
-  }
-
-  .btn-block {
-    margin-top: 14px;
-    width: 100%;
-  }
-
-  .booking-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.55);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    z-index: 50;
-  }
-
-  .booking-modal {
-    width: 100%;
-    max-width: 480px;
-    background: var(--surface);
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    display: flex;
-    flex-direction: column;
-    max-height: 90vh;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: 16px;
   }
 
-  .booking-modal-header {
+  .tab-btn {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 18px 22px;
-    border-bottom: 1px solid var(--border);
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--muted);
+    transition: all 0.15s ease;
   }
 
-  .booking-modal-header h3 {
-    font-size: 1.1rem;
+  .tab-btn:hover {
+    color: var(--accent);
+    background: var(--accent-muted);
   }
 
-  .booking-modal-body {
-    padding: 22px;
+  .tab-btn.tab-active {
+    color: var(--accent);
+    background: var(--accent-muted);
+  }
+
+  .option-list {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    overflow-y: auto;
+    gap: 8px;
+    margin-bottom: 14px;
   }
 
-  .booking-modal-body .field {
+  .option-card {
+    width: 100%;
+    text-align: left;
+    background: var(--bg-alt);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: all 0.15s ease;
     display: flex;
     flex-direction: column;
     gap: 6px;
   }
 
-  .booking-modal-body .field span {
-    color: var(--muted);
+  .option-card:hover {
+    border-color: var(--accent);
+  }
+
+  .option-card.option-selected {
+    border-color: var(--accent);
+    background: var(--accent-muted);
+  }
+
+  .option-title {
+    font-weight: 700;
     font-size: 0.9rem;
+    color: var(--ink);
+    line-height: 1.3;
   }
 
-  .booking-modal-footer {
+  .option-meta {
     display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-    padding: 16px 22px;
-    border-top: 1px solid var(--border);
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
   }
 
-  .booking-error {
-    color: var(--status-warning-ink);
-    margin: 0;
+  .option-price {
+    font-weight: 800;
+    font-size: 1rem;
+    color: var(--accent);
   }
 
-  .muted {
+  .option-dur {
+    font-size: 0.82rem;
     color: var(--muted);
-    margin: 0;
+  }
+
+  .plan-features {
+    margin: 4px 0 0;
+    padding-left: 16px;
+    font-size: 0.8rem;
+    color: var(--ink-secondary);
+    line-height: 1.5;
+  }
+
+  .slot-hint {
+    font-size: 0.82rem;
+    color: var(--accent);
+    margin: 0 0 14px;
+    font-weight: 500;
+  }
+
+  .slot-hint-none {
+    color: var(--muted);
+  }
+
+  .cta-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .hold-notice {
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  .tab-empty {
+    margin-top: 8px;
+    font-size: 0.9rem;
   }
 
   .empty-state {
@@ -947,6 +902,10 @@
     .chip-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    .booking-card {
+      position: static;
+    }
   }
 
   @media (max-width: 560px) {
@@ -961,8 +920,7 @@
       align-items: flex-start;
     }
 
-    .chip-grid,
-    .offer-grid {
+    .chip-grid {
       grid-template-columns: minmax(0, 1fr);
     }
 
