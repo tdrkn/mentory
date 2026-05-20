@@ -214,6 +214,7 @@ export class DiscoveryService {
       select: {
         id: true,
         fullName: true,
+        avatarUrl: true,
         timezone: true,
         createdAt: true,
         mentorProfile: {
@@ -221,9 +222,12 @@ export class DiscoveryService {
             headline: true,
             bio: true,
             education: true,
+            position: true,
             workplace: true,
+            activityFields: true,
             goals: true,
             hobbies: true,
+            skills: true,
             languages: true,
             ratingAvg: true,
             ratingCount: true,
@@ -231,6 +235,17 @@ export class DiscoveryService {
               select: { topic: true },
             },
           },
+        },
+        regaliaUploaded: {
+          where: { status: 'approved' },
+          select: {
+            id: true,
+            title: true,
+            fileName: true,
+            fileUrl: true,
+            status: true,
+          },
+          orderBy: { createdAt: 'desc' },
         },
         mentorServices: {
           where: { isActive: true },
@@ -241,6 +256,23 @@ export class DiscoveryService {
             priceAmount: true,
             currency: true,
           },
+        },
+        mentorPlans: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            kind: true,
+            priceAmount: true,
+            currency: true,
+            billingIntervalMonths: true,
+            callsPerMonth: true,
+            sessionDurationMin: true,
+            responseTimeHours: true,
+            includesUnlimitedChat: true,
+          },
+          orderBy: { createdAt: 'desc' },
         },
         _count: {
           select: { sessionsAsMentor: { where: { status: 'completed' } } },
@@ -263,6 +295,9 @@ export class DiscoveryService {
   }
 
   async getMentorReviews(mentorId: string, page = 1, limit = 10) {
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(50, Math.max(1, Number(limit) || 10));
+
     const [reviews, total] = await Promise.all([
       this.prisma.review.findMany({
         where: { mentorId },
@@ -272,15 +307,15 @@ export class DiscoveryService {
           },
         },
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
+        skip: (safePage - 1) * safeLimit,
+        take: safeLimit,
       }),
       this.prisma.review.count({ where: { mentorId } }),
     ]);
 
     return {
       data: reviews,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      meta: { total, page: safePage, limit: safeLimit, totalPages: Math.ceil(total / safeLimit) },
     };
   }
 

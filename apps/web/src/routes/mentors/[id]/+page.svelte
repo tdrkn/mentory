@@ -1,30 +1,47 @@
 <script lang="ts">
   import AppHeader from '$lib/components/AppHeader.svelte';
   import Loading from '$lib/components/Loading.svelte';
-  import { api, ApiError } from '$lib/api';
+  import { api } from '$lib/api';
+  import { getApiUrl } from '$lib/env';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { user } from '$lib/stores/auth';
-  import { goto } from '$app/navigation';
-  import { Star, Clock, Users, Globe, CheckCircle2, Calendar, ArrowLeft, MessageCircle, Video, ChevronRight } from 'lucide-svelte';
+  import {
+    BriefcaseBusiness,
+    Calendar,
+    CheckCircle2,
+    MessageCircle,
+    Star,
+    Users,
+  } from 'lucide-svelte';
 
   interface MentorDetail {
     id: string;
     fullName: string;
+    avatarUrl?: string | null;
     timezone: string;
     createdAt: string;
     mentorProfile: {
-      headline: string;
-      bio: string;
+      headline?: string | null;
+      bio?: string | null;
       education?: string | null;
+      position?: string | null;
       workplace?: string | null;
-      goals?: string[];
+      activityFields?: string[];
       hobbies?: string[];
+      skills?: string[];
       languages: string[];
       ratingAvg: string;
       ratingCount: number;
-      topics: { topic: { id: string; name: string } }[];
+      topics?: { topic: { id: string; name: string } }[];
     };
+    regaliaUploaded?: {
+      id: string;
+      title?: string | null;
+      fileName: string;
+      fileUrl: string;
+      status: string;
+    }[];
     mentorServices: {
       id: string;
       title: string;
@@ -32,37 +49,94 @@
       priceAmount: string;
       currency: string;
     }[];
+    mentorPlans?: {
+      id: string;
+      title: string;
+      description?: string | null;
+      kind: string;
+      priceAmount: string;
+      currency: string;
+      billingIntervalMonths: number;
+      callsPerMonth?: number | null;
+      sessionDurationMin?: number | null;
+      responseTimeHours?: number | null;
+      includesUnlimitedChat: boolean;
+    }[];
     _count: { sessionsAsMentor: number };
   }
 
-  interface Slot {
+  interface ReviewItem {
     id: string;
-    startAt: string;
-    endAt: string;
-    status: string;
+    rating: number;
+    text?: string | null;
+    mentee?: { fullName: string };
   }
 
   let mentor: MentorDetail | null = null;
-  let slots: Slot[] = [];
-  let selectedSlot: string | null = null;
-  let selectedService: string | null = null;
-  let requestGoal = '';
-  let requestMotivation = '';
+  let reviews: ReviewItem[] = [];
   let isLoading = true;
-  let isBooking = false;
   let error: string | null = null;
+
+  $: isOwnProfile = !!mentor && $user?.id === mentor.id;
+
+  const resolveFileUrl = (value?: string | null) => {
+    if (!value) return '';
+    if (value.startsWith('http') || value.startsWith('data:')) return value;
+    return `${getApiUrl()}${value}`;
+  };
+
+  const formatMoney = (amount: string | number, currency: string) => {
+    const value = Number(amount);
+    if (!Number.isFinite(value)) return `${amount} ${currency}`;
+    return `${value.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ${currency}`;
+  };
+
+  const normalizeRating = (value?: string | number | null) => {
+    const numeric = Number(value || 0);
+    return numeric > 0 ? numeric.toFixed(1) : '0.0';
+  };
+
+  const planFacts = (plan: MentorDetail['mentorPlans'][number]) => {
+    const facts = [
+      `${Math.max(1, plan.billingIntervalMonths || 1) * 30} дней`,
+      plan.callsPerMonth ? `${plan.callsPerMonth} сессии` : null,
+      plan.sessionDurationMin ? `${plan.sessionDurationMin} мин` : null,
+    ].filter(Boolean) as string[];
+
+    return facts;
+  };
+
+  const planFeatures = (plan: MentorDetail['mentorPlans'][number]) => {
+    const explicit = (plan.description || '')
+      .split('\n')
+      .map((item) => item.replace(/^[-•]\s*/, '').trim())
+      .filter(Boolean);
+
+    if (explicit.length > 0) return explicit;
+
+    return [
+      plan.includesUnlimitedChat ? 'Поддержка в чате' : null,
+      plan.callsPerMonth ? `${plan.callsPerMonth} созвона с ментором` : null,
+      plan.responseTimeHours ? `Ответ до ${plan.responseTimeHours} ч` : null,
+      'Видео-встречи',
+    ].filter(Boolean) as string[];
+  };
+
+  const activityItems = (profile: MentorDetail['mentorProfile']) => {
+    if (profile.activityFields?.length) return profile.activityFields;
+    return profile.topics?.map((item) => item.topic.name) || [];
+  };
 
   const loadMentor = async (id: string) => {
     try {
       const mentorData = await api.get<MentorDetail>(`/mentors/${id}`);
       mentor = mentorData;
-      selectedService = mentorData.mentorServices?.[0]?.id || null;
 
       try {
-        const slotsResponse = await api.get<{ slots: Slot[] }>(`/scheduling/mentors/${id}/slots`);
-        slots = (slotsResponse.slots || []).filter((s) => s.status === 'free');
+        const reviewData = await api.get<{ data: ReviewItem[] }>(`/mentors/${id}/reviews?limit=3`);
+        reviews = reviewData.data || [];
       } catch {
-        slots = [];
+        reviews = [];
       }
     } catch {
       error = 'Не удалось загрузить профиль ментора';
@@ -74,59 +148,6 @@
   onMount(() => {
     loadMentor($page.params.id);
   });
-
-  const groupedSlots = () => {
-    const map: Record<string, Slot[]> = {};
-    slots.forEach((slot) => {
-      const date = new Date(slot.startAt).toLocaleDateString('ru-RU', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-      });
-      if (!map[date]) map[date] = [];
-      map[date].push(slot);
-    });
-    return map;
-  };
-
-  const handleHold = async () => {
-    if (!selectedSlot || !selectedService) return;
-
-    if (!$user) {
-      goto(`/login?redirect=/mentors/${$page.params.id}`);
-      return;
-    }
-
-    isBooking = true;
-    error = null;
-
-    try {
-      const result = await api.post<{ session: { id: string } }>('/booking/hold', {
-        slotId: selectedSlot,
-        serviceId: selectedService,
-        requestGoal: requestGoal.trim() || undefined,
-        requestMotivation: requestMotivation.trim() || undefined,
-      });
-      goto(`/checkout/${result.session.id}`);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        error = 'Этот слот уже занят. Выберите другое время.';
-      } else {
-        error = 'Не удалось забронировать слот.';
-      }
-      selectedSlot = null;
-      try {
-        const slotsResponse = await api.get<{ slots: Slot[] }>(`/scheduling/mentors/${$page.params.id}/slots`);
-        slots = (slotsResponse.slots || []).filter((s) => s.status === 'free');
-      } catch {
-        slots = [];
-      }
-    } finally {
-      isBooking = false;
-    }
-  };
-
-  $: selectedServiceData = mentor?.mentorServices?.find(s => s.id === selectedService);
 </script>
 
 <div class="page">
@@ -135,217 +156,204 @@
   {#if isLoading}
     <Loading />
   {:else if error && !mentor}
-    <main class="container section">
-      <div class="error-state card">
-        <h2>Ментор не найден</h2>
-        <p class="muted">{error || 'Проверьте ссылку.'}</p>
-        <a class="btn btn-outline" href="/mentors">
-          <ArrowLeft size={16} /> Вернуться к каталогу
-        </a>
-      </div>
+    <main class="mentor-view-shell">
+      <section class="profile-card empty-state">
+        <h1>Ментор не найден</h1>
+        <p>{error}</p>
+        <a class="btn btn-outline" href="/mentors">Вернуться к каталогу</a>
+      </section>
     </main>
   {:else if mentor}
-    <main class="container section">
-      <!-- Back link -->
-      <a class="back-link" href="/mentors">
-        <ArrowLeft size={16} /> Все менторы
-      </a>
+    <main class="mentor-view-shell">
+      <div class="mentor-view-header">
+        <div class="title-row">
+          <h1>Просмотр профиля</h1>
+          <span class="verified-badge">Профиль верифицирован</span>
+        </div>
+        {#if isOwnProfile}
+          <a class="btn btn-primary" href="/profile/edit">Редактировать</a>
+        {/if}
+      </div>
 
-      <div class="mentor-layout">
-        <!-- Main content -->
+      <div class="mentor-grid">
         <div class="mentor-main">
-          <!-- Profile header -->
-          <div class="profile-header card">
-            <div class="profile-avatar">
-              {mentor.fullName.charAt(0)}
+          <section class="profile-card hero-card">
+            <div class="avatar">
+              {#if mentor.avatarUrl}
+                <img src={resolveFileUrl(mentor.avatarUrl)} alt="Фото ментора" />
+              {:else}
+                <span>{mentor.fullName.slice(0, 1)}</span>
+              {/if}
             </div>
-            <div class="profile-info">
-              <h1 class="profile-name">{mentor.fullName}</h1>
-              <p class="profile-headline">{mentor.mentorProfile?.headline || 'Эксперт'}</p>
-              
-              <div class="profile-stats">
-                <div class="profile-stat">
-                  <Star size={16} fill="currentColor" class="star-icon" />
-                  <span class="stat-value">{mentor.mentorProfile?.ratingAvg || '0'}</span>
-                  <span class="muted">({mentor.mentorProfile?.ratingCount || 0} отзывов)</span>
-                </div>
-                <div class="profile-stat">
+            <div class="hero-info">
+              <h2>{mentor.fullName}</h2>
+              <p>Ментор</p>
+              <div class="hero-stats">
+                <span class="rating">
+                  <Star size={16} fill="currentColor" />
+                  <strong>{normalizeRating(mentor.mentorProfile?.ratingAvg)}</strong>
+                  <span>({mentor.mentorProfile?.ratingCount || 0} отзывов)</span>
+                </span>
+                <span>
                   <Users size={16} />
-                  <span>{mentor._count?.sessionsAsMentor || 0} сессий</span>
-                </div>
-                {#if mentor.mentorProfile?.languages?.length}
-                  <div class="profile-stat">
-                    <Globe size={16} />
-                    <span>{mentor.mentorProfile.languages.join(', ')}</span>
+                  {mentor._count?.sessionsAsMentor || 0} сессии
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <section class="profile-card">
+            <h2 class="section-title">
+              <MessageCircle size={20} />
+              О себе
+            </h2>
+            <p class="plain-text">{mentor.mentorProfile?.bio || 'Описание пока не добавлено.'}</p>
+          </section>
+
+          <section class="profile-card career-card">
+            <h2>Карьера</h2>
+            <div class="career-list">
+              <div>
+                <span>Образование</span>
+                <strong>{mentor.mentorProfile?.education || 'Не указано'}</strong>
+              </div>
+              <div>
+                <span>Должность</span>
+                <strong>{mentor.mentorProfile?.position || 'Не указано'}</strong>
+              </div>
+              <div>
+                <span>Место работы</span>
+                <strong>{mentor.mentorProfile?.workplace || 'Не указано'}</strong>
+              </div>
+              <div>
+                <span>Сфера деятельности</span>
+                {#if activityItems(mentor.mentorProfile).length}
+                  <div class="chip-row">
+                    {#each activityItems(mentor.mentorProfile) as item}
+                      <span class="outline-chip">{item}</span>
+                    {/each}
                   </div>
+                {:else}
+                  <strong>Не указано</strong>
                 {/if}
               </div>
             </div>
-          </div>
+          </section>
 
-          <!-- Bio -->
-          <div class="card">
-            <h2 class="card-title">
-              <MessageCircle size={20} /> О менторе
-            </h2>
-            <p class="bio-text">{mentor.mentorProfile?.bio || 'Описание не указано.'}</p>
-          </div>
-
-          <div class="card">
-            <h2 class="card-title">Профиль ментора</h2>
-            <div class="stack" style="gap:10px;">
-              <div>
-                <div class="muted">Место работы</div>
-                <div>{mentor.mentorProfile?.workplace || 'Не указано'}</div>
-              </div>
-              <div>
-                <div class="muted">Образование</div>
-                <div>{mentor.mentorProfile?.education || 'Не указано'}</div>
-              </div>
-              <div>
-                <div class="muted">Хобби</div>
-                <div>
-                  {#if mentor.mentorProfile?.hobbies?.length}
-                    {mentor.mentorProfile.hobbies.join(', ')}
-                  {:else}
-                    Не указано
-                  {/if}
-                </div>
-              </div>
-              <div>
-                <div class="muted">Цели</div>
-                <div>
-                  {#if mentor.mentorProfile?.goals?.length}
-                    {mentor.mentorProfile.goals.join(', ')}
-                  {:else}
-                    Не указано
-                  {/if}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Topics -->
-          {#if mentor.mentorProfile?.topics?.length}
-            <div class="card">
-              <h2 class="card-title">
-                <CheckCircle2 size={20} /> Экспертиза
-              </h2>
-              <div class="topics-grid">
-                {#each mentor.mentorProfile.topics as topic}
-                  <span class="topic-badge">
-                    <CheckCircle2 size={14} /> {topic.topic.name}
-                  </span>
+          <section class="profile-card">
+            <h2>Навыки</h2>
+            {#if mentor.mentorProfile?.skills?.length}
+              <div class="chip-grid">
+                {#each mentor.mentorProfile.skills as skill}
+                  <span class="outline-chip">{skill}</span>
                 {/each}
-              </div>
-            </div>
-          {/if}
-
-          <!-- Services -->
-          {#if mentor.mentorServices?.length}
-            <div class="card">
-              <h2 class="card-title">
-                <Video size={20} /> Услуги
-              </h2>
-              <div class="services-list">
-                {#each mentor.mentorServices as service}
-                  <button
-                    class="service-card {selectedService === service.id ? 'selected' : ''}"
-                    on:click={() => (selectedService = service.id)}
-                  >
-                    <div class="service-info">
-                      <div class="service-name">{service.title}</div>
-                      <div class="service-duration">
-                        <Clock size={14} /> {service.durationMin} минут
-                      </div>
-                    </div>
-                    <div class="service-price">
-                      {service.priceAmount} {service.currency}
-                    </div>
-                    {#if selectedService === service.id}
-                      <div class="service-check">
-                        <CheckCircle2 size={18} />
-                      </div>
-                    {/if}
-                  </button>
-                {/each}
-              </div>
-            </div>
-          {/if}
-        </div>
-
-        <!-- Sidebar - Booking -->
-        <aside class="booking-sidebar">
-          <div class="booking-card card">
-            <div class="booking-header">
-              <Calendar size={20} />
-              <h3>Забронировать сессию</h3>
-            </div>
-
-            {#if selectedServiceData}
-              <div class="booking-service">
-                <span>{selectedServiceData.title}</span>
-                <span class="booking-price">{selectedServiceData.priceAmount} {selectedServiceData.currency}</span>
-              </div>
-            {/if}
-
-            {#if error}
-              <div class="alert alert-error">{error}</div>
-            {/if}
-
-            <label style="display:block;margin:12px 0;">
-              <div class="muted" style="margin-bottom:4px;">Цель встречи</div>
-              <input class="input" bind:value={requestGoal} maxlength="500" placeholder="Например: подготовиться к system design" />
-            </label>
-
-            <label style="display:block;margin-bottom:12px;">
-              <div class="muted" style="margin-bottom:4px;">Мотивация</div>
-              <textarea class="textarea" bind:value={requestMotivation} maxlength="2000" rows="4" placeholder="Коротко опишите контекст и ожидания от ментора"></textarea>
-            </label>
-
-            {#if Object.keys(groupedSlots()).length === 0}
-              <div class="no-slots">
-                <Calendar size={32} />
-                <p>Нет доступных слотов</p>
-                <span class="muted">Ментор пока не добавил расписание</span>
               </div>
             {:else}
-              <div class="slots-container">
-                {#each Object.entries(groupedSlots()) as [date, dateSlots]}
-                  <div class="slots-day">
-                    <div class="slots-date">{date}</div>
-                    <div class="slots-grid">
-                      {#each dateSlots as slot}
-                        {@const time = new Date(slot.startAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-                        <button
-                          class="slot-btn {selectedSlot === slot.id ? 'selected' : ''}"
-                          on:click={() => (selectedSlot = slot.id)}
-                        >
-                          {time}
-                        </button>
-                      {/each}
+              <p class="plain-text">Навыки пока не добавлены.</p>
+            {/if}
+          </section>
+
+          <section class="profile-card">
+            <h2>Хобби</h2>
+            {#if mentor.mentorProfile?.hobbies?.length}
+              <div class="chip-grid">
+                {#each mentor.mentorProfile.hobbies as hobby}
+                  <span class="outline-chip">{hobby}</span>
+                {/each}
+              </div>
+            {:else}
+              <p class="plain-text">Хобби пока не добавлены.</p>
+            {/if}
+          </section>
+
+          <section class="profile-card">
+            <h2>Достижения</h2>
+            {#if mentor.regaliaUploaded?.length}
+              <div class="achievement-list">
+                {#each mentor.regaliaUploaded as item}
+                  <a class="achievement-item" href={resolveFileUrl(item.fileUrl)} target="_blank" rel="noreferrer">
+                    <span>{item.title || item.fileName}</span>
+                    <CheckCircle2 size={18} />
+                  </a>
+                {/each}
+              </div>
+            {:else}
+              <p class="plain-text">Достижения пока не добавлены.</p>
+            {/if}
+          </section>
+
+          <section class="profile-card reviews-card">
+            <h2>Отзывы</h2>
+            {#if reviews.length}
+              <div class="review-list">
+                {#each reviews as review}
+                  <div class="review-item">
+                    <div class="review-avatar">{review.mentee?.fullName?.slice(0, 1) || 'M'}</div>
+                    <p>{review.text || 'Отзыв без текста.'}</p>
+                    <div class="review-rating">
+                      <strong>{normalizeRating(review.rating)}</strong>
+                      <Star size={16} fill="currentColor" />
                     </div>
                   </div>
                 {/each}
               </div>
+            {:else}
+              <p class="plain-text">Отзывы появятся после завершенных сессий.</p>
             {/if}
+          </section>
+        </div>
 
-            <button 
-              class="btn btn-primary btn-lg booking-btn" 
-              on:click={handleHold} 
-              disabled={!selectedSlot || isBooking || !selectedService}
-            >
-              {#if isBooking}
-                Бронирование...
-              {:else}
-                Забронировать <ChevronRight size={18} />
-              {/if}
-            </button>
+        <aside class="mentor-sidebar">
+          <section class="profile-card sidebar-card">
+            <h3>
+              <Calendar size={18} />
+              Планы подписки
+            </h3>
+            {#if mentor.mentorPlans?.length}
+              <div class="side-list">
+                {#each mentor.mentorPlans as plan}
+                  <article class="offer-card">
+                    <h4>{plan.title}</h4>
+                    <div class="offer-grid">
+                      <span>{formatMoney(plan.priceAmount, plan.currency)}</span>
+                      {#each planFacts(plan) as fact}
+                        <span>{fact}</span>
+                      {/each}
+                    </div>
+                    <ul>
+                      {#each planFeatures(plan) as feature}
+                        <li>{feature}</li>
+                      {/each}
+                    </ul>
+                  </article>
+                {/each}
+              </div>
+            {:else}
+              <p class="plain-text">Планы пока не добавлены.</p>
+            {/if}
+          </section>
 
-            <p class="booking-note muted">
-              Слот удерживается на 10 минут для оплаты
-            </p>
-          </div>
+          <section class="profile-card sidebar-card">
+            <h3>
+              <BriefcaseBusiness size={18} />
+              Разовые сессии и услуги
+            </h3>
+            {#if mentor.mentorServices?.length}
+              <div class="side-list">
+                {#each mentor.mentorServices as service}
+                  <article class="offer-card service-offer">
+                    <h4>{service.title}</h4>
+                    <div class="offer-grid">
+                      <span>{formatMoney(service.priceAmount, service.currency)}</span>
+                      <span>{service.durationMin} мин</span>
+                    </div>
+                  </article>
+                {/each}
+              </div>
+            {:else}
+              <p class="plain-text">Услуги пока не добавлены.</p>
+            {/if}
+          </section>
         </aside>
       </div>
     </main>
@@ -353,345 +361,385 @@
 </div>
 
 <style>
-  .back-link {
-    display: inline-flex;
+  .mentor-view-shell {
+    width: 100%;
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 60px 20px 120px;
+  }
+
+  .mentor-view-header,
+  .title-row {
+    display: flex;
     align-items: center;
-    gap: 6px;
-    color: var(--muted);
-    font-size: 0.9rem;
-    margin-bottom: 24px;
-    transition: color 0.2s ease;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
   }
 
-  .back-link:hover {
+  .title-row {
+    justify-content: flex-start;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  p {
+    margin: 0;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
     color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.15;
   }
 
-  .mentor-layout {
+  h1 {
+    font-size: 1.75rem;
+    font-weight: 800;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 800;
+  }
+
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  h3 :global(svg),
+  .section-title :global(svg) {
+    color: var(--accent);
+  }
+
+  .verified-badge {
+    border: 1px solid var(--status-success-border);
+    color: var(--status-success-ink);
+    background: var(--surface);
+    border-radius: var(--radius-md);
+    padding: 12px 18px;
+    font-weight: 600;
+  }
+
+  .mentor-grid {
     display: grid;
-    grid-template-columns: 1fr 380px;
-    gap: 32px;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 28px;
+    margin-top: 24px;
     align-items: start;
   }
 
-  .mentor-main {
+  .mentor-main,
+  .mentor-sidebar,
+  .side-list,
+  .review-list,
+  .achievement-list {
     display: flex;
     flex-direction: column;
-    gap: 24px;
   }
 
-  .profile-header {
-    display: flex;
-    gap: 24px;
-    align-items: flex-start;
+  .mentor-main,
+  .mentor-sidebar {
+    gap: 20px;
+    min-width: 0;
   }
 
-  .profile-avatar {
-    width: 100px;
-    height: 100px;
-    border-radius: 20px;
-    background: linear-gradient(135deg, var(--accent) 0%, var(--violet) 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 2.5rem;
-    color: var(--on-accent);
-    font-family: var(--font-display);
-    flex-shrink: 0;
-  }
-
-  .profile-info {
-    flex: 1;
-  }
-
-  .profile-name {
-    font-size: 1.75rem;
-    margin-bottom: 4px;
-  }
-
-  .profile-headline {
-    color: var(--ink-secondary);
-    font-size: 1.1rem;
-    margin-bottom: 16px;
-  }
-
-  .profile-stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-  }
-
-  .profile-stat {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.9rem;
-    color: var(--ink-secondary);
-  }
-
-  .profile-stat :global(.star-icon) {
-    color: var(--amber);
-  }
-
-  .stat-value {
-    font-weight: 600;
-    color: var(--ink);
-  }
-
-  .card-title {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 1.1rem;
-    margin-bottom: 16px;
-    color: var(--ink);
-  }
-
-  .card-title :global(svg) {
-    color: var(--accent);
-  }
-
-  .bio-text {
-    color: var(--ink-secondary);
-    line-height: 1.7;
-    white-space: pre-line;
-  }
-
-  .topics-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
-  .topic-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    background: var(--accent-muted);
-    color: var(--accent);
-    border-radius: 999px;
-    font-size: 0.875rem;
-    font-weight: 500;
-  }
-
-  .services-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .service-card {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px 20px;
-    background: var(--bg-alt);
-    border: 2px solid transparent;
+  .profile-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    text-align: left;
-    width: 100%;
-  }
-
-  .service-card:hover {
-    border-color: var(--border);
-  }
-
-  .service-card.selected {
-    background: var(--accent-muted);
-    border-color: var(--accent);
-  }
-
-  .service-info {
-    flex: 1;
-  }
-
-  .service-name {
-    font-weight: 600;
-    margin-bottom: 4px;
-  }
-
-  .service-duration {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--muted);
-    font-size: 0.875rem;
-  }
-
-  .service-price {
-    font-weight: 700;
-    font-size: 1.1rem;
-    color: var(--accent);
-  }
-
-  .service-check {
-    color: var(--accent);
-  }
-
-  /* Booking sidebar */
-  .booking-sidebar {
-    position: sticky;
-    top: 100px;
-  }
-
-  .booking-card {
     padding: 24px;
   }
 
-  .booking-header {
+  .hero-card {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 20px;
+    gap: 24px;
+    min-height: 132px;
   }
 
-  .booking-header :global(svg) {
+  .avatar {
+    width: 82px;
+    height: 82px;
+    flex: 0 0 82px;
+    border: 2px solid var(--accent);
+    border-radius: 18px;
+    overflow: hidden;
+    background: var(--accent-soft);
     color: var(--accent);
-  }
-
-  .booking-header h3 {
-    margin: 0;
-    font-size: 1.1rem;
-  }
-
-  .booking-service {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
-    background: var(--bg-alt);
-    border-radius: var(--radius-md);
-    margin-bottom: 16px;
-    font-size: 0.9rem;
+    justify-content: center;
+    font-size: 2.4rem;
+    font-weight: 800;
   }
 
-  .booking-price {
-    font-weight: 700;
-    color: var(--accent);
+  .avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
-  .no-slots {
-    text-align: center;
-    padding: 32px 16px;
+  .hero-info {
+    min-width: 0;
+  }
+
+  .hero-info h2 {
+    font-size: 1.8rem;
+    margin-bottom: 6px;
+  }
+
+  .hero-info p,
+  .plain-text,
+  .career-list span {
     color: var(--muted);
   }
 
-  .no-slots :global(svg) {
-    margin-bottom: 12px;
-    opacity: 0.5;
+  .hero-stats {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 10px;
   }
 
-  .no-slots p {
-    font-weight: 600;
+  .hero-stats span,
+  .rating {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     color: var(--ink-secondary);
+  }
+
+  .rating :global(svg),
+  .review-rating :global(svg) {
+    color: var(--amber);
+  }
+
+  .rating strong,
+  .review-rating strong {
+    color: var(--ink);
+    font-size: 1.45rem;
+    line-height: 1;
+  }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .plain-text {
+    margin-top: 12px;
+    line-height: 1.55;
+  }
+
+  .career-card h2,
+  .profile-card > h2 {
+    margin-bottom: 18px;
+  }
+
+  .career-list {
+    display: grid;
+    gap: 14px;
+  }
+
+  .career-list span {
+    display: block;
     margin-bottom: 4px;
   }
 
-  .slots-container {
-    max-height: 320px;
-    overflow-y: auto;
-    margin-bottom: 20px;
-    padding-right: 8px;
-  }
-
-  .slots-day {
-    margin-bottom: 16px;
-  }
-
-  .slots-day:last-child {
-    margin-bottom: 0;
-  }
-
-  .slots-date {
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: capitalize;
+  .career-list strong {
     color: var(--ink-secondary);
-    margin-bottom: 8px;
+    font-weight: 700;
   }
 
-  .slots-grid {
+  .chip-row,
+  .chip-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .chip-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .slot-btn {
-    padding: 10px 8px;
-    border: 1.5px solid var(--border);
+  .outline-chip {
+    min-height: 42px;
+    border: 1.5px solid var(--accent);
     border-radius: var(--radius-md);
-    background: var(--surface);
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--ink-secondary);
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .slot-btn:hover {
-    border-color: var(--accent);
     color: var(--accent);
-  }
-
-  .slot-btn.selected {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--on-accent);
-  }
-
-  .booking-btn {
-    width: 100%;
+    background: var(--surface);
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
+    padding: 10px 18px;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .achievement-list,
+  .review-list,
+  .side-list {
+    gap: 12px;
+  }
+
+  .achievement-item {
+    min-height: 52px;
+    border: 1.5px solid var(--accent);
+    border-radius: var(--radius-md);
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    font-weight: 700;
+  }
+
+  .achievement-item span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .review-item {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: center;
+    border: 1.5px solid var(--accent);
+    border-radius: var(--radius-md);
+    background: var(--accent-soft);
+    padding: 14px;
+  }
+
+  .review-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+  }
+
+  .review-item p {
+    background: var(--surface);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    color: var(--ink-secondary);
+    line-height: 1.45;
+  }
+
+  .review-rating {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .sidebar-card {
+    padding: 22px;
+  }
+
+  .offer-card {
+    background: var(--bg-alt);
+    border-radius: var(--radius-md);
+    padding: 18px;
+  }
+
+  .offer-card h4 {
+    color: var(--accent);
+    font-size: 0.98rem;
     margin-bottom: 12px;
   }
 
-  .booking-note {
-    text-align: center;
-    font-size: 0.8rem;
+  .offer-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 
-  .error-state {
+  .offer-grid span {
+    min-height: 44px;
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    font-weight: 800;
     text-align: center;
-    padding: 48px 24px;
   }
 
-  .alert {
-    margin-bottom: 16px;
+  .offer-card ul {
+    margin: 14px 0 0;
+    padding-left: 18px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .service-offer h4 {
+    line-height: 1.35;
+  }
+
+  .empty-state {
+    text-align: center;
+  }
+
+  .empty-state p {
+    margin: 12px 0 20px;
+    color: var(--muted);
   }
 
   @media (max-width: 900px) {
-    .mentor-layout {
-      grid-template-columns: 1fr;
+    .mentor-grid {
+      grid-template-columns: minmax(0, 1fr);
     }
 
-    .booking-sidebar {
-      position: static;
-    }
-
-    .profile-header {
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-    }
-
-    .profile-stats {
-      justify-content: center;
+    .chip-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
-  @media (max-width: 480px) {
-    .profile-avatar {
-      width: 80px;
-      height: 80px;
-      font-size: 2rem;
+  @media (max-width: 560px) {
+    .mentor-view-shell {
+      padding: 32px 16px 80px;
     }
 
-    .slots-grid {
-      grid-template-columns: repeat(2, 1fr);
+    .hero-card,
+    .review-item {
+      grid-template-columns: minmax(0, 1fr);
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .chip-grid,
+    .offer-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .hero-info h2 {
+      font-size: 1.45rem;
+    }
+
+    .outline-chip {
+      width: 100%;
     }
   }
 </style>
