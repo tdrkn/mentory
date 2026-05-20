@@ -290,7 +290,7 @@ export class PaymentsService {
     return {
       available,
       pending: Number(pendingPayouts._sum?.amount ?? 0),
-      currency: 'USD',
+      currency: 'RUB',
     };
   }
 

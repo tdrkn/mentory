@@ -231,6 +231,7 @@ export class DiscoveryService {
             languages: true,
             ratingAvg: true,
             ratingCount: true,
+            verificationStatus: true,
             topics: {
               select: { topic: true },
             },

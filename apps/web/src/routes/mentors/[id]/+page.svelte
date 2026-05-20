@@ -5,6 +5,7 @@
   import { getApiUrl } from '$lib/env';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
   import { user } from '$lib/stores/auth';
   import {
     BriefcaseBusiness,
@@ -34,6 +35,7 @@
       ratingAvg: string;
       ratingCount: number;
       topics?: { topic: { id: string; name: string } }[];
+      verificationStatus?: string | null;
     };
     regaliaUploaded?: {
       id: string;
@@ -72,12 +74,30 @@
     mentee?: { fullName: string };
   }
 
+  interface Slot {
+    id: string;
+    startAt: string;
+    endAt: string;
+    status: string;
+  }
+
   let mentor: MentorDetail | null = null;
   let reviews: ReviewItem[] = [];
   let isLoading = true;
   let error: string | null = null;
 
+  let bookingService: MentorDetail['mentorServices'][number] | null = null;
+  let bookingSlots: Slot[] = [];
+  let bookingSelectedSlotId: string | null = null;
+  let bookingGoal = '';
+  let bookingMotivation = '';
+  let bookingError: string | null = null;
+  let isLoadingSlots = false;
+  let isHolding = false;
+
   $: isOwnProfile = !!mentor && $user?.id === mentor.id;
+  $: canBook = !!$user && $user.role !== 'mentor' && !isOwnProfile;
+  $: isVerified = mentor?.mentorProfile?.verificationStatus === 'verified';
 
   const resolveFileUrl = (value?: string | null) => {
     if (!value) return '';
@@ -145,6 +165,67 @@
     }
   };
 
+  const formatSlotLabel = (slot: Slot) => {
+    const start = new Date(slot.startAt);
+    return start.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const openBooking = async (service: MentorDetail['mentorServices'][number]) => {
+    if (!mentor || !canBook) return;
+    bookingService = service;
+    bookingSelectedSlotId = null;
+    bookingGoal = '';
+    bookingMotivation = '';
+    bookingError = null;
+    bookingSlots = [];
+    isLoadingSlots = true;
+    try {
+      const data = await api.get<{ slots: Slot[] }>(`/scheduling/mentors/${mentor.id}/slots`);
+      bookingSlots = (data.slots || []).filter((slot) => slot.status === 'free');
+    } catch {
+      bookingError = 'Не удалось загрузить свободные слоты.';
+    } finally {
+      isLoadingSlots = false;
+    }
+  };
+
+  const closeBooking = () => {
+    bookingService = null;
+    bookingSlots = [];
+    bookingSelectedSlotId = null;
+    bookingError = null;
+  };
+
+  const submitBooking = async () => {
+    if (!bookingService || !bookingSelectedSlotId) {
+      bookingError = 'Выберите слот.';
+      return;
+    }
+    isHolding = true;
+    bookingError = null;
+    try {
+      const result = await api.post<{ session: { id: string } }>('/booking/hold', {
+        slotId: bookingSelectedSlotId,
+        serviceId: bookingService.id,
+        requestGoal: bookingGoal.trim() || undefined,
+        requestMotivation: bookingMotivation.trim() || undefined,
+      });
+      const sessionId = result.session.id;
+      closeBooking();
+      goto(`/checkout/${sessionId}`);
+    } catch (err: any) {
+      bookingError = err?.data?.message || 'Не удалось зарезервировать слот.';
+    } finally {
+      isHolding = false;
+    }
+  };
+
   onMount(() => {
     loadMentor($page.params.id);
   });
@@ -168,7 +249,9 @@
       <div class="mentor-view-header">
         <div class="title-row">
           <h1>Просмотр профиля</h1>
-          <span class="verified-badge">Профиль верифицирован</span>
+          {#if isVerified}
+            <span class="verified-badge">Профиль верифицирован</span>
+          {/if}
         </div>
         {#if isOwnProfile}
           <a class="btn btn-primary" href="/profile/edit">Редактировать</a>
@@ -347,6 +430,11 @@
                       <span>{formatMoney(service.priceAmount, service.currency)}</span>
                       <span>{service.durationMin} мин</span>
                     </div>
+                    {#if canBook}
+                      <button class="btn btn-primary btn-block" on:click={() => openBooking(service)}>
+                        Записаться
+                      </button>
+                    {/if}
                   </article>
                 {/each}
               </div>
@@ -357,6 +445,74 @@
         </aside>
       </div>
     </main>
+
+    {#if bookingService}
+      <div class="booking-overlay" role="dialog" aria-modal="true">
+        <div class="booking-modal">
+          <header class="booking-modal-header">
+            <h3>Записаться на «{bookingService.title}»</h3>
+            <button class="btn btn-ghost" on:click={closeBooking} aria-label="Закрыть">✕</button>
+          </header>
+
+          <div class="booking-modal-body">
+            <p class="muted">
+              {formatMoney(bookingService.priceAmount, bookingService.currency)} · {bookingService.durationMin} мин
+            </p>
+
+            <label class="field">
+              <span>Свободный слот</span>
+              {#if isLoadingSlots}
+                <p class="muted">Загрузка…</p>
+              {:else if bookingSlots.length === 0}
+                <p class="muted">У ментора пока нет свободных слотов.</p>
+              {:else}
+                <select bind:value={bookingSelectedSlotId} class="input">
+                  <option value={null} disabled>Выберите слот</option>
+                  {#each bookingSlots as slot}
+                    <option value={slot.id}>{formatSlotLabel(slot)}</option>
+                  {/each}
+                </select>
+              {/if}
+            </label>
+
+            <label class="field">
+              <span>Цель встречи</span>
+              <textarea
+                class="input"
+                rows="2"
+                bind:value={bookingGoal}
+                placeholder="Что хотите получить от сессии"
+              ></textarea>
+            </label>
+
+            <label class="field">
+              <span>Мотивация</span>
+              <textarea
+                class="input"
+                rows="3"
+                bind:value={bookingMotivation}
+                placeholder="Коротко о вашем контексте"
+              ></textarea>
+            </label>
+
+            {#if bookingError}
+              <p class="booking-error">{bookingError}</p>
+            {/if}
+          </div>
+
+          <footer class="booking-modal-footer">
+            <button class="btn btn-ghost" on:click={closeBooking} disabled={isHolding}>Отмена</button>
+            <button
+              class="btn btn-primary"
+              on:click={submitBooking}
+              disabled={isHolding || !bookingSelectedSlotId}
+            >
+              {isHolding ? 'Резервирование…' : 'Зарезервировать и перейти к оплате'}
+            </button>
+          </footer>
+        </div>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -696,6 +852,82 @@
 
   .service-offer h4 {
     line-height: 1.35;
+  }
+
+  .btn-block {
+    margin-top: 14px;
+    width: 100%;
+  }
+
+  .booking-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 50;
+  }
+
+  .booking-modal {
+    width: 100%;
+    max-width: 480px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+  }
+
+  .booking-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .booking-modal-header h3 {
+    font-size: 1.1rem;
+  }
+
+  .booking-modal-body {
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-y: auto;
+  }
+
+  .booking-modal-body .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .booking-modal-body .field span {
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .booking-modal-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    padding: 16px 22px;
+    border-top: 1px solid var(--border);
+  }
+
+  .booking-error {
+    color: var(--status-warning-ink);
+    margin: 0;
+  }
+
+  .muted {
+    color: var(--muted);
+    margin: 0;
   }
 
   .empty-state {

@@ -50,6 +50,7 @@
   let avatarUrl: string | null = null;
   let avatarInput: HTMLInputElement;
   let achievementInput: HTMLInputElement;
+  let mentorVerificationStatus: string | null = null;
 
   const form = superForm<ProfileForm>(
     {
@@ -81,6 +82,7 @@
   const { form: formData, errors } = form;
   const errorMessage = (err: unknown) => (Array.isArray(err) ? err[0] : err);
   $: isProfileMentor = $isMentor || profileRole === 'mentor' || profileRole === 'both';
+  $: isVerified = isProfileMentor && mentorVerificationStatus === 'verified';
 
   let selectedTopicIds: string[] = [];
   let selectedActivitySearch = '';
@@ -195,6 +197,7 @@
 
     if (profile.role === 'mentor' || profile.role === 'both') {
       const mentorProfile = await api.get<any>('/profile/mentor');
+      mentorVerificationStatus = mentorProfile.verificationStatus ?? null;
       nextForm.age = mentorProfile.age ?? null;
       nextForm.birthDate = formatBirthDate(mentorProfile.birthDate);
       nextForm.education = mentorProfile.education || '';
@@ -422,8 +425,10 @@
       <div class="profile-edit-header">
         <div class="title-row">
           <h1>Редактирование профиля</h1>
-          {#if isProfileMentor}
+          {#if isVerified}
             <span class="verified-badge">Профиль верифицирован</span>
+          {:else if isProfileMentor}
+            <span class="verified-badge verified-badge-pending">На модерации</span>
           {/if}
         </div>
         <button class="btn btn-primary" on:click={saveProfile} disabled={saving}>
@@ -460,6 +465,7 @@
             </label>
           </section>
 
+          {#if isProfileMentor}
           <section class="profile-card">
             <h2>Карьера</h2>
             <label class="field">
@@ -491,9 +497,31 @@
               {/each}
             </div>
           </section>
+          {:else}
+          <section class="profile-card">
+            <h2>Образование и опыт</h2>
+            <label class="field">
+              <span>Образование</span>
+              <input class="input" bind:value={$formData.education} />
+            </label>
+            <label class="field">
+              <span>Место учёбы / работы</span>
+              <input class="input" bind:value={$formData.workplace} />
+            </label>
+            <label class="field">
+              <span>Контекст и цели</span>
+              <textarea
+                class="input"
+                rows="3"
+                bind:value={$formData.background}
+                placeholder="Чему хотите научиться, какой опыт уже есть"
+              ></textarea>
+            </label>
+          </section>
+          {/if}
 
           <section class="profile-card">
-            <h2>Навыки*</h2>
+            <h2>Навыки{isProfileMentor ? '*' : ''}</h2>
             <input class="input" bind:value={skillSearch} placeholder="Найти навык в поиске" />
             <div class="selection-grid">
               {#each filteredSkillOptions as skill}
@@ -683,6 +711,11 @@
     border-radius: var(--radius-md);
     padding: 12px 18px;
     font-weight: 600;
+  }
+
+  .verified-badge-pending {
+    border-color: var(--status-warning-border);
+    color: var(--status-warning-ink);
   }
 
   .notice {

@@ -2,7 +2,6 @@
   import AppHeader from '$lib/components/AppHeader.svelte';
   import Loading from '$lib/components/Loading.svelte';
   import { api } from '$lib/api';
-  import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { user, isAuthenticated, isLoading as authLoading } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
@@ -21,25 +20,28 @@
 
   let sessions: SessionItem[] = [];
   let isLoading = true;
+  let didLoad = false;
   let filter: 'upcoming' | 'past' | 'all' = 'upcoming';
 
   const showSuccess = () => $page.url.searchParams.get('success') === '1';
 
   const loadSessions = async () => {
     isLoading = true;
-    sessions = await api.get<SessionItem[]>('/sessions');
-    isLoading = false;
+    try {
+      sessions = await api.get<SessionItem[]>('/sessions');
+    } finally {
+      isLoading = false;
+    }
   };
 
-  onMount(async () => {
-    if (!$isAuthenticated && !$authLoading) {
+  $: if (!$authLoading) {
+    if (!$isAuthenticated) {
       goto('/login');
-      return;
+    } else if (!didLoad) {
+      didLoad = true;
+      loadSessions();
     }
-    if ($isAuthenticated) {
-      await loadSessions();
-    }
-  });
+  }
 
   const filtered = () => {
     const now = new Date();
