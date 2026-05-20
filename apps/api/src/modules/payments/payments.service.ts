@@ -287,10 +287,25 @@ export class PaymentsService {
       _sum: { amount: true },
     });
 
+    // Completed sessions count
+    const sessionsCount = await this.prisma.session.count({
+      where: { mentorId, status: 'completed' },
+    });
+
+    // Mentor rating
+    const mentorProfile = await this.prisma.mentorProfile.findUnique({
+      where: { userId: mentorId },
+      select: { ratingAvg: true, ratingCount: true },
+    });
+
     return {
+      totalEarned,
       available,
       pending: Number(pendingPayouts._sum?.amount ?? 0),
       currency: 'RUB',
+      sessionsCount,
+      ratingAvg: Number(mentorProfile?.ratingAvg ?? 0),
+      ratingCount: mentorProfile?.ratingCount ?? 0,
     };
   }
 
