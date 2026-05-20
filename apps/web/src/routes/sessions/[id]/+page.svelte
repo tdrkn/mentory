@@ -17,7 +17,7 @@
     mentor: { id: string; fullName: string; email: string };
     mentee: { id: string; fullName: string; email: string };
     service: { id: string; title: string; durationMin: number; priceAmount: string; currency: string };
-    videoRoom?: { joinUrlMentor?: string; joinUrlMentee?: string } | null;
+    videoLink?: string | null;
   }
 
   let session: SessionDetail | null = null;
@@ -33,8 +33,13 @@
   let reviewText = '';
   let showReviewForm = false;
 
+  // Video link
+  let videoLinkInput = '';
+  let isSavingVideoLink = false;
+
   const loadSession = async () => {
     session = await api.get<SessionDetail>(`/sessions/${$page.params.id}`);
+    videoLinkInput = session?.videoLink || '';
   };
 
   const loadNotes = async () => {
@@ -56,11 +61,19 @@
     isSaving = false;
   };
 
-  const handleJoin = async () => {
-    const room = await api.get<{ joinUrlMentor?: string; joinUrlMentee?: string }>(`/sessions/${$page.params.id}/video`);
-    const url = ($isMentor ? room.joinUrlMentor : room.joinUrlMentee) || room.joinUrlMentor || room.joinUrlMentee;
-    if (url) {
-      window.open(url, '_blank');
+  const handleSaveVideoLink = async () => {
+    if (!session) return;
+    isSavingVideoLink = true;
+    try {
+      const result = await api.patch<{ id: string; videoLink: string | null }>(
+        `/sessions/${session.id}/video-link`,
+        { videoLink: videoLinkInput.trim() || null },
+      );
+      if (session) session = { ...session, videoLink: result.videoLink };
+    } catch {
+      // silent — link stays in input
+    } finally {
+      isSavingVideoLink = false;
     }
   };
 
@@ -180,10 +193,61 @@
           </div>
         {/if}
 
-        <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;">
-          {#if session.status === 'booked'}
-            <button class="btn btn-primary" on:click={handleJoin}>Присоединиться</button>
-          {/if}
+        <!-- Video link section -->
+        {#if session.status === 'booked' || session.status === 'completed'}
+          <div style="margin-top:18px;padding:16px;background:var(--bg-alt);border-radius:var(--radius-md);">
+            {#if $isMentor}
+              <div class="muted" style="font-size:0.88rem;margin-bottom:8px;font-weight:600;">
+                Ссылка на встречу
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input
+                  class="input"
+                  style="flex:1;"
+                  bind:value={videoLinkInput}
+                  placeholder="https://meet.google.com/... или zoom.us/..."
+                  on:blur={handleSaveVideoLink}
+                />
+                <button
+                  class="btn btn-outline"
+                  on:click={handleSaveVideoLink}
+                  disabled={isSavingVideoLink}
+                >
+                  {isSavingVideoLink ? '...' : 'Сохранить'}
+                </button>
+              </div>
+              {#if videoLinkInput}
+                <a
+                  href={videoLinkInput}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="btn btn-primary"
+                  style="margin-top:10px;display:inline-flex;"
+                >
+                  Открыть встречу
+                </a>
+              {/if}
+            {:else}
+              {#if session.videoLink}
+                <div class="muted" style="font-size:0.88rem;margin-bottom:8px;">Ссылка на встречу</div>
+                <a
+                  href={session.videoLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="btn btn-primary"
+                >
+                  Присоединиться к встрече
+                </a>
+              {:else}
+                <p class="muted" style="margin:0;font-size:0.9rem;">
+                  Ментор ещё не добавил ссылку на встречу.
+                </p>
+              {/if}
+            {/if}
+          </div>
+        {/if}
+
+        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
           <a class="btn btn-ghost" href={`/chat?session=${session.id}`}>Открыть чат</a>
           {#if $isMentor && session.status === 'booked'}
             <button class="btn btn-outline" on:click={handleCompleteSession} disabled={isCompleting}>

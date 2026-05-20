@@ -4,6 +4,7 @@ import { CurrentUser } from '../auth/decorators';
 import { SessionsService } from './sessions.service';
 import { UpdateSessionNotesDto } from './dto/update-session-notes.dto';
 import { CancelSessionDto } from './dto/cancel-session.dto';
+import { UpdateSessionVideoLinkDto } from './dto/update-session-video-link.dto';
 
 @Controller('sessions')
 @UseGuards(JwtAuthGuard)
@@ -117,5 +118,19 @@ export class SessionsController {
     @Param('id') sessionId: string,
   ) {
     return this.sessionsService.completeSession(userId, sessionId);
+  }
+
+  /**
+   * PATCH /api/sessions/:id/video-link
+   * Set external video link for the session
+   * Access: Mentor only
+   */
+  @Patch(':id/video-link')
+  async updateVideoLink(
+    @CurrentUser('id') userId: string,
+    @Param('id') sessionId: string,
+    @Body() dto: UpdateSessionVideoLinkDto,
+  ) {
+    return this.sessionsService.updateVideoLink(userId, sessionId, dto.videoLink);
   }
 }

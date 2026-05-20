@@ -504,4 +504,22 @@ export class SessionsService {
 
     return review;
   }
+
+  async updateVideoLink(mentorId: string, sessionId: string, videoLink: string | null | undefined) {
+    const session = await this.prisma.session.findFirst({
+      where: { id: sessionId, mentorId },
+      select: { id: true },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Session not found or access denied');
+    }
+
+    const trimmed = videoLink?.trim() || null;
+    return this.prisma.session.update({
+      where: { id: sessionId },
+      data: { videoLink: trimmed },
+      select: { id: true, videoLink: true },
+    });
+  }
 }
