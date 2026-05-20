@@ -209,7 +209,7 @@
 
   const handleSubscribe = () => {
     if (!mentor || !selectedPlanId) return;
-    goto(`/subscriptions/new?planId=${selectedPlanId}`);
+    goto(`/subscriptions/new?planId=${selectedPlanId}&mentorId=${mentor.id}`);
   };
 
   onMount(() => {
