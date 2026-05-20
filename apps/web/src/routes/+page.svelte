@@ -1,7 +1,28 @@
 <script lang="ts">
   import AppHeader from '$lib/components/AppHeader.svelte';
   import BrandLogo from '$lib/components/BrandLogo.svelte';
-  import { Search, CalendarDays, MessageCircle, CheckCircle2, Sparkles, Star, Clock, ArrowUpRight } from 'lucide-svelte';
+  import { Search, CalendarDays, MessageCircle, CheckCircle2, Star, TrendingUp } from 'lucide-svelte';
+
+  const testimonials = [
+    {
+      text: 'За три недели с ментором подготовился к интервью и получил оффер в продуктовую команду уровня Senior.',
+      name: 'Мария К.',
+      role: 'Frontend → Senior, FAANG',
+      initials: 'МК',
+    },
+    {
+      text: 'Настроили регулярные слоты с командой, синхронизировали часовые пояса и убрали хаос в календарях.',
+      name: 'Игорь С.',
+      role: 'Team Lead, FinTech',
+      initials: 'ИС',
+    },
+    {
+      text: 'Ментор помог собрать платёжную воронку и первую сотню пользователей. Сэкономили месяцы экспериментов.',
+      name: 'Алина Р.',
+      role: 'Фаундер, запустила MVP за 6 недель',
+      initials: 'АР',
+    },
+  ];
 </script>
 
 <div class="page">
@@ -86,6 +107,8 @@
 
     <!-- Features -->
     <section class="section">
+      <h2 class="section-title">Возможности платформы</h2>
+      <p class="section-subtitle">Всё необходимое для продуктивной работы с ментором — в одном месте.</p>
       <div class="grid cols-3">
         <div class="feature-card reveal">
           <div class="feature-icon"><Search size="20" /></div>
@@ -133,55 +156,35 @@
       <h2 class="section-title">Истории успеха</h2>
       <p class="section-subtitle">Люди, которые уже выросли с Mentory.</p>
       <div class="grid cols-3">
-        <div class="testimonial-card reveal">
-          <div class="testimonial-content">«За три недели с ментором подготовился к интервью и вышел на оффер в продуктовую команду уровня Senior.»</div>
-          <div class="testimonial-author">
-            <div class="avatar">
-              <img src="https://i.pravatar.cc/80?img=5" alt="avatar" />
+        {#each testimonials as t, i}
+          <div class="testimonial-card reveal {i > 0 ? `reveal-delay-${i}` : ''}">
+            <div class="testimonial-stars">
+              {#each [1,2,3,4,5] as _}
+                <Star size={14} fill="var(--amber)" color="var(--amber)" />
+              {/each}
             </div>
-            <div class="testimonial-author-info">
-              <div class="testimonial-author-name">Мария, Frontend</div>
-              <div class="testimonial-author-role">Перешла в FAANG</div>
-            </div>
-          </div>
-        </div>
-        <div class="testimonial-card reveal reveal-delay-1">
-          <div class="testimonial-content">«Настроили регулярные слоты с командой, синхронизировали часовые пояса и убрали хаос в календарях.»</div>
-          <div class="testimonial-author">
-            <div class="avatar">
-              <img src="https://i.pravatar.cc/80?img=15" alt="avatar" />
-            </div>
-            <div class="testimonial-author-info">
-              <div class="testimonial-author-name">Игорь, Team Lead</div>
-              <div class="testimonial-author-role">Сделал прозрачные процессы</div>
+            <div class="testimonial-content">{t.text}</div>
+            <div class="testimonial-author">
+              <div class="avatar-initials">{t.initials}</div>
+              <div class="testimonial-author-info">
+                <div class="testimonial-author-name">{t.name}</div>
+                <div class="testimonial-author-role">{t.role}</div>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="testimonial-card reveal reveal-delay-2">
-          <div class="testimonial-content">«Ментор помог собрать платёжную воронку и первую сотню пользователей. Экономия месяцев экспериментов.»</div>
-          <div class="testimonial-author">
-            <div class="avatar">
-              <img src="https://i.pravatar.cc/80?img=32" alt="avatar" />
-            </div>
-            <div class="testimonial-author-info">
-              <div class="testimonial-author-name">Алина, фаундер</div>
-              <div class="testimonial-author-role">Запустила MVP за 6 недель</div>
-            </div>
-          </div>
-        </div>
+        {/each}
       </div>
     </section>
 
     <!-- CTA -->
     <section class="section">
-      <div class="card elevated" style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center;">
-        <div>
-          <h2 class="section-title" style="margin-bottom:6px;">Готовы начать?</h2>
-          <p class="muted">Создайте аккаунт, заполните профиль и забронируйте первую сессию.</p>
-        </div>
-        <div class="flex gap-md" style="flex-wrap:wrap;">
-          <a class="btn btn-primary" href="/register">Создать аккаунт</a>
-          <a class="btn btn-ghost" href="/login">У меня уже есть аккаунт</a>
+      <div class="cta-block reveal">
+        <div class="cta-icon"><TrendingUp size={32} /></div>
+        <h2 class="cta-title">Готовы начать?</h2>
+        <p class="cta-sub">Создайте аккаунт, выберите ментора и забронируйте первую сессию — займёт меньше пяти минут.</p>
+        <div class="flex gap-md" style="flex-wrap:wrap;justify-content:center;margin-top:28px;">
+          <a class="btn btn-primary btn-lg" href="/register">Найти ментора</a>
+          <a class="btn btn-outline" href="/register?role=mentor">Стать ментором</a>
         </div>
       </div>
     </section>
@@ -221,3 +224,73 @@
     </div>
   </footer>
 </div>
+
+<style>
+  /* Testimonial stars row */
+  .testimonial-stars {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 14px;
+  }
+
+  /* Text-based avatar */
+  .avatar-initials {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--accent-muted);
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    letter-spacing: 0.02em;
+  }
+
+  /* CTA block */
+  .cta-block {
+    background: linear-gradient(135deg, var(--accent-soft) 0%, var(--violet-soft, var(--accent-muted)) 100%);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-xl);
+    padding: 64px 32px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .cta-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+  }
+
+  .cta-title {
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0;
+  }
+
+  .cta-sub {
+    font-size: 1.05rem;
+    color: var(--muted);
+    max-width: 480px;
+    margin: 0;
+    line-height: 1.6;
+  }
+
+  .btn-lg {
+    padding: 14px 28px;
+    font-size: 1rem;
+  }
+</style>
