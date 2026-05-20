@@ -5,6 +5,8 @@ export interface User {
   email: string;
   username?: string | null;
   fullName: string;
+  firstName?: string | null;
+  lastName?: string | null;
   timezone: string;
   role: UserRole;
   isBlocked?: boolean;
