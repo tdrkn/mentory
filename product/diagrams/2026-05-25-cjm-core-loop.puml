@@ -1,0 +1,53 @@
+@startuml
+title Mentory — Core CJM loop / current vs target gaps
+
+start
+:Mentee lands on homepage;
+:Open mentor catalog;
+if (Find relevant mentor?) then (yes)
+  :Open mentor profile;
+  note right
+    Current UI: works, no overflow.
+    Gap: demo profile has placeholder photo,
+    empty skills/hobbies/achievements,
+    one subscription still shows USD.
+  end note
+  if (One-time session?) then (session)
+    :Choose service;
+    :Open booking request page;
+    :Select slot + write motivation;
+    :Pay through mock checkout;
+    :Session becomes paid / waiting mentor;
+    :Mentor reviews request;
+    if (Mentor approves?) then (yes)
+      :Session becomes booked;
+      :Chat + video link / room;
+      :Complete session;
+      :Review mentor;
+      :Delayed payout scheduled;
+    else (no)
+      :Reject + mock refund/cancel;
+    endif
+  else (subscription)
+    :Choose subscription plan;
+    :Send subscription request;
+    :Mentor approves;
+    note right
+      Gap: subscription payment/checkout
+      is not a full production flow.
+    end note
+    :Workspace opens after active status;
+  endif
+else (no)
+  :Refine filters / search;
+endif
+
+:Trust/support available through complaints;
+:Admin handles verification/support/database;
+stop
+
+legend right
+  Green path = functional MVP path.
+  Notes = key product gaps to ideal state.
+endlegend
+@enduml

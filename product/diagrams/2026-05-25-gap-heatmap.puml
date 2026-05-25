@@ -1,0 +1,38 @@
+@startmindmap
+* Mentory gap heatmap\n2026-05-25
+** Зеленая зона / работает
+*** Лендинг + каталог менторов
+*** Структура профиля ментора
+*** Блоки редактирования профиля
+*** Управление слотами + недельный календарь
+*** Разовое бронирование + mock-оплата
+*** Подтверждение заявки ментором
+*** Базовый чат
+*** Жалобы + admin trust
+** Желтая зона / частично product-ready
+*** Демо-данные профилей
+**** нет реальных фото
+**** пустые навыки/хобби/достижения
+**** смешаны RUB/USD
+*** Подписки
+**** approval есть
+**** payment flow неполный
+*** Видео
+**** platform room есть
+**** Figma просит внешнюю ссылку
+*** Admin moderation
+**** endpoints работают
+**** UI все еще UUID/technical
+*** Уведомления
+**** email/in-app база
+**** нет push center/settings
+** Красная зона / не хватает до идеала
+*** Реальный acquiring/refunds/payout provider
+*** Payout processing UI и scheduler
+*** Reschedule/cancel policy UI
+*** Reject/comment details для заявок
+*** Production storage adapter + migration
+*** Load/performance evidence
+*** SLO/SLA/RTO/RPO runbooks
+*** Retention/DWH/export evidence
+@endmindmap

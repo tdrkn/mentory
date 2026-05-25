@@ -1,6 +1,6 @@
 # Frontend gap-анализ: DOCX/Figma vs текущий web UI
 
-Дата ревизии: 2026-05-21
+Дата ревизии: 2026-05-25
 
 Источник сравнения:
 
@@ -38,6 +38,16 @@
 - `product/qa-screenshots/qa-mobile-mentor-detail.png`
 - `product/qa-screenshots/qa-mobile-subscriptions.png`
 - `product/qa-screenshots/qa-mobile-admin-trust-after-responsive-fix.png`
+- `product/qa-screenshots/qa-2026-05-25-home-desktop.png`
+- `product/qa-screenshots/qa-2026-05-25-home-mobile.png`
+- `product/qa-screenshots/qa-2026-05-25-mentors-desktop.png`
+- `product/qa-screenshots/qa-2026-05-25-mentors-mobile.png`
+- `product/qa-screenshots/qa-2026-05-25-mentor-detail-desktop.png`
+- `product/qa-screenshots/qa-2026-05-25-mentor-detail-mobile.png`
+- `product/qa-screenshots/qa-2026-05-25-profile-edit-desktop.png`
+- `product/qa-screenshots/qa-2026-05-25-calendar-desktop.png`
+- `product/qa-screenshots/qa-2026-05-25-admin-dashboard-desktop.png`
+- `product/qa-screenshots/qa-2026-05-25-admin-trust-desktop.png`
 
 Пройдено:
 
@@ -58,6 +68,7 @@
 | Mentor public profile | Работает: левая колонка с профилем/карьерой/навыками/хобби/достижениями/отзывами, правая колонка с отдельными блоками `Планы подписки` и `Разовые сессии и услуги` |
 | Mentor calendar | Работает: `/schedule/calendar` показывает weekly grid, свободные слоты и не дает горизонтального overflow на desktop/mobile |
 | Admin login/dashboard/trust | Работает: `/admin/login` обновляет auth store, `/admin` не уходит обратно на login, hash-вкладки `/admin/trust#...` переключаются корректно |
+| 2026-05-25 visual QA | Работает: landing, catalog, mentor profile, profile edit, calendar, admin dashboard/trust; на проверенных desktop/mobile viewport horizontal overflow = 0 |
 
 ## Найденные и исправленные frontend/runtime дефекты
 

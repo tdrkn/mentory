@@ -1,0 +1,27 @@
+@startuml
+title Mentory — модель стадии продукта / 2026-05-25
+
+left to right direction
+
+state "0. Концепт / отчет" as concept
+state "1. Кликабельный прототип" as prototype
+state "2. Функциональный MVP" as mvp
+state "3. Demo-ready alpha" as alpha
+state "4. Beta product" as beta
+state "5. Production-grade product" as prod
+
+concept --> prototype : Figma / DOCX
+prototype --> mvp : core domains implemented
+mvp --> alpha : текущая стадия\n(feature-complete enough\nfor supervised demo)
+alpha --> beta : нужен UX polish,\nrequest flows,\nsubscription payment,\nseed data
+beta --> prod : нужны real providers,\nNFR evidence,\nops runbooks,\nmonitoring/SLA
+
+note bottom of alpha
+  Текущая оценка:
+  65-70% от идеального продукта.
+  Архитектурная база и широкие flows есть.
+  Главные gaps: UI/UX polish,
+  demo data и production readiness.
+end note
+
+@enduml

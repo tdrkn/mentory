@@ -1,0 +1,37 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+title Mentory — C4 L2 Containers / framework map 2026-05-25
+
+Person(user, "Mentee / Mentor / Admin", "Роли работают через один web app.")
+
+System_Boundary(mentory, "Mentory monorepo") {
+  Container(web, "Web App", "SvelteKit 2 + Svelte 5 + Tailwind/Skeleton", "SSR + client-side REST calls.\nRoutes: landing, catalog, profiles,\nbooking, sessions, subscriptions,\nschedule, trust, admin.")
+  Container(api, "API Modular Monolith", "NestJS 10 + Prisma + Socket.IO", "Modules: auth, profiles, discovery,\nscheduling, booking, sessions,\npayments, subscriptions, chat,\ntrust, notifications.")
+  Container(shared, "Shared package", "TypeScript workspace package", "Shared DTO/types/constants\nused by web and api.")
+  ContainerDb(db, "PostgreSQL", "Prisma schema", "Users, profiles, topics, slots,\nsessions, payments, payouts,\nchat, trust, subscriptions.")
+  ContainerDb(redis, "Redis", "Locks/cache/presence", "Booking hold locks,\nlogin lockout counters,\nchat scale boundary.")
+  ContainerDb(uploads, "Local uploads", "FileStorageService", "Data URLs -> files under uploads;\nDB keeps /uploads/* URLs.")
+  Container(proxy, "Caddy", "Reverse proxy / TLS", "Production ingress:\nweb, /api, /admin, /socket.io.")
+}
+
+System_Ext(acquirer, "Payment provider", "Mock now; real provider target.")
+System_Ext(mail, "SMTP", "MailHog in dev, SMTP target.")
+System_Ext(minio, "MinIO/S3", "Provisioned in dev; production adapter target.")
+
+Rel(user, web, "Uses product UI", "HTTPS")
+Rel(web, api, "REST + Socket.IO", "HTTP/WS")
+Rel(web, shared, "Imports types", "workspace")
+Rel(api, shared, "Imports types/DTOs", "workspace")
+Rel(api, db, "ORM queries", "TCP 5432")
+Rel(api, redis, "Locks/cache/pubsub", "TCP 6379")
+Rel(api, uploads, "Save/read uploaded files", "FS")
+Rel(proxy, web, "Reverse proxy", "HTTP")
+Rel(proxy, api, "Reverse proxy", "HTTP/WS")
+Rel(api, acquirer, "Payments/refunds/payouts", "REST")
+Rel(api, mail, "Emails", "SMTP")
+Rel(uploads, minio, "Future storage adapter", "S3 API")
+
+SHOW_LEGEND()
+@enduml

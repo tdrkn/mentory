@@ -25,6 +25,10 @@
 
 - `frontend-gap.md` - расхождения web UI с отчетом, пройденные браузерные сценарии, найденные/исправленные runtime дефекты и frontend backlog.
 
+- `mini-report-2026-05-25.md` - краткий отчет по текущей стадии продукта, свежему browser QA, степени расхождений с DOCX/Figma и недостающим частям до идеального продукта.
+
+- `framework-map-2026-05-25.md` - раскладка продукта по technical/product/UI/C4/stage frameworks.
+
 - `usm.txt` - User Story Map и Use Cases из последнего DOCX-отчета с пометками текущего статуса реализации.
 
 - `er-user-panel.puml` - as-is ER пользовательского контура.
@@ -35,6 +39,8 @@
 
 - `с4_and_sequence/c4-L1-context.puml` и `с4_and_sequence/c4-L2-containers.puml` - C4-контекст и контейнеры.
   Описывают текущую реализацию как SvelteKit web + NestJS modular monolith, а не микросервисную схему из формулировок отчета.
+
+- `diagrams/2026-05-25-*.puml` и соответствующие `.png` - свежий набор визуальных артефактов: C4 L1/L2/L3, CJM, gap heatmap и product stage model.
 
 - `с4_and_sequence/sequence-diagrams-final/01-booking-payment_FIXED.puml` - сценарий бронирования и оплаты.
   Диаграмма должна читаться вместе с `requirements-gap.md`, потому что booking/payment state machine сейчас требует выравнивания.

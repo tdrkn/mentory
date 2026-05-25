@@ -1,0 +1,45 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+title Mentory — C4 L3 API Components / NestJS modular monolith
+
+Container_Boundary(api, "Backend Monolith — NestJS 10") {
+  Component(auth, "AuthModule", "JWT, email verification, lockout", "Registration, login, reset password.")
+  Component(profiles, "ProfilesModule", "Profile CRUD", "Mentor/mentee profiles, avatar, topics.")
+  Component(discovery, "DiscoveryModule", "Catalog/search", "Mentor list, filters, mentor detail, reviews.")
+  Component(scheduling, "SchedulingModule", "Slots/rules", "Availability, generated slots, calendar.")
+  Component(booking, "BookingModule", "Session request/hold", "10 min slot hold, request goal/motivation.")
+  Component(sessions, "SessionsModule", "Session lifecycle", "Confirm/reject, notes, video, reviews.")
+  Component(payments, "PaymentsModule", "Payment/payout boundary", "Mock acquiring, refunds, delayed payouts.")
+  Component(subs, "SubscriptionsModule", "Mentorship plans", "Plans, subscription approval, workspace, credits.")
+  Component(chat, "ChatModule + Gateway", "REST + Socket.IO", "Conversations, messages, typing/read events.")
+  Component(trust, "TrustModule", "Safety/admin trust", "Complaints, regalia review, blocks, audit logs.")
+  Component(notif, "NotificationsModule", "Email/in-app", "SMTP delivery and notification records.")
+}
+
+ContainerDb(db, "PostgreSQL", "Prisma schema")
+ContainerDb(redis, "Redis", "Locks/cache")
+ContainerDb(files, "Uploads", "Local FS")
+System_Ext(acquirer, "Payment provider", "Mock now")
+System_Ext(smtp, "SMTP", "MailHog/dev")
+
+Rel(auth, db, "users, user_agreements")
+Rel(profiles, db, "users, mentor_profiles, mentee_profiles")
+Rel(discovery, db, "topics, mentor_services, reviews, slots")
+Rel(scheduling, db, "availability_rules, slots")
+Rel(booking, db, "slots, sessions")
+Rel(booking, redis, "hold lock + TTL")
+Rel(sessions, db, "sessions, notes, reviews, video_rooms")
+Rel(payments, db, "payments, payouts")
+Rel(payments, acquirer, "intent/webhook/refund")
+Rel(subs, db, "mentorship_* and credits")
+Rel(chat, db, "conversations/messages/attachments")
+Rel(chat, redis, "scale boundary / pubsub")
+Rel(trust, db, "complaints, regalia, blocks, audit")
+Rel(trust, files, "regalia and complaint uploads")
+Rel(notif, db, "notifications")
+Rel(notif, smtp, "emails")
+
+SHOW_LEGEND()
+@enduml

@@ -1,0 +1,28 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+title Mentory — C4 L1 Context / as-is 2026-05-25
+
+Person(mentee, "Менти", "Ищет ментора, подает заявку,\nоплачивает, общается, оставляет отзыв.")
+Person(mentor, "Ментор", "Ведет профиль, услуги,\nслоты, заявки, сессии и выплаты.")
+Person(admin, "Администратор", "Верификация, поддержка,\nмодерация, блокировки, аудит.")
+
+System(mentory, "Mentory", "Web-платформа менторства:\nпоиск -> заявка/оплата -> сессия -> отзыв -> выплата.")
+
+System_Ext(acquirer, "Эквайринг", "As-is: mock/payment provider boundary.\nTarget: production acquiring + refunds.")
+System_Ext(smtp, "SMTP / MailHog", "Email verification,\npassword reset, notifications.")
+System_Ext(video, "Видео-провайдер", "As-is: platform video room placeholder.\nFigma target: external meeting link.")
+System_Ext(storage, "File storage", "As-is: local /uploads adapter.\nTarget: S3/MinIO in production.")
+
+Rel(mentee, mentory, "Поиск, booking, payment, chat", "HTTPS")
+Rel(mentor, mentory, "Profile, schedule, requests, payouts", "HTTPS")
+Rel(admin, mentory, "Trust/admin operations", "HTTPS")
+
+Rel(mentory, acquirer, "Payment intent, webhook, refund/payout boundary", "REST")
+Rel(mentory, smtp, "Transactional email", "SMTP")
+Rel(mentory, video, "Meeting URL / room", "REST")
+Rel(mentory, storage, "Uploads for regalia, complaints, chat", "Filesystem / S3 target")
+
+SHOW_LEGEND()
+@enduml
