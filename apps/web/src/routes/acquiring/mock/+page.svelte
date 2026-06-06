@@ -12,21 +12,23 @@
   let isProcessing = false;
   let error: string | null = null;
 
-  const resolveReturnUrl = (value: string, fallbackSessionId: string) => {
+  const resolveReturnUrl = (value: string, fallbackSessionId: string, fallbackSubscriptionId: string) => {
     if (value && value.startsWith('/')) return value;
     if (fallbackSessionId) return `/checkout/${fallbackSessionId}`;
+    if (fallbackSubscriptionId) return `/checkout/subscriptions/${fallbackSubscriptionId}`;
     return '/mentors';
   };
 
   $: sessionId = $page.url.searchParams.get('sessionId') ?? '';
+  $: subscriptionId = $page.url.searchParams.get('subscriptionId') ?? '';
   $: paymentIntentId = $page.url.searchParams.get('paymentIntentId') ?? '';
   $: amount = $page.url.searchParams.get('amount') ?? '';
   $: currency = $page.url.searchParams.get('currency') ?? '';
   $: mentor = $page.url.searchParams.get('mentor') ?? 'Ментор';
   $: service = $page.url.searchParams.get('service') ?? 'Сессия';
   $: returnUrl = $page.url.searchParams.get('returnUrl') ?? '';
-  $: safeReturnUrl = resolveReturnUrl(returnUrl, sessionId);
-  $: canPay = Boolean(sessionId && paymentIntentId && amount && currency);
+  $: safeReturnUrl = resolveReturnUrl(returnUrl, sessionId, subscriptionId);
+  $: canPay = Boolean((sessionId || subscriptionId) && paymentIntentId && amount && currency);
 
   const formatCardNumber = (value: string) =>
     value

@@ -153,7 +153,7 @@
         }
       }
 
-      goto('/sessions?success=1');
+      goto('/sessions?success=1&tab=pending');
     } catch (err) {
       if (err instanceof ApiError && err.status === 410) {
         error = 'Время на оплату истекло. Слот освобожден.';

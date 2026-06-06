@@ -187,7 +187,7 @@ export class SessionsService {
     return session;
   }
 
-  async confirmSession(mentorId: string, sessionId: string) {
+  async confirmSession(mentorId: string, sessionId: string, reason?: string) {
     const session = await this.prisma.session.findFirst({
       where: { id: sessionId, mentorId, status: { in: ['requested', 'paid', 'booked'] } },
       include: { slot: true },
@@ -205,7 +205,11 @@ export class SessionsService {
 
       return tx.session.update({
         where: { id: sessionId },
-        data: { status: 'booked' },
+        data: {
+          status: 'booked',
+          decisionComment: reason?.trim() || null,
+          decidedAt: new Date(),
+        },
         include: {
           mentor: { select: { id: true, fullName: true } },
           mentee: { select: { id: true, fullName: true } },
@@ -249,13 +253,14 @@ export class SessionsService {
         data: { status: 'free', heldUntil: null },
       });
 
-      // Cancel session
       return tx.session.update({
         where: { id: sessionId },
         data: {
-          status: 'canceled',
+          status: 'rejected',
           canceledAt: new Date(),
           cancelReason: reason,
+          decisionComment: reason?.trim() || null,
+          decidedAt: new Date(),
         },
       });
     });

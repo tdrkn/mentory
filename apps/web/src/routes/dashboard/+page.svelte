@@ -65,7 +65,7 @@
     actionInProgressId = sessionId;
     try {
       await api.patch(`/sessions/${sessionId}/reject`, {
-        reason: 'Rejected by mentor',
+      reason: 'Ментор отклонил заявку',
       });
       sessions = await api.get<SessionItem[]>('/sessions?role=mentor');
     } finally {
@@ -106,7 +106,10 @@
       </div>
 
       <div class="card" style="margin-bottom:20px;">
-        <h2 class="section-title">Заявки на встречи со мной</h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+          <h2 class="section-title" style="margin:0;">Заявки на встречи со мной</h2>
+          <a class="btn btn-outline btn-sm" href="/requests">Все заявки</a>
+        </div>
         {#if pending().length === 0}
           <p class="muted">Новых заявок нет.</p>
         {:else}

@@ -187,6 +187,7 @@ export class SubscriptionsService {
         status: {
           in: [
             MentorshipSubscriptionStatus.pending,
+            MentorshipSubscriptionStatus.approved_pending_payment,
             MentorshipSubscriptionStatus.active,
             MentorshipSubscriptionStatus.paused,
           ],
@@ -253,7 +254,8 @@ export class SubscriptionsService {
     }
 
     if (
-      (dto.status === MentorshipSubscriptionStatus.active ||
+      (dto.status === MentorshipSubscriptionStatus.approved_pending_payment ||
+        dto.status === MentorshipSubscriptionStatus.active ||
         dto.status === MentorshipSubscriptionStatus.rejected) &&
       user.role !== 'admin' &&
       subscription.mentorId !== user.id
@@ -265,12 +267,28 @@ export class SubscriptionsService {
       throw new BadRequestException('Rejected subscriptions cannot be changed');
     }
 
+    if (
+      dto.status === MentorshipSubscriptionStatus.active &&
+      subscription.status === MentorshipSubscriptionStatus.pending &&
+      user.role !== 'admin'
+    ) {
+      throw new BadRequestException('Pending subscriptions must be approved before payment');
+    }
+
+    if (
+      dto.status === MentorshipSubscriptionStatus.approved_pending_payment &&
+      subscription.status !== MentorshipSubscriptionStatus.pending
+    ) {
+      throw new BadRequestException('Only pending subscriptions can be approved for payment');
+    }
+
     const intervalMonths = subscription.plan.kind === MentorshipPlanKind.subscription
       ? Math.max(subscription.plan.billingIntervalMonths || 1, 1)
       : 1;
     const activatingPending =
       dto.status === MentorshipSubscriptionStatus.active &&
-      subscription.status === MentorshipSubscriptionStatus.pending;
+      (subscription.status === MentorshipSubscriptionStatus.pending ||
+        subscription.status === MentorshipSubscriptionStatus.approved_pending_payment);
 
     return this.prisma.mentorshipSubscription.update({
       where: { id: subscription.id },

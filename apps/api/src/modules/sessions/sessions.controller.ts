@@ -89,8 +89,9 @@ export class SessionsController {
   async confirmSession(
     @CurrentUser('id') userId: string,
     @Param('id') sessionId: string,
+    @Body() dto?: CancelSessionDto,
   ) {
-    return this.sessionsService.confirmSession(userId, sessionId);
+    return this.sessionsService.confirmSession(userId, sessionId, dto?.reason);
   }
 
   /**

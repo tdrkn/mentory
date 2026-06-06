@@ -23,6 +23,7 @@
   let verificationInfo: string | null = null;
   let verificationBusy = false;
   let showErrorModal = false;
+  let didRedirectAuthenticated = false;
 
   const closeErrorModal = () => {
     clearAuthError();
@@ -45,12 +46,14 @@
       pendingVerificationEmail = verifyEmail;
       verificationInfo = `Мы отправили письмо для подтверждения на ${verifyEmail}.`;
     }
-    if ($isAuthenticated && !$isLoading) {
-      goto('/mentors');
-    }
   });
 
   $: showErrorModal = !!$error;
+
+  $: if (!$isLoading && $isAuthenticated && !didRedirectAuthenticated) {
+    didRedirectAuthenticated = true;
+    goto('/mentors');
+  }
 
   const fillTestAccount = (e: string, p: string) => {
     loginValue = e;

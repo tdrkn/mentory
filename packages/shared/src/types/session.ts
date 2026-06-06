@@ -2,6 +2,7 @@ export type SessionStatus =
   | 'requested'
   | 'booked'
   | 'paid'
+  | 'rejected'
   | 'canceled'
   | 'completed'
   | 'no_show';

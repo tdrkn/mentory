@@ -30,11 +30,20 @@
   let isLoading = true;
   let isSlotsLoading = false;
   let didLoad = false;
+  let didInitTab = false;
 
   // Tabs: upcoming / past / pending / all
-  let tab: 'upcoming' | 'past' | 'pending' | 'all' = 'upcoming';
+  type SessionTab = 'upcoming' | 'past' | 'pending' | 'all';
+  let tab: SessionTab = 'upcoming';
 
   const showSuccess = () => $page.url.searchParams.get('success') === '1';
+
+  const parseTab = (value: string | null): SessionTab | null => {
+    if (value === 'upcoming' || value === 'past' || value === 'pending' || value === 'all') {
+      return value;
+    }
+    return null;
+  };
 
   const loadSessions = async () => {
     isLoading = true;
@@ -65,6 +74,11 @@
   };
 
   $: if (!$authLoading) {
+    if (!didInitTab) {
+      tab = parseTab($page.url.searchParams.get('tab')) ?? (showSuccess() ? 'pending' : 'upcoming');
+      didInitTab = true;
+    }
+
     if (!$isAuthenticated) {
       goto('/login');
     } else if (!didLoad) {
@@ -74,15 +88,15 @@
     }
   }
 
-  const filtered = (sessions: SessionItem[]) => {
+  const filtered = (sessions: SessionItem[], activeTab: SessionTab) => {
     const now = new Date();
     return sessions.filter((s) => {
       const date = new Date(s.startAt);
-      switch (tab) {
+      switch (activeTab) {
         case 'upcoming':
-          return date > now && s.status !== 'canceled' && s.status !== 'requested' && s.status !== 'paid';
+          return date > now && s.status !== 'canceled' && s.status !== 'rejected' && s.status !== 'requested' && s.status !== 'paid';
         case 'past':
-          return date <= now || s.status === 'completed' || s.status === 'canceled';
+          return date <= now || s.status === 'completed' || s.status === 'canceled' || s.status === 'rejected';
         case 'pending':
           return s.status === 'requested' || s.status === 'paid';
         case 'all':
@@ -97,6 +111,7 @@
       case 'booked':    return 'Подтверждена';
       case 'paid':      return 'Оплачена, ждёт подтверждения';
       case 'completed': return 'Завершена';
+      case 'rejected':  return 'Отклонена';
       case 'canceled':  return 'Отменена';
       default:          return status;
     }
@@ -106,7 +121,7 @@
     if (status === 'completed') return 'badge-success';
     if (status === 'booked')    return 'badge-info';
     if (status === 'requested' || status === 'paid') return 'badge-warning';
-    if (status === 'canceled')  return 'badge-error';
+    if (status === 'canceled' || status === 'rejected') return 'badge-error';
     return '';
   };
 
@@ -123,7 +138,7 @@
   $: pendingCount = sessions.filter((s) => s.status === 'requested' || s.status === 'paid').length;
 
   // Active tab list (reactive)
-  $: list = filtered(sessions);
+  $: list = filtered(sessions, tab);
 </script>
 
 <div class="page">

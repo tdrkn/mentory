@@ -3,7 +3,7 @@
   import { user, isMentor, isAdmin } from '$lib/stores/auth';
   import { logout } from '$lib/stores/auth';
   import BrandLogo from '$lib/components/BrandLogo.svelte';
-  import { Menu, X, User, LogOut, LayoutDashboard, Calendar, Wallet, MessageCircle, Video, Settings } from 'lucide-svelte';
+  import { Menu, X, User, LogOut, LayoutDashboard, Calendar, Wallet, MessageCircle, Video, Settings, ClipboardList, ShieldCheck } from 'lucide-svelte';
 
   let mobileMenuOpen = false;
 
@@ -25,6 +25,12 @@
         </a>
         <a class="nav-link {isActive('/sessions') ? 'active' : ''}" href="/sessions">
           <Video size={16} /> Сессии
+        </a>
+        <a class="nav-link {isActive('/requests') ? 'active' : ''}" href="/requests">
+          <ClipboardList size={16} /> Заявки
+        </a>
+        <a class="nav-link {isActive('/trust') ? 'active' : ''}" href="/trust">
+          <ShieldCheck size={16} /> Траст
         </a>
         <a class="nav-link {isActive('/chat') ? 'active' : ''}" href="/chat">
           <MessageCircle size={16} /> Чат
@@ -62,7 +68,7 @@
               <Settings size={16} /> Настройки профиля
             </a>
             <a class="user-dropdown-item" href="/trust">
-              <LayoutDashboard size={16} /> Траст-центр
+              <ShieldCheck size={16} /> Траст-центр
             </a>
             {#if $isAdmin}
               <a class="user-dropdown-item" href="/admin/trust">
@@ -104,6 +110,12 @@
           <a class="mobile-nav-link {isActive('/sessions') ? 'active' : ''}" href="/sessions" on:click={closeMenu}>
             <Video size={18} /> Сессии
           </a>
+          <a class="mobile-nav-link {isActive('/requests') ? 'active' : ''}" href="/requests" on:click={closeMenu}>
+            <ClipboardList size={18} /> Заявки
+          </a>
+          <a class="mobile-nav-link {isActive('/trust') ? 'active' : ''}" href="/trust" on:click={closeMenu}>
+            <ShieldCheck size={18} /> Траст
+          </a>
           <a class="mobile-nav-link {isActive('/chat') ? 'active' : ''}" href="/chat" on:click={closeMenu}>
             <MessageCircle size={18} /> Чат
           </a>
@@ -125,7 +137,7 @@
             <Settings size={18} /> Настройки
           </a>
           <a class="mobile-nav-link" href="/trust" on:click={closeMenu}>
-            Траст-центр
+            <ShieldCheck size={18} /> Траст-центр
           </a>
           {#if $isAdmin}
             <a class="mobile-nav-link" href="/admin/trust" on:click={closeMenu}>

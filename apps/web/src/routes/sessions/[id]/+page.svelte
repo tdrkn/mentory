@@ -17,6 +17,11 @@
     mentor: { id: string; fullName: string; email: string };
     mentee: { id: string; fullName: string; email: string };
     service: { id: string; title: string; durationMin: number; priceAmount: string; currency: string };
+    requestGoal?: string | null;
+    requestMotivation?: string | null;
+    cancelReason?: string | null;
+    decisionComment?: string | null;
+    decidedAt?: string | null;
     videoLink?: string | null;
   }
 
@@ -26,12 +31,14 @@
   let isLoading = true;
   let isSaving = false;
   let isCompleting = false;
+  let isReviewingRequest = false;
   let isSubmittingReview = false;
   let error: string | null = null;
   let actionMessage: string | null = null;
   let reviewRating = 5;
   let reviewText = '';
   let showReviewForm = false;
+  let decisionCommentInput = '';
 
   // Video link
   let videoLinkInput = '';
@@ -92,6 +99,40 @@
     }
   };
 
+  const handleApproveRequest = async () => {
+    if (!session) return;
+    isReviewingRequest = true;
+    actionMessage = null;
+    try {
+      await api.patch(`/sessions/${session.id}/confirm`, {
+        reason: decisionCommentInput.trim() || undefined,
+      });
+      actionMessage = 'Заявка подтверждена.';
+      await loadSession();
+    } catch {
+      actionMessage = 'Не удалось подтвердить заявку.';
+    } finally {
+      isReviewingRequest = false;
+    }
+  };
+
+  const handleRejectRequest = async () => {
+    if (!session) return;
+    isReviewingRequest = true;
+    actionMessage = null;
+    try {
+      await api.patch(`/sessions/${session.id}/reject`, {
+        reason: decisionCommentInput.trim() || 'Ментор отклонил заявку',
+      });
+      actionMessage = 'Заявка отклонена.';
+      await loadSession();
+    } catch {
+      actionMessage = 'Не удалось отклонить заявку.';
+    } finally {
+      isReviewingRequest = false;
+    }
+  };
+
   const handleSubmitReview = async () => {
     if (!session) return;
     isSubmittingReview = true;
@@ -117,6 +158,8 @@
         return 'Подтверждена';
       case 'completed':
         return 'Завершена';
+      case 'rejected':
+        return 'Отклонена';
       case 'canceled':
         return 'Отменена';
       default:
@@ -190,6 +233,40 @@
         {#if actionMessage}
           <div class="surface" style="margin-top:14px;background:var(--status-success-bg);border-color:var(--status-success-border);color:var(--status-success-ink);">
             {actionMessage}
+          </div>
+        {/if}
+
+        {#if $isMentor && (session.status === 'requested' || session.status === 'paid')}
+          <div style="margin-top:18px;padding:16px;background:var(--status-warning-bg);border:1px solid var(--status-warning-border);border-radius:var(--radius-md);">
+            <div style="font-weight:700;color:var(--status-warning-ink);margin-bottom:8px;">
+              Заявка ожидает вашего решения
+            </div>
+            {#if session.requestGoal}
+              <p class="muted" style="margin:0 0 6px;">Цель: {session.requestGoal}</p>
+            {/if}
+            {#if session.requestMotivation}
+              <p class="muted" style="margin:0 0 12px;">{session.requestMotivation}</p>
+            {/if}
+            <input
+              class="input"
+              style="margin:0 0 10px;"
+              bind:value={decisionCommentInput}
+              placeholder="Комментарий к решению (необязательно)"
+            />
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-primary" on:click={handleApproveRequest} disabled={isReviewingRequest}>
+                {isReviewingRequest ? 'Обработка...' : 'Подтвердить'}
+              </button>
+              <button class="btn btn-ghost" on:click={handleRejectRequest} disabled={isReviewingRequest}>
+                Отклонить
+              </button>
+            </div>
+          </div>
+        {/if}
+
+        {#if session.status === 'rejected' && (session.decisionComment || session.cancelReason)}
+          <div style="margin-top:18px;padding:16px;background:var(--status-error-bg);border:1px solid var(--status-error-border);border-radius:var(--radius-md);color:var(--status-error-ink);">
+            Причина отклонения: {session.decisionComment || session.cancelReason}
           </div>
         {/if}
 

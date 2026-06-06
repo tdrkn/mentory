@@ -10,6 +10,7 @@
     "build": "pnpm -r build",
     "build:web": "pnpm --filter @mentory/web build",
     "build:api": "pnpm --filter @mentory/api build",
+    "test": "pnpm -r --if-present test",
     "lint": "pnpm -r lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\"",

@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma';
 import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
 import { CreatePayoutAccountDto } from './dto/create-payout-account.dto';
 import { RequestPayoutDto } from './dto/request-payout.dto';
-import { PayoutStatus } from '@prisma/client';
+import { MentorshipSubscriptionStatus, PayoutStatus } from '@prisma/client';
 
 const SUPPORTED_ACQUIRING_METHODS = ['qr', 'card', 'cbr'] as const;
 const DEFAULT_ACQUIRER_CHECKOUT_BASE_URL = 'https://acquirer.example/checkout';
@@ -18,6 +18,18 @@ export class PaymentsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createPaymentIntent(menteeId: string, dto: CreatePaymentIntentDto) {
+    if (!!dto.sessionId === !!dto.subscriptionId) {
+      throw new BadRequestException('Provide exactly one of sessionId or subscriptionId');
+    }
+
+    if (dto.subscriptionId) {
+      return this.createSubscriptionPaymentIntent(menteeId, dto.subscriptionId);
+    }
+
+    if (!dto.sessionId) {
+      throw new BadRequestException('sessionId or subscriptionId is required');
+    }
+
     const session = await this.prisma.session.findFirst({
       where: { id: dto.sessionId, menteeId, status: { in: ['requested', 'booked'] } },
       include: { service: true, slot: true },
@@ -89,6 +101,63 @@ export class PaymentsService {
     };
   }
 
+  private async createSubscriptionPaymentIntent(menteeId: string, subscriptionId: string) {
+    const subscription = await this.prisma.mentorshipSubscription.findFirst({
+      where: {
+        id: subscriptionId,
+        menteeId,
+        status: MentorshipSubscriptionStatus.approved_pending_payment,
+      },
+      include: {
+        plan: true,
+      },
+    });
+
+    if (!subscription) {
+      throw new NotFoundException('Subscription not found or not approved for payment');
+    }
+
+    const existing = await this.prisma.payment.findUnique({
+      where: { subscriptionId },
+    });
+
+    if (existing) {
+      if (existing.status === 'failed' || existing.status === 'refunded') {
+        throw new BadRequestException('Previous subscription payment is closed');
+      }
+      throw new BadRequestException('Payment already exists');
+    }
+
+    const amount = Math.round(Number(subscription.monthlyPrice ?? subscription.plan.priceAmount) * 100);
+    const platformFee = Math.round(amount * 0.15);
+    const mentorAmount = amount - platformFee;
+
+    const payment = await this.prisma.payment.create({
+      data: {
+        subscriptionId,
+        menteeId,
+        mentorId: subscription.mentorId,
+        amount,
+        currency: subscription.currency || subscription.plan.currency,
+        platformFee,
+        mentorAmount,
+        status: 'pending',
+        provider: 'acquirer_mock',
+        providerPaymentId: `pi_mock_sub_${Date.now()}`,
+      },
+    });
+
+    const checkoutBaseUrl = process.env.ACQUIRER_CHECKOUT_BASE_URL || DEFAULT_ACQUIRER_CHECKOUT_BASE_URL;
+    const checkoutUrl = `${checkoutBaseUrl}/${payment.providerPaymentId}`;
+
+    return {
+      payment,
+      clientSecret: `mock_secret_${payment.id}`,
+      checkoutUrl,
+      paymentMethods: [...SUPPORTED_ACQUIRING_METHODS],
+    };
+  }
+
   async handleWebhook(body: any) {
     const { type, data } = body;
 
@@ -117,11 +186,41 @@ export class PaymentsService {
           session: {
             include: { slot: true },
           },
+          subscription: {
+            include: { plan: true },
+          },
         },
       });
 
       if (!payment) return;
       if (payment.status === 'refunded') return;
+
+      if (payment.subscription) {
+        const subscription = payment.subscription;
+        const intervalMonths = Math.max(subscription.plan.billingIntervalMonths || 1, 1);
+
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: 'succeeded', paidAt: now },
+        });
+
+        if (subscription.status === MentorshipSubscriptionStatus.approved_pending_payment) {
+          await tx.mentorshipSubscription.update({
+            where: { id: subscription.id },
+            data: {
+              status: MentorshipSubscriptionStatus.active,
+              currentPeriodStart: now,
+              currentPeriodEnd: this.addMonths(now, intervalMonths),
+              nextBillingAt: this.addMonths(now, intervalMonths),
+              endedAt: null,
+              pausedAt: null,
+            },
+          });
+        }
+        return;
+      }
+
+      if (!payment.session) return;
 
       const { session } = payment;
       const holdExpired =
@@ -174,6 +273,7 @@ export class PaymentsService {
           session: {
             include: { slot: true },
           },
+          subscription: true,
         },
       });
 
@@ -184,9 +284,15 @@ export class PaymentsService {
         data: { status: 'failed' },
       });
 
+      if (payment.subscription?.status === MentorshipSubscriptionStatus.approved_pending_payment) {
+        return;
+      }
+
+      if (!payment.session) return;
+
       if (payment.session.status === 'requested' || payment.session.status === 'booked') {
         await tx.session.update({
-          where: { id: payment.sessionId },
+          where: { id: payment.session.id },
           data: {
             status: 'canceled',
             canceledAt: now,
@@ -225,6 +331,13 @@ export class PaymentsService {
             service: { select: { id: true, title: true } },
           },
         },
+        subscription: {
+          include: {
+            mentor: { select: { id: true, fullName: true } },
+            mentee: { select: { id: true, fullName: true } },
+            plan: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -241,6 +354,13 @@ export class PaymentsService {
             service: true,
           },
         },
+        subscription: {
+          include: {
+            mentor: { select: { id: true, fullName: true } },
+            mentee: { select: { id: true, fullName: true } },
+            plan: true,
+          },
+        },
       },
     });
 
@@ -248,7 +368,7 @@ export class PaymentsService {
       throw new NotFoundException('Payment not found');
     }
 
-    if (payment.mentorId !== userId && payment.session.menteeId !== userId) {
+    if (payment.mentorId !== userId && payment.menteeId !== userId) {
       throw new ForbiddenException('Access denied');
     }
 
@@ -441,8 +561,10 @@ export class PaymentsService {
       select: {
         id: true,
         sessionId: true,
+        subscriptionId: true,
         status: true,
-        session: { select: { status: true } },
+        session: { select: { status: true, slotId: true } },
+        subscription: { include: { plan: true } },
       },
     });
 
@@ -463,15 +585,32 @@ export class PaymentsService {
           paidAt: now,
         },
       });
-      const session = await tx.session.update({
-        where: { id: payment.sessionId },
-        data: { status: payment.session.status === 'booked' ? 'booked' : 'paid' },
-        select: { slotId: true },
-      });
-      await tx.slot.update({
-        where: { id: session.slotId },
-        data: { status: 'booked', heldUntil: null },
-      });
+      if (payment.sessionId && payment.session) {
+        const session = await tx.session.update({
+          where: { id: payment.sessionId },
+          data: { status: payment.session.status === 'booked' ? 'booked' : 'paid' },
+          select: { slotId: true },
+        });
+        await tx.slot.update({
+          where: { id: session.slotId },
+          data: { status: 'booked', heldUntil: null },
+        });
+      }
+      if (payment.subscriptionId && payment.subscription) {
+        const now = new Date();
+        const intervalMonths = Math.max(payment.subscription.plan.billingIntervalMonths || 1, 1);
+        await tx.mentorshipSubscription.update({
+          where: { id: payment.subscriptionId },
+          data: {
+            status: MentorshipSubscriptionStatus.active,
+            currentPeriodStart: now,
+            currentPeriodEnd: this.addMonths(now, intervalMonths),
+            nextBillingAt: this.addMonths(now, intervalMonths),
+            pausedAt: null,
+            endedAt: null,
+          },
+        });
+      }
       return updatedPayment;
     });
 
@@ -486,7 +625,7 @@ export class PaymentsService {
   async adminCancelPayment(adminId: string, paymentId: string, reason?: string) {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
-      select: { id: true, sessionId: true, status: true },
+      select: { id: true, sessionId: true, subscriptionId: true, status: true },
     });
 
     if (!payment) {
@@ -503,19 +642,30 @@ export class PaymentsService {
         where: { id: paymentId },
         data: { status: 'refunded' },
       });
-      const session = await tx.session.update({
-        where: { id: payment.sessionId },
-        data: {
-          status: 'canceled',
-          canceledAt: now,
-          cancelReason: reason || 'Canceled by admin',
-        },
-        select: { slotId: true },
-      });
-      await tx.slot.update({
-        where: { id: session.slotId },
-        data: { status: 'free', heldUntil: null },
-      });
+      if (payment.sessionId) {
+        const session = await tx.session.update({
+          where: { id: payment.sessionId },
+          data: {
+            status: 'canceled',
+            canceledAt: now,
+            cancelReason: reason || 'Canceled by admin',
+          },
+          select: { slotId: true },
+        });
+        await tx.slot.update({
+          where: { id: session.slotId },
+          data: { status: 'free', heldUntil: null },
+        });
+      }
+      if (payment.subscriptionId) {
+        await tx.mentorshipSubscription.update({
+          where: { id: payment.subscriptionId },
+          data: {
+            status: MentorshipSubscriptionStatus.approved_pending_payment,
+            notes: reason ? `[${now.toISOString()}] Payment canceled by admin: ${reason}` : undefined,
+          },
+        });
+      }
       return updated;
     });
 
@@ -525,5 +675,11 @@ export class PaymentsService {
       reason: reason || null,
       payment: updatedPayment,
     };
+  }
+
+  private addMonths(date: Date, months: number) {
+    const output = new Date(date);
+    output.setMonth(output.getMonth() + months);
+    return output;
   }
 }

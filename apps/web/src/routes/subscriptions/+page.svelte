@@ -35,7 +35,7 @@
     mentorId: string;
     menteeId: string;
     planId: string;
-    status: 'pending' | 'active' | 'paused' | 'ended' | 'rejected';
+    status: 'pending' | 'approved_pending_payment' | 'active' | 'paused' | 'ended' | 'rejected';
     startedAt: string;
     pausedAt?: string | null;
     endedAt?: string | null;
@@ -469,6 +469,10 @@
       return 'Активна';
     }
 
+    if (status === 'approved_pending_payment') {
+      return 'Одобрена, ожидает оплаты';
+    }
+
     if (status === 'paused') {
       return 'На паузе';
     }
@@ -482,7 +486,7 @@
 
   function subscriptionBadgeClass(status: MentorshipSubscription['status']) {
     if (status === 'active') return 'success';
-    if (status === 'paused' || status === 'pending') return 'warning';
+    if (status === 'paused' || status === 'pending' || status === 'approved_pending_payment') return 'warning';
     return 'error';
   }
 
@@ -656,8 +660,10 @@
                 </button>
                 <div class="subscription-actions">
                   {#if canReviewSubscription(item)}
-                    <button class="btn btn-sm btn-primary" on:click={() => changeSubscriptionStatus(item.id, 'active')} disabled={isBusy}>Принять</button>
+                    <button class="btn btn-sm btn-primary" on:click={() => changeSubscriptionStatus(item.id, 'approved_pending_payment')} disabled={isBusy}>Одобрить</button>
                     <button class="btn btn-sm btn-outline" on:click={() => changeSubscriptionStatus(item.id, 'rejected')} disabled={isBusy}>Отклонить</button>
+                  {:else if item.status === 'approved_pending_payment' && item.menteeId === $user?.id}
+                    <a class="btn btn-sm btn-primary" href={`/checkout/subscriptions/${item.id}`}>Оплатить</a>
                   {:else if item.status === 'active'}
                     <button class="btn btn-sm btn-ghost" on:click={() => changeSubscriptionStatus(item.id, 'paused')} disabled={isBusy}>Пауза</button>
                     <button class="btn btn-sm btn-outline" on:click={() => changeSubscriptionStatus(item.id, 'ended')} disabled={isBusy}>Завершить</button>
@@ -682,7 +688,9 @@
         {#if !selectedSubscription || !workspace}
           <p class="muted">
             {selectedSubscription && !canOpenWorkspace(selectedSubscription.status)
-              ? 'Рабочее пространство откроется после одобрения заявки ментором.'
+              ? selectedSubscription.status === 'approved_pending_payment'
+                ? 'Рабочее пространство откроется после оплаты одобренной подписки.'
+                : 'Рабочее пространство откроется после одобрения заявки ментором.'
               : 'Когда у вас будет подписка, здесь появится ваш рабочий план.'}
           </p>
         {:else}

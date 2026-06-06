@@ -34,6 +34,7 @@ enum SessionStatus {
   requested
   booked
   paid
+  rejected
   canceled
   completed
   no_show
@@ -74,6 +75,7 @@ enum MentorshipPlanKind {
 
 enum MentorshipSubscriptionStatus {
   pending
+  approved_pending_payment
   active
   paused
   ended
@@ -335,6 +337,8 @@ model Session {
   createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz
   canceledAt        DateTime?     @map("canceled_at") @db.Timestamptz
   cancelReason      String?       @map("cancel_reason")
+  decisionComment   String?       @map("decision_comment") @db.Text
+  decidedAt         DateTime?     @map("decided_at") @db.Timestamptz
   videoLink         String?       @map("video_link")
 
   // Relations
@@ -365,7 +369,8 @@ model Session {
 
 model Payment {
   id                String        @id @default(uuid()) @db.Uuid
-  sessionId         String        @unique @map("session_id") @db.Uuid
+  sessionId         String?       @unique @map("session_id") @db.Uuid
+  subscriptionId    String?       @unique @map("subscription_id") @db.Uuid
   menteeId          String?       @map("mentee_id") @db.Uuid
   mentorId          String?       @map("mentor_id") @db.Uuid
   provider          String        @default("stripe")
@@ -379,11 +384,13 @@ model Payment {
   createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  mentor  User?   @relation("MentorPayments", fields: [mentorId], references: [id], onDelete: SetNull)
-  mentee  User?   @relation("MenteePayments", fields: [menteeId], references: [id], onDelete: SetNull)
+  session      Session?                 @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  subscription MentorshipSubscription?  @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  mentor       User?                    @relation("MentorPayments", fields: [mentorId], references: [id], onDelete: SetNull)
+  mentee       User?                    @relation("MenteePayments", fields: [menteeId], references: [id], onDelete: SetNull)
 
   @@index([sessionId])
+  @@index([subscriptionId])
   @@index([mentorId])
   @@index([menteeId])
   @@index([status])
@@ -569,6 +576,7 @@ model MentorshipSubscription {
   plan      MentorshipPlan       @relation(fields: [planId], references: [id], onDelete: Restrict)
   tasks     MentorshipTask[]
   bookmarks MentorshipBookmark[]
+  payments  Payment[]
 
   @@index([mentorId])
   @@index([menteeId])
