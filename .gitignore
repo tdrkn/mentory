@@ -35,6 +35,8 @@ coverage
 
 # Local QA/tool artifacts
 .playwright-mcp/
+.codex-artifacts/
+apps/api/uploads/
 tmp/pdfs/figma-basics/
 
 # Misc

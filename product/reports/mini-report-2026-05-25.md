@@ -100,7 +100,7 @@ Mentory сейчас находится на стадии **functional MVP+ / de
 
 ## Артефакты
 
-- `framework-map-2026-05-25.md` - раскладка по technical/product/UI/C4/stage frameworks.
+- `reports/framework-map-2026-05-25.md` - раскладка по technical/product/UI/C4/stage frameworks.
 - `diagrams/2026-05-25-c4-l1-context.puml`
 - `diagrams/2026-05-25-c4-l2-containers.puml`
 - `diagrams/2026-05-25-c4-l3-api-components.puml`
