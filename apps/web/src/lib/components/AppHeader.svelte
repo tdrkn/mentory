@@ -3,6 +3,7 @@
   import { user, isMentor, isAdmin } from '$lib/stores/auth';
   import { logout } from '$lib/stores/auth';
   import BrandLogo from '$lib/components/BrandLogo.svelte';
+  import { getApiUrl } from '$lib/env';
   import { Menu, X, User, LogOut, LayoutDashboard, Calendar, Wallet, MessageCircle, Video, Settings, ClipboardList, ShieldCheck } from 'lucide-svelte';
 
   let mobileMenuOpen = false;
@@ -11,6 +12,12 @@
 
   const toggleMenu = () => mobileMenuOpen = !mobileMenuOpen;
   const closeMenu = () => mobileMenuOpen = false;
+
+  const resolveAvatarUrl = (value?: string | null) => {
+    if (!value) return '';
+    if (value.startsWith('http') || value.startsWith('data:') || value.startsWith('blob:')) return value;
+    return `${getApiUrl()}${value.startsWith('/') ? value : `/${value}`}`;
+  };
 </script>
 
 <header class="header">
@@ -56,7 +63,11 @@
 
         <div class="user-menu">
           <button class="user-avatar" aria-label="Меню пользователя">
-            <User size={18} />
+            {#if $user.avatarUrl}
+              <img src={resolveAvatarUrl($user.avatarUrl)} alt={$user.fullName || 'Пользователь'} />
+            {:else}
+              <User size={18} />
+            {/if}
           </button>
           <div class="user-dropdown">
             <div class="user-dropdown-header">
@@ -248,11 +259,19 @@
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
+    overflow: hidden;
   }
 
   .user-avatar:hover {
     background: var(--accent);
     color: var(--on-accent);
+  }
+
+  .user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
   }
 
   .user-dropdown {

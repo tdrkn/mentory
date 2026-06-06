@@ -146,7 +146,7 @@ export class DiscoveryService {
     const data = mentors.map((mentor: any) => ({
       id: mentor.id,
       fullName: mentor.fullName,
-      avatarUrl: null, // TODO: Add avatarUrl to User model
+      avatarUrl: mentor.avatarUrl,
       headline: mentor.mentorProfile?.headline,
       bio: mentor.mentorProfile?.bio?.substring(0, 200), // Truncate for list
       education: mentor.mentorProfile?.education || null,

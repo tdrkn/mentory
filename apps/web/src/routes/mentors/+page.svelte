@@ -2,6 +2,7 @@
   import AppHeader from '$lib/components/AppHeader.svelte';
   import Loading from '$lib/components/Loading.svelte';
   import { api, ApiError } from '$lib/api';
+  import { getApiUrl } from '$lib/env';
   import { createQuery } from '@tanstack/svelte-query';
   import { Search, Star, Users, ChevronRight, SlidersHorizontal, X } from 'lucide-svelte';
 
@@ -126,6 +127,12 @@
     if (!num) return 'По запросу';
     const formatted = num.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
     return `От ${formatted} руб`;
+  };
+
+  const resolveAvatarUrl = (value?: string | null) => {
+    if (!value) return '';
+    if (value.startsWith('http') || value.startsWith('data:') || value.startsWith('blob:')) return value;
+    return `${getApiUrl()}${value.startsWith('/') ? value : `/${value}`}`;
   };
 
   // Active filter pills
@@ -298,7 +305,7 @@
               <div class="mentor-card-header">
                 <div class="avatar avatar-lg">
                   {#if mentor.avatarUrl}
-                    <img src={mentor.avatarUrl} alt={mentor.fullName} />
+                    <img src={resolveAvatarUrl(mentor.avatarUrl)} alt={mentor.fullName} />
                   {:else}
                     {mentor.fullName?.charAt(0) || 'M'}
                   {/if}

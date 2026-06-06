@@ -7,6 +7,7 @@ export interface User {
   fullName: string;
   firstName?: string | null;
   lastName?: string | null;
+  avatarUrl?: string | null;
   timezone: string;
   role: UserRole;
   isBlocked?: boolean;
