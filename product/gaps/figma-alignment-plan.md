@@ -8,7 +8,7 @@
 
 ---
 
-## Статус после QA 2026-05-21
+## Статус после QA 2026-06-06
 
 Последние приложенные PNG-макеты уточнили часть решений из исходного PDF. Главное уточнение: публичный профиль ментора должен показывать справа **два отдельных блока** `Планы подписки` и `Разовые сессии и услуги`, а не старый переключатель `Сессия/Подписка`.
 
@@ -18,11 +18,12 @@
 - `/mentors/:id`: профиль ментора с отдельными правыми блоками `Планы подписки` и `Разовые сессии и услуги`.
 - `/schedule/calendar`: weekly calendar без горизонтального overflow на desktop/mobile.
 - `/admin/login`, `/admin`, `/admin/trust#verification|support|database`: вход, dashboard, hash-вкладки, mobile overflow и русские labels финансов.
+- `/requests`: общий центр заявок для mentor/mentee, разделение разовых сессий и подписок, комментарий к решению.
+- `/checkout/subscriptions/:id`: approve-first оплата подписки после решения ментора.
 
 Не закрыто:
 
-- Новые страницы заявок `/requests/:id/...` и полноценная причина reject.
-- Subscription checkout / approve-then-pay.
+- Отдельные pixel-perfect страницы деталей заявок `/requests/:id/session` и `/requests/:id/subscription`.
 - UI обработки ready payouts.
 - Демо-данные профилей: часть seed/runtime менторов пока без фото, навыков, хобби и достижений.
 
@@ -95,28 +96,34 @@
 
 **Цель:** дать подпискам корректный двухшаговый approve-then-pay flow.
 
-- [ ] Новая страница `/subscriptions/new?planId=`.
+- [x] State machine подписки:
+  - `pending` (после submit, mentor approval required).
+  - `approved_pending_payment` (после mentor approve).
+  - `active` (после payment).
+  - `rejected`.
+- [x] У mentee в `/requests` по одобренной подписке показывается CTA «Оплатить подписку».
+- [x] Добавлен checkout `/checkout/subscriptions/:subscriptionId` через mock acquiring.
+- [ ] Новая pixel-perfect страница `/subscriptions/new?planId=`.
   - Имя/Фамилия/Email (prefilled).
   - **Цель** (required, single line).
   - **Мотивационное письмо** (optional, textarea).
   - Кнопка `Подать заявку` (не Оплатить).
-- [ ] State machine подписки:
-  - `pending` (после submit, mentor approval required).
-  - `approved_pending_payment` (после mentor approve).
-  - `active` (после payment).
-  - `rejected` / `canceled`.
-- [ ] Эндпоинт `POST /api/subscriptions/:id/pay` для оплаты after approval.
-- [ ] У mentee Управление заявками → Подписки → Одобренные показывается CTA «Оплатить заявку», ведёт на детали + Оплатить.
+- [ ] Опционально добавить отдельный endpoint `POST /api/subscriptions/:id/pay`; сейчас используется общий `/payments/intent` с `subscriptionId`.
 
 **Тест:** subscription submit → mentor approve → mentee видит «Оплатить заявку» → оплата → подписка активна.
 
 ---
 
-## Итерация 5 — «Управление заявками» переработка (1 PR)
+## Итерация 5 — «Управление заявками» переработка (частично закрыто 2026-06-06)
 
 **Цель:** привести структуру табов к Figma.
 
-- [ ] Mentor `/admin/requests` или `/dashboard/requests`:
+- [x] Общая страница `/requests` для mentor/mentee.
+- [x] Top tabs: `Разовые сессии` / `Подписки`.
+- [x] Sub-tabs: `В ожидании` / `Одобренные` / `Оплаченные` / `Отклонённые` / `Все`.
+- [x] Mentor может подтвердить/отклонить заявку с комментарием.
+- [x] Mentee видит CTA оплаты для `approved_pending_payment`.
+- [ ] Pixel-perfect разнести версии mentor/mentee по Figma:
   - Top tabs: `Одиночные сессии` / `Подписки`.
   - Sub-tabs:
     - Одиночные сессии: `Оплаченные / Отклонённые / Все` (без В ожидании потому что pay-first, тёрминальный statuses).
@@ -129,7 +136,7 @@
     - Подписки: `В ожидании / Одобренные / Отклонённые / Все`.
   - Карточка: профиль ментора + кнопки «Профиль ментора» + «Чат с ментором» + «Оплатить заявку» / «Посмотреть заявку».
 
-**Тест:** full path mentee→mentor visible в обеих сторонах.
+**Тест:** 2026-06-06 Playwright smoke: mentor/mentee `/requests`, `/subscriptions`, `/sessions?tab=pending`, `/checkout/subscriptions/:id`; overflow = 0, 401 нет.
 
 ---
 
@@ -145,7 +152,8 @@
   - Кнопки `Принять` (если ожидает) / `Отклонить`.
 - [ ] `/requests/:id/subscription`:
   - Те же блоки, но Подписка card + `Одобрить` / `Отклонить`.
-- [ ] API: `PATCH /sessions/:id/confirm` принимает `mentorComment`. `PATCH /sessions/:id/reject` принимает `mentorComment`. Аналогично для subscriptions.
+- [x] API: `PATCH /sessions/:id/confirm|reject` принимает reason/comment и сохраняет `decisionComment`.
+- [x] API: `PATCH /subscriptions/:id/status` принимает `reason`, использует notes/status.
 
 **Тест:** ментор reject с комментарием → mentee видит комментарий в детали заявки.
 

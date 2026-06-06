@@ -1,6 +1,6 @@
 # Карта фреймворков Mentory
 
-Дата: 2026-05-25
+Дата: 2026-05-25, обновлено 2026-06-06
 
 Этот документ раскладывает Mentory не по файлам, а по фреймворкам мышления: как система работает, как выглядит, чем текущий продукт отличается от DOCX/Figma и где он находится по зрелости.
 
@@ -23,9 +23,9 @@
 | Auth | Email/username login, verification, password reset, lockout | 2FA для admin есть только как UI-поле, backend не подключен |
 | Profiles | Mentor/mentee profiles, avatar, skills, hobbies, regalia | Demo profiles пустые; нет хорошего наполнения под презентацию |
 | Discovery | Каталог, фильтры, profile detail | Фильтры работают, но не все Figma/NFR поля являются first-class domain fields |
-| Booking | Hold, request goal/motivation, payment, mentor approve/reject | Нет полноценного request detail UX с комментарием reject |
+| Booking | Hold, request goal/motivation, payment, mentor approve/reject, decision comment | Нет pixel-perfect detail screens для каждого request-типа |
 | Sessions | Session detail, notes, chat/video, review | Figma требует внешний video link; текущий room placeholder отличается |
-| Subscriptions | Plans, pending/active/rejected, workspace | Нет полноценного checkout/pay-after-approval flow |
+| Subscriptions | Plans, `pending -> approved_pending_payment -> active`, checkout after approval, workspace | Real acquiring остается production gap |
 | Scheduling | Rules, slots, weekly calendar | Базово хорошо; нужен UX-polish для больших календарей и timezone edge cases |
 | Payments/Payouts | Mock acquiring, delayed payout after completion | Нет real acquiring/refunds/payout provider и операторского payout UI |
 | Chat | REST + Socket.IO, messages/attachments | Базовый flow есть; notification/presence UX можно улучшать |
@@ -41,7 +41,7 @@
 | Mentor profile view | Структура совпадает с последним PNG: hero, sections, right blocks | Средняя: пустые данные, placeholder avatar, USD в demo subscription |
 | Mentor profile edit | Основные блоки совпадают с PNG, фото и карьерный блок есть | Средняя: dense form, placeholder photo, не все fields prefilled |
 | Booking/session request | Работает, но не полностью как Figma request screens | Высокая |
-| Subscription request | Есть pending/approval, но payment flow не тот | Высокая |
+| Subscription request | Есть approve-first flow и checkout after approval | Средняя: structure MVP, не 1:1 Figma detail screen |
 | Sessions | Есть основные страницы, но Figma требует отдельные states/details/review | Средняя-высокая |
 | Finance | Есть earnings/payout foundation | Высокая: Figma KPI/table/payment method UX не закрыт полностью |
 | Admin | Custom UI есть и работает | Средняя: dashboard близко, moderation database tab остается technical |
@@ -74,10 +74,10 @@ PNG-версии лежат рядом после render pass.
 
 Что нужно для beta:
 
-1. Завершить заявки и подписки как продуктовые flows, а не как набор технических экранов.
-2. Привести demo data к Figma: фото, навыки, хобби, achievements, RUB-only.
-3. Довести admin moderation до очередей и actionable cards.
-4. Закрыть finance UX: KPI, payout table, payout actions.
+1. Привести demo data к Figma: фото, навыки, хобби, achievements, RUB-only.
+2. Довести admin moderation до очередей и actionable cards.
+3. Закрыть finance UX: KPI, payout table, payout actions.
+4. Добавить cancel/reschedule policy UI.
 5. Заменить placeholders на production provider boundaries или явно выключенные post-MVP flags.
 
 Что нужно для production-grade:

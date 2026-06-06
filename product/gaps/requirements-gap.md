@@ -1,6 +1,6 @@
 # Gap-анализ: последний DOCX-отчет vs текущая реализация Mentory
 
-Дата ревизии: 2026-05-18
+Дата ревизии: 2026-06-06
 
 Источник сравнения:
 
@@ -27,7 +27,7 @@
 | Архитектура | Микросервисная архитектура | TypeScript monorepo + NestJS modular monolith, SvelteKit web, PostgreSQL, Redis | В product/C4/CLAUDE писать "modular monolith as-is"; микросервисы оставить как target/report wording |
 | Заявки | Отдельная заявка/application, которую ментор подтверждает/отклоняет | Отдельной таблицы `applications` нет; роль заявки выполняет `sessions.status = requested`, есть `requestGoal`/`requestMotivation` | Оставить session-as-request как as-is; отдельную таблицу добавлять только при новом scope |
 | Запись и оплата | Менти создает заявку, оплачивает, ментор подтверждает или отклоняет, при отказе возврат | Hold + payment intent + mock webhook + mentor confirm/reject выровнены: `paid` = ждет ментора, `booked` = подтверждено | Остается заменить mock-acquirer/refund на реального провайдера |
-| Подписки | Менти отправляет заявку на подписку, ментор рассматривает | `POST /subscriptions` создает `pending`; ментор/admin переводит в `active` или `rejected`; есть goal/motivation | Payment behavior подписок остается отдельным gap |
+| Подписки | Менти отправляет заявку на подписку, ментор рассматривает, после одобрения оплачивает | `POST /subscriptions` создает `pending`; ментор/admin переводит в `approved_pending_payment`; менти оплачивает через mock acquiring; webhook активирует `active` | Закрыто в MVP-flow; real acquiring остается production gap |
 | Payout | Выплата через 5 рабочих дней после проведенной сессии, если нет жалоб | `completeSession` создает delayed pending payout с `availableAt`; active complaints блокируют создание/процессинг; idempotency по `sessionId` | Реальный payout provider/job scheduler остается gap |
 | Видео | Ссылка на внешний ВКС в чате | Есть `video_rooms` и `GET /sessions/:id/video` с provider `daily` placeholder | Решить: platform-generated room или external link |
 | Файлы | PDF/PNG/JPG до 128MB; документы не должны храниться как платежные данные | Trust/chat/regalia data URLs сохраняются в local uploads через `FileStorageService`; в БД хранится `/uploads/*` URL | MinIO/S3 production storage остается optional upgrade |
@@ -46,7 +46,7 @@
 | FR6 - видеосвязь | Частично | Есть `video_rooms` и кнопка входа в сессию; отличается от отчетного сценария "ментор добавляет внешнюю ссылку в чат" |
 | FR7 - поиск менторов | Реализовано | Каталог и фильтры есть, но точный набор полей может отличаться от отчета |
 | FR8 - запись в свободный слот | Реализовано | Hold + session-as-request + цель/мотивация + mentor confirm/reject; отдельной таблицы `applications` нет |
-| FR9 - оплата сессии/подписки | Частично | Разовая сессия покрыта mock-acquirer flow; подписки не имеют полноценного payment flow |
+| FR9 - оплата сессии/подписки | Частично | Разовая сессия и подписка покрыты mock-acquirer flow; production acquiring/refund provider не подключен |
 | FR10 - просмотр профиля ментора | Реализовано | Профиль, услуги, рейтинг и слоты доступны |
 | FR11 - отзыв 1..5 после сессии | Реализовано | Отзыв после `completed`, окно +24h, уникальность по session |
 | FR12 - слоты и тарифы ментора | Реализовано | Сервисы, правила доступности, исключения и генерация слотов есть |
@@ -95,7 +95,7 @@
 | US5 - поиск ментора | Реализовано | Каталог и фильтры есть |
 | US6 - профиль ментора | Реализовано | Профиль, услуги, рейтинг, слоты |
 | US7 - запись к ментору | Реализовано | Слот и заявка через `Session requested`; request goal/motivation сохраняются на session |
-| US8 - оплата сессий и подписок | Частично | Разовая оплата есть; оплата подписок не доведена до полного flow |
+| US8 - оплата сессий и подписок | Частично | Разовая оплата и approve-first subscription checkout есть; остается заменить mock acquiring на production provider |
 | US9 - отзыв | Реализовано | После completed + 24h |
 | US10 - тарифы | Реализовано | Разовые услуги и mentorship plans |
 | US11 - подтверждение/отклонение запросов | Реализовано | Mentor dashboard использует `PATCH /sessions/:id/confirm|reject`, отказ отменяет/возвращает платеж в mock-flow |
@@ -109,9 +109,9 @@
 
 Приоритетные задачи, если приводим продукт ближе к DOCX-отчету:
 
-1. Subscription payments:
-   - определить payment behavior для подписок;
-   - связать approval, billing period и списания.
+1. Real acquiring/refund provider:
+   - заменить mock acquiring на production provider;
+   - закрыть refund edge cases для session reject/cancel и subscription payment failure.
 2. Real payout provider/job:
    - заменить mock/manual processing на провайдера или scheduled worker;
    - добавить audit/error handling для failed payouts.
@@ -172,7 +172,7 @@
 4. После одобрения у менти Подписки → Одобренные с «Ожидает оплаты» badge + CTA «Оплатить заявку».
 5. После оплаты — Одобренные с «Заявка одобрена» зелёным.
 
-**Текущее различие в коде:** есть `requestGoal` и `requestMotivation` на session, отдельной заявки нет, подписки имеют `pending → active`, но оплата подписок недоделана.
+**Текущее различие в коде:** отдельной таблицы заявки нет; session-as-request и subscription-as-request закрывают основной UX. Подписки идут `pending → approved_pending_payment → active`, но real acquiring остается production gap.
 
 ### 7.5 Управление заявками
 

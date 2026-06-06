@@ -1,6 +1,6 @@
 # Frontend gap-анализ: DOCX/Figma vs текущий web UI
 
-Дата ревизии: 2026-05-25
+Дата ревизии: 2026-06-06
 
 Источник сравнения:
 
@@ -48,6 +48,11 @@
 - `product/qa-screenshots/qa-2026-05-25-calendar-desktop.png`
 - `product/qa-screenshots/qa-2026-05-25-admin-dashboard-desktop.png`
 - `product/qa-screenshots/qa-2026-05-25-admin-trust-desktop.png`
+- `product/qa-screenshots/qa-2026-06-06-requests-mentor.png`
+- `product/qa-screenshots/qa-2026-06-06-requests-mentee.png`
+- `product/qa-screenshots/qa-2026-06-06-subscription-checkout.png`
+- `product/qa-screenshots/qa-2026-06-06-subscriptions-mentor.png`
+- `product/qa-screenshots/qa-2026-06-06-sessions-mentor-pending.png`
 
 Пройдено:
 
@@ -69,6 +74,7 @@
 | Mentor calendar | Работает: `/schedule/calendar` показывает weekly grid, свободные слоты и не дает горизонтального overflow на desktop/mobile |
 | Admin login/dashboard/trust | Работает: `/admin/login` обновляет auth store, `/admin` не уходит обратно на login, hash-вкладки `/admin/trust#...` переключаются корректно |
 | 2026-05-25 visual QA | Работает: landing, catalog, mentor profile, profile edit, calendar, admin dashboard/trust; на проверенных desktop/mobile viewport horizontal overflow = 0 |
+| 2026-06-06 requests/subscription QA | Работает: mentor/mentee `/requests`, `/subscriptions`, `/sessions?tab=pending`, `/checkout/subscriptions/:id`; protected routes не падают в 401, horizontal overflow = 0 |
 
 ## Найденные и исправленные frontend/runtime дефекты
 
@@ -85,14 +91,16 @@
 | Ссылки на `/uploads/*` в trust/admin открывались с web-host `:3000`, хотя файлы раздает API `:4000` | Исправлено | Добавлен `resolveFileUrl()` в trust/admin маршруты |
 | Публичный профиль ментора показывал старый таб-переключатель `Сессия/Подписка`, хотя последний макет требует два отдельных блока справа | Исправлено | `apps/web/src/routes/mentors/[id]/+page.svelte`: правый sidebar пересобран в `Планы подписки` + `Разовые сессии и услуги` |
 | На mobile `/admin/trust#database` вкладки давали небольшой body overflow | Исправлено | Tabs теперь wrap'ятся и уменьшают padding на narrow viewport |
+| Подписки не имели checkout после одобрения ментором | Исправлено MVP | Добавлен `approved_pending_payment`, `/checkout/subscriptions/[subscriptionId]`, mock acquiring и активация подписки после webhook |
+| Reject/approve заявки не давали нормальный комментарий для менти | Исправлено MVP | Добавлен `decisionComment`, `rejected`, поле комментария в `/requests` и на детальной странице сессии |
 
 ## Frontend-расхождения с отчетом
 
 | Область | В отчете | В текущем UI | Статус |
 |---|---|---|---|
-| Оплата подписки | Сценарий покупки подписки входит в оплату услуг | UI подписки создает `pending` заявку без checkout/payment screen | Gap |
+| Оплата подписки | Сценарий покупки подписки входит в оплату услуг | Есть approve-first flow: `pending -> approved_pending_payment -> mock checkout -> active` | Закрыто MVP; real acquiring остается production gap |
 | Отмена/перенос оплаченной сессии | UC10 описывает отмену или перенос оплаченной сессии | UI показывает детали/чат/video, но нет отдельного reschedule flow | Gap |
-| Причина отказа ментора | Ментор подтверждает или отклоняет заявку, ожидается понятная причина/комментарий | Для session reject frontend отправляет hardcoded `Rejected by mentor`; в UI нет поля причины | Gap |
+| Причина отказа ментора | Ментор подтверждает или отклоняет заявку, ожидается понятная причина/комментарий | В `/requests` и `/sessions/:id` есть поле комментария, причина сохраняется как `decisionComment`/`cancelReason` | Закрыто MVP |
 | Видеосвязь | Отчет ближе к external VKS/link-in-chat сценарию | UI использует platform video room через `/sessions/:id/video` | Намеренное отличие |
 | Админская модерация контента | Модерация профилей/контента как операторский workflow | UI имеет техническую форму `targetType/targetId/action`, без контент-очереди по профилям/отзывам/сообщениям | Частично |
 | Уведомления | Push на телефон + email | Header не имеет полноценного notification center/settings UI; push delivery не реализован | Gap |
@@ -103,28 +111,22 @@
 
 ## Рекомендуемый frontend backlog
 
-1. Добавить subscription checkout:
-   - plan -> payment intent -> paid/pending -> mentor approval;
-   - явно связать billing period и активацию workspace.
-2. Добавить cancel/reschedule UI для оплаченной сессии:
+1. Добавить cancel/reschedule UI для оплаченной сессии:
    - правила 24h;
    - причина отмены;
    - возврат/освобождение слота.
-3. Добавить поля комментария при reject:
-   - session requests;
-   - subscription requests.
-4. Расширить admin moderation UI:
+2. Расширить admin moderation UI:
    - очереди профилей, отзывов, сообщений;
    - действия без ручного ввода UUID там, где объект уже известен.
-5. Добавить notification center/settings:
+3. Добавить notification center/settings:
    - in-app list;
    - email/push toggles;
    - честно пометить push как disabled, пока нет delivery.
-6. Добавить UI для admin payout processing:
+4. Добавить UI для admin payout processing:
    - список ready payouts;
    - кнопка process-ready;
    - журнал ошибок.
-7. Донаполнить seed/demo profiles под Figma:
+5. Донаполнить seed/demo profiles под Figma:
    - avatar URL или локальный upload для демонстрационных менторов;
    - skills/hobbies/achievements для обоих seed-менторов;
    - согласовать валюту demo-планов с RUB-first интерфейсом.
