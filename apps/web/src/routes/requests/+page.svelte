@@ -208,7 +208,7 @@
     });
   }
 
-  function formatMoney(value: number | string | null | undefined, currency = 'USD') {
+  function formatMoney(value: number | string | null | undefined, currency = 'RUB') {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency,

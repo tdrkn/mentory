@@ -41,7 +41,7 @@
   let error: string | null = null;
 
   $: amount = subscription ? Number(subscription.monthlyPrice ?? subscription.plan?.priceAmount ?? 0) : 0;
-  $: currency = subscription?.currency || subscription?.plan?.currency || 'USD';
+  $: currency = subscription?.currency || subscription?.plan?.currency || 'RUB';
 
   async function loadSubscription() {
     const items = await api.get<SubscriptionDetail[]>('/subscriptions/mine');

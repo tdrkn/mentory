@@ -147,7 +147,7 @@
   };
 
   const creditsForm = {
-    topupAmountCents: 5000,
+    topupAmountRub: 500,
     expiresInDays: 365,
     redeemCode: '',
   };
@@ -260,7 +260,7 @@
         title: planForm.title.trim(),
         description: planForm.description || undefined,
         priceAmount: Number(planForm.priceAmount),
-        currency: 'USD',
+        currency: 'RUB',
         billingIntervalMonths: Number(planForm.billingIntervalMonths),
         callsPerMonth: Number(planForm.callsPerMonth),
         sessionDurationMin: Number(planForm.sessionDurationMin),
@@ -419,7 +419,7 @@
   async function topupCredits() {
     await withBusy(async () => {
       await api.post('/subscriptions/credits/topup', {
-        amountCents: Number(creditsForm.topupAmountCents),
+        amountCents: Math.round(Number(creditsForm.topupAmountRub) * 100),
         expiresInDays: Number(creditsForm.expiresInDays),
       });
 
@@ -444,7 +444,7 @@
     });
   }
 
-  function formatMoney(value: number | string | null | undefined, currency = 'USD') {
+  function formatMoney(value: number | string | null | undefined, currency = 'RUB') {
     const numeric = Number(value || 0);
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
@@ -649,7 +649,7 @@
                     Старт: {formatDate(item.startedAt)} · Следующее списание: {formatDate(item.nextBillingAt)}
                   </div>
                   <div class="muted">
-                    Цена: {formatMoney(item.monthlyPrice ?? item.plan?.priceAmount, item.currency || item.plan?.currency || 'USD')}
+                    Цена: {formatMoney(item.monthlyPrice ?? item.plan?.priceAmount, item.currency || item.plan?.currency || 'RUB')}
                   </div>
                   {#if item.requestGoal}
                     <div class="muted">Цель: {item.requestGoal}</div>
@@ -804,7 +804,7 @@
                 <h3 class="section-subtitle">2. Условия подписки</h3>
                 <div class="grid cols-2 compact-grid">
                   <div class="stack-sm">
-                    <label class="label" for="plan-price">Стоимость за период (USD)</label>
+                    <label class="label" for="plan-price">Стоимость за период (RUB)</label>
                     <input id="plan-price" class="input" type="number" min="0" step="0.01" bind:value={planForm.priceAmount} />
                   </div>
                   <div class="stack-sm">
@@ -908,14 +908,14 @@
               </div>
 
               <form class="stack-sm" on:submit|preventDefault={topupCredits}>
-                <label class="label" for="topup-amount-cents">Сумма пополнения (в центах)</label>
+                <label class="label" for="topup-amount-rub">Сумма пополнения, руб.</label>
                 <input
-                  id="topup-amount-cents"
+                  id="topup-amount-rub"
                   class="input"
                   type="number"
-                  min="100"
-                  step="100"
-                  bind:value={creditsForm.topupAmountCents}
+                  min="1"
+                  step="1"
+                  bind:value={creditsForm.topupAmountRub}
                 />
                 <label class="label" for="topup-expires-days">Срок (дней)</label>
                 <input

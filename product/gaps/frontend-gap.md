@@ -55,6 +55,11 @@
 - `product/qa-screenshots/qa-2026-06-06-mentors-demo-data.png`
 - `product/qa-screenshots/qa-2026-06-06-mentor-profile-demo-data.png`
 - `product/qa-screenshots/qa-2026-06-06-admin-payout-processing.png`
+- `product/qa-screenshots/qa-2026-06-06-mentors-rub.png`
+- `product/qa-screenshots/qa-2026-06-06-profile-edit-rub.png`
+- `product/qa-screenshots/qa-2026-06-06-subscriptions-rub.png`
+- `product/qa-screenshots/qa-2026-06-06-requests-rub.png`
+- `product/qa-screenshots/qa-2026-06-06-admin-rub.png`
 - `product/qa-screenshots/qa-2026-06-06-sessions-mentor-pending.png`
 
 Пройдено:
@@ -78,6 +83,7 @@
 | Admin login/dashboard/trust | Работает: `/admin/login` обновляет auth store, `/admin` не уходит обратно на login, hash-вкладки `/admin/trust#...` переключаются корректно |
 | 2026-05-25 visual QA | Работает: landing, catalog, mentor profile, profile edit, calendar, admin dashboard/trust; на проверенных desktop/mobile viewport horizontal overflow = 0 |
 | 2026-06-06 requests/subscription QA | Работает: mentor/mentee `/requests`, `/subscriptions`, `/sessions?tab=pending`, `/checkout/subscriptions/:id`; protected routes не падают в 401, horizontal overflow = 0 |
+| 2026-06-06 RUB/ru localization QA | Работает: `/mentors`, `/profile/edit`, `/subscriptions`, `/requests`, `/admin/trust#database`; видимого `USD`/`$` нет, новые defaults в API/Prisma переведены на `RUB`, даты форматируются через `ru-RU` |
 
 ## Найденные и исправленные frontend/runtime дефекты
 

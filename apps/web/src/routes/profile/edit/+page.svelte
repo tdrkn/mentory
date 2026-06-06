@@ -120,9 +120,9 @@
       title: editServiceDraft.title,
       durationMin: Number(editServiceDraft.durationMin),
       priceAmount: Number(editServiceDraft.priceAmount),
-      currency: editServiceDraft.currency,
+      currency: 'RUB',
     });
-    services = services.map((s) => s.id === id ? { ...s, title: editServiceDraft!.title, durationMin: Number(editServiceDraft!.durationMin), priceAmount: editServiceDraft!.priceAmount } : s);
+    services = services.map((s) => s.id === id ? { ...s, title: editServiceDraft!.title, durationMin: Number(editServiceDraft!.durationMin), priceAmount: editServiceDraft!.priceAmount, currency: 'RUB' } : s);
     cancelEditService();
     message = 'Услуга обновлена.';
   };
@@ -414,6 +414,7 @@
       ...newService,
       durationMin: Number(newService.durationMin),
       priceAmount: Number(newService.priceAmount),
+      currency: 'RUB',
     });
     services = [...services, created];
     newService = { title: '', durationMin: 60, priceAmount: '0', currency: 'RUB' };
@@ -426,7 +427,7 @@
       callsPerMonth: Number(newPlan.callsPerMonth),
       sessionDurationMin: Number(newPlan.sessionDurationMin),
       billingIntervalMonths: Math.max(1, Math.min(12, Math.ceil(Number(newPlan.durationDays || 30) / 30))),
-      currency: newPlan.currency,
+      currency: 'RUB',
       priceAmount: Number(newPlan.priceAmount),
     });
     plans = [created, ...plans];
@@ -743,7 +744,6 @@
                 <input class="input" type="number" min="15" bind:value={newService.durationMin} placeholder="Продолжительность (мин)" />
                 <input class="input" type="number" min="0" bind:value={newService.priceAmount} placeholder="Цена" />
               </div>
-              <input class="input" bind:value={newService.currency} placeholder="Валюта (RUB)" />
               <button class="btn btn-primary" on:click={addService}>Добавить услугу</button>
             </section>
 
@@ -788,7 +788,6 @@
               </div>
               <input class="input" type="number" min="1" bind:value={newPlan.durationDays} placeholder="Срок действия в днях" />
               <div class="two-fields">
-                <input class="input" bind:value={newPlan.currency} placeholder="Валюта (RUB)" />
                 <input class="input" type="number" min="0" bind:value={newPlan.priceAmount} placeholder="Цена" />
               </div>
               <input class="input" bind:value={newPlan.description} placeholder="Описание подписки" />

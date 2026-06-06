@@ -115,7 +115,7 @@
 
   let balance: PlatformBalance | null = null;
   let withdrawAmount = '';
-  let withdrawCurrency = 'USD';
+  let withdrawCurrency = 'RUB';
   let withdrawProvider = 'manual';
 
   let auditLogs: AuditLogItem[] = [];

@@ -499,7 +499,7 @@ export class SubscriptionsService {
       balance: balance || {
         menteeId: userId,
         amountCents: 0,
-        currency: 'USD',
+        currency: 'RUB',
         expiresAt: null,
       },
       transactions,
@@ -690,7 +690,7 @@ export class SubscriptionsService {
   }
 
   private normalizeCurrency(input?: string) {
-    return (input || 'USD').trim().toUpperCase();
+    return (input || 'RUB').trim().toUpperCase();
   }
 
   private toDate(input?: string) {
@@ -719,15 +719,15 @@ export class SubscriptionsService {
   private resolveRedeemCode(code: string) {
     const catalog: Record<string, { amountCents: number; currency: string; description: string; expiresAt: Date | null }> = {
       'MENTORY-START-10': {
-        amountCents: 1000,
-        currency: 'USD',
-        description: 'Welcome bonus',
+        amountCents: 100000,
+        currency: 'RUB',
+        description: 'Стартовый бонус',
         expiresAt: this.addDays(new Date(), 365),
       },
       'MENTORY-TEAM-25': {
-        amountCents: 2500,
-        currency: 'USD',
-        description: 'Team promo credit',
+        amountCents: 250000,
+        currency: 'RUB',
+        description: 'Командный промокод',
         expiresAt: this.addDays(new Date(), 180),
       },
     };

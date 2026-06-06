@@ -448,7 +448,7 @@ export class TrustService {
       totalFees,
       totalWithdrawn,
       available: Math.max(0, totalFees - totalWithdrawn),
-      currency: 'USD',
+      currency: 'RUB',
     };
   }
 

@@ -38,7 +38,7 @@
 |---|---|---|
 | Landing | Близко к Figma: hero, stat cards, features, steps, stories, CTA, footer | Низкая |
 | Mentor catalog | Близко: headline, pills, cards, price from N rub | Низкая-средняя: нужны реальные фото/богатые cards |
-| Mentor profile view | Структура совпадает с последним PNG: hero, sections, right blocks | Средняя: пустые данные, placeholder avatar, USD в demo subscription |
+| Mentor profile view | Структура совпадает с последним PNG: hero, sections, right blocks | Средняя-низкая: demo seed заполнен, остается pixel-perfect polish |
 | Mentor profile edit | Основные блоки совпадают с PNG, фото и карьерный блок есть | Средняя: dense form, placeholder photo, не все fields prefilled |
 | Booking/session request | Работает, но не полностью как Figma request screens | Высокая |
 | Subscription request | Есть approve-first flow и checkout after approval | Средняя: structure MVP, не 1:1 Figma detail screen |

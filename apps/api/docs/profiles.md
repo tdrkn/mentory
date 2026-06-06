@@ -73,7 +73,7 @@ src/modules/profiles/
   "headline": "Senior Developer",
   "bio": "10 years experience in web development",
   "hourlyRateCents": 5000,
-  "currency": "USD",
+  "currency": "RUB",
   "languages": ["en", "ru"],
   "ratingAvg": 4.8,
   "ratingCount": 25,
@@ -176,7 +176,7 @@ curl -X PATCH http://localhost:4000/api/profile/mentee \
 - `headline`: string, max 200 chars
 - `bio`: string, max 5000 chars
 - `hourlyRateCents`: number, min 0
-- `currency`: enum (USD, EUR, RUB)
+- `currency`: enum (RUB)
 - `languages`: array of strings
 - `isVisible`: boolean
 

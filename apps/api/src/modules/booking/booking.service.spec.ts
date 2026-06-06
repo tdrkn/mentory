@@ -23,7 +23,7 @@ describe('BookingService', () => {
     mentorId: 'mentor-1',
     title: 'Mentoring Session',
     priceCents: 5000,
-    currency: 'USD',
+    currency: 'RUB',
     isActive: true,
   };
 

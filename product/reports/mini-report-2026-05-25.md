@@ -26,7 +26,7 @@ Mentory сейчас находится на стадии **functional MVP+ / de
 |---|---:|---|
 | DOCX-отчет | Высокая на архитектуре, средняя на доменах | DOCX говорит “микросервисы”; код - modular monolith. Заявки не отдельная таблица, а session-as-request. NFR в основном target-only. |
 | Figma basics PDF | Средняя | Большинство основных экранов уже есть, но часть flows реализована иначе: sessions/reviews/finance/request details/subscription payment. |
-| Последние PNG по профилям | Средняя-низкая по структуре, средняя по качеству данных | Блоки совпадают, но demo data пустые: placeholder avatars, нет skills/hobbies/achievements, в плане подписки USD. |
+| Последние PNG по профилям | Низкая по структуре, средняя по polish | Блоки совпадают, demo seed заполнен фото/skills/hobbies/regalia, валюта приведена к RUB. |
 | Browser QA 2026-05-25 | Технически низкая, продуктово средняя | Horizontal overflow не найден; главные проблемы теперь не версточные, а UX/product polish и data realism. |
 
 ## Свежий browser QA

@@ -257,7 +257,7 @@ model MentorService {
   title       String
   durationMin Int     @map("duration_min")
   priceAmount Decimal @map("price_amount") @db.Decimal(10, 2)
-  currency    String  @default("USD") @db.VarChar(3)
+  currency    String  @default("RUB") @db.VarChar(3)
   isActive    Boolean @default(true) @map("is_active")
 
   // Relations
@@ -530,7 +530,7 @@ model MentorshipPlan {
   description           String?
   kind                  MentorshipPlanKind @default(subscription)
   priceAmount           Decimal            @map("price_amount") @db.Decimal(10, 2)
-  currency              String             @default("USD") @db.VarChar(3)
+  currency              String             @default("RUB") @db.VarChar(3)
   billingIntervalMonths Int                @default(1) @map("billing_interval_months")
   callsPerMonth         Int?               @map("calls_per_month")
   sessionDurationMin    Int?               @map("session_duration_min")
@@ -563,7 +563,7 @@ model MentorshipSubscription {
   currentPeriodStart DateTime?                    @map("current_period_start") @db.Timestamptz
   currentPeriodEnd   DateTime?                    @map("current_period_end") @db.Timestamptz
   monthlyPrice       Decimal?                     @map("monthly_price") @db.Decimal(10, 2)
-  currency           String                       @default("USD") @db.VarChar(3)
+  currency           String                       @default("RUB") @db.VarChar(3)
   requestGoal        String?                      @map("request_goal") @db.Text
   requestMotivation  String?                      @map("request_motivation") @db.Text
   notes              String?
@@ -633,7 +633,7 @@ model MentorshipBookmark {
 model MenteeCreditBalance {
   menteeId    String    @id @map("mentee_id") @db.Uuid
   amountCents Int       @default(0) @map("amount_cents")
-  currency    String    @default("USD") @db.VarChar(3)
+  currency    String    @default("RUB") @db.VarChar(3)
   expiresAt   DateTime? @map("expires_at") @db.Timestamptz
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -649,7 +649,7 @@ model MenteeCreditTransaction {
   type        CreditTransactionType
   status      CreditTransactionStatus @default(succeeded)
   amountCents Int                     @map("amount_cents")
-  currency    String                  @default("USD") @db.VarChar(3)
+  currency    String                  @default("RUB") @db.VarChar(3)
   description String?
   externalRef String?                 @map("external_ref")
   expiresAt   DateTime?               @map("expires_at") @db.Timestamptz

@@ -280,8 +280,8 @@ export class NotificationsService {
         mentorName,
         menteeName: payment.session?.mentee?.fullName || 'Mentee',
         amount: (payment.mentorAmount / 100).toFixed(2),
-        currency: payment.currency || 'USD',
-        sessionDate: payment.session?.startAt ? new Date(payment.session.startAt).toLocaleDateString('ru-RU') : 'N/A',
+        currency: payment.currency || 'RUB',
+        sessionDate: payment.session?.startAt ? new Date(payment.session.startAt).toLocaleDateString('ru-RU') : 'Не указано',
       },
     });
 
