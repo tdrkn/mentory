@@ -8,7 +8,7 @@ Mentory сейчас находится на стадии **functional MVP+ / de
 
 Оценка готовности: **65-70% от идеального продукта**.
 
-Обновление 2026-06-06: закрыты два важных flow-gap из отчета и Figma - общий центр заявок с комментариями к решению и approve-first оплата подписки через mock acquiring. После этого продукт ближе к **70%**; главные открытые зоны сместились в production providers, cancel/reschedule, admin queues, demo data и NFR evidence.
+Обновление 2026-06-06: закрыты три важных gap - общий центр заявок с комментариями к решению, approve-first оплата подписки через mock acquiring и живые seed/demo профили. После этого продукт ближе к **70%**; главные открытые зоны сместились в production providers, cancel/reschedule, admin queues и NFR evidence.
 
 ## Что уже хорошо
 
@@ -45,13 +45,10 @@ Mentory сейчас находится на стадии **functional MVP+ / de
 
 ## UI/UX проблемы, которые я бы правил следующими
 
-1. **Демо-профили не выглядят как живой продукт.** Нужны реальные фото, заполненные skills/hobbies/achievements, образование/должность/место работы.
-2. **Валюты расходятся.** В профиле ментора подписка показывает `120 USD`, а Figma/RU-продукт ожидает RUB-first интерфейс.
-3. **Публичный профиль слишком “пустой” ниже hero.** Структура правильная, но много `Не указано` и empty-state блоков.
-4. **Admin database tab технический.** Сейчас это формы `targetType/targetId/action`; идеальный продукт требует очереди профилей/отзывов/сообщений с действиями.
-5. **Заявки закрыты MVP-уровнем, но не 1:1 Figma.** Есть `/requests`, комментарии и states, но не отдельные pixel-perfect detail screens для каждого типа заявки.
-6. **Video flow расходится с Figma.** Код имеет platform room placeholder, Figma просит внешнюю ссылку, прикрепляемую ментором.
-7. **Finance UX не финальный.** Нужны KPI, payout table, payment methods, process-ready admin UI.
+1. **Admin database tab технический.** Сейчас это формы `targetType/targetId/action`; идеальный продукт требует очереди профилей/отзывов/сообщений с действиями.
+2. **Заявки закрыты MVP-уровнем, но не 1:1 Figma.** Есть `/requests`, комментарии и states, но не отдельные pixel-perfect detail screens для каждого типа заявки.
+3. **Video flow расходится с Figma.** Код имеет platform room placeholder, Figma просит внешнюю ссылку, прикрепляемую ментором.
+4. **Finance UX не финальный.** Нужны KPI, payout table, payment methods, process-ready admin UI.
 
 ## Архитектурная оценка
 
@@ -71,7 +68,6 @@ Mentory сейчас находится на стадии **functional MVP+ / de
 
 - Cancel/reschedule policy UI.
 - Notification center/settings.
-- Красивые demo profiles и seed-data.
 - Единый design-system pass на плотность, карточки, состояния, loading/error/empty.
 
 ### Business operations

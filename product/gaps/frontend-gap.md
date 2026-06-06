@@ -52,6 +52,8 @@
 - `product/qa-screenshots/qa-2026-06-06-requests-mentee.png`
 - `product/qa-screenshots/qa-2026-06-06-subscription-checkout.png`
 - `product/qa-screenshots/qa-2026-06-06-subscriptions-mentor.png`
+- `product/qa-screenshots/qa-2026-06-06-mentors-demo-data.png`
+- `product/qa-screenshots/qa-2026-06-06-mentor-profile-demo-data.png`
 - `product/qa-screenshots/qa-2026-06-06-sessions-mentor-pending.png`
 
 Пройдено:
@@ -93,6 +95,7 @@
 | На mobile `/admin/trust#database` вкладки давали небольшой body overflow | Исправлено | Tabs теперь wrap'ятся и уменьшают padding на narrow viewport |
 | Подписки не имели checkout после одобрения ментором | Исправлено MVP | Добавлен `approved_pending_payment`, `/checkout/subscriptions/[subscriptionId]`, mock acquiring и активация подписки после webhook |
 | Reject/approve заявки не давали нормальный комментарий для менти | Исправлено MVP | Добавлен `decisionComment`, `rejected`, поле комментария в `/requests` и на детальной странице сессии |
+| Демо-профили выглядели пустыми: placeholder avatar, мало навыков/хобби/достижений, валютный шум | Исправлено MVP | Seed теперь создает avatar URL, career fields, skills, hobbies, verified profiles, RUB plans и approved regalia |
 
 ## Frontend-расхождения с отчетом
 
@@ -107,7 +110,7 @@
 | Верификация регалий | Админ проверяет документы, ментор получает статус и причину | Upload/review/status есть; deep-link коммуникация по конкретной regalia-заявке ограничена | Частично |
 | Подбор по критериям | Стаж, компания, специализация, цели и др. | Каталог фильтрует topic/price/rating/education/workplace/hobby/skill; нет обязательных gender/stage fields из части NFR | Частично |
 | Payout admin processing | Отчет описывает контроль выплат и жалоб | Backend endpoint `process-ready` есть; отдельной UI-кнопки в admin panel нет | Gap |
-| Данные профилей в seed/runtime | Макеты показывают фото, навыки, хобби и достижения у демонстрационного ментора | Структурные блоки есть, но часть seed-профилей остается пустой (`Не указано`, placeholder avatar) | Data gap |
+| Данные профилей в seed/runtime | Макеты показывают фото, навыки, хобби и достижения у демонстрационного ментора | Seed-профили заполнены фото, career fields, skills, hobbies, RUB plans и approved regalia | Закрыто MVP |
 
 ## Рекомендуемый frontend backlog
 
@@ -126,7 +129,3 @@
    - список ready payouts;
    - кнопка process-ready;
    - журнал ошибок.
-5. Донаполнить seed/demo profiles под Figma:
-   - avatar URL или локальный upload для демонстрационных менторов;
-   - skills/hobbies/achievements для обоих seed-менторов;
-   - согласовать валюту demo-планов с RUB-first интерфейсом.

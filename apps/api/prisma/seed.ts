@@ -47,6 +47,7 @@ async function main() {
   await prisma.attachment.deleteMany();
   await prisma.message.deleteMany();
   await prisma.conversation.deleteMany();
+  await prisma.payment.deleteMany();
   await prisma.mentorshipBookmark.deleteMany();
   await prisma.mentorshipTask.deleteMany();
   await prisma.mentorshipSubscription.deleteMany();
@@ -55,7 +56,6 @@ async function main() {
   await prisma.menteeCreditBalance.deleteMany();
   await prisma.sessionNote.deleteMany();
   await prisma.videoRoom.deleteMany();
-  await prisma.payment.deleteMany();
   await prisma.payout.deleteMany();
   await prisma.session.deleteMany();
   await prisma.slot.deleteMany();
@@ -96,6 +96,9 @@ async function main() {
       username: 'alex_mentor',
       passwordHash,
       fullName: 'Алексей Петров',
+      firstName: 'Алексей',
+      lastName: 'Петров',
+      avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=480&q=80',
       timezone: 'Europe/Moscow',
       role: UserRole.mentor,
       isEmailVerified: true,
@@ -104,8 +107,15 @@ async function main() {
         create: {
           headline: 'Senior Software Engineer @ Yandex',
           bio: 'Более 10 лет опыта в backend-разработке. Помогаю разработчикам расти от junior до senior. Специализируюсь на архитектуре высоконагруженных систем.',
+          education: 'МФТИ, прикладная математика и информатика',
+          position: 'Senior Software Engineer',
+          workplace: 'Yandex',
+          activityFields: ['Backend', 'System Design', 'DevOps'],
+          skills: ['Node.js', 'PostgreSQL', 'System Design', 'Kubernetes', 'Highload'],
+          hobbies: ['Бег', 'Шахматы', 'Технические подкасты'],
           languages: ['Русский', 'English'],
           timezone: 'Europe/Moscow',
+          verificationStatus: 'verified',
           isActive: true,
           ratingAvg: 4.85,
           ratingCount: 47,
@@ -120,6 +130,9 @@ async function main() {
       username: 'maria_mentor',
       passwordHash,
       fullName: 'Мария Иванова',
+      firstName: 'Мария',
+      lastName: 'Иванова',
+      avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=480&q=80',
       timezone: 'Europe/Moscow',
       role: UserRole.mentor,
       isEmailVerified: true,
@@ -128,8 +141,15 @@ async function main() {
         create: {
           headline: 'Engineering Manager @ VK',
           bio: 'Прошла путь от junior developer до Engineering Manager. Помогаю с карьерным ростом, переходом в менеджмент и развитием soft skills.',
+          education: 'ВШЭ, управление продуктами и командами',
+          position: 'Engineering Manager',
+          workplace: 'VK',
+          activityFields: ['Career Growth', 'Product Management', 'Leadership'],
+          skills: ['People Management', 'Product Strategy', '1:1', 'Roadmap', 'Hiring'],
+          hobbies: ['Путешествия', 'Настольные игры', 'Йога'],
           languages: ['Русский', 'English', 'Deutsch'],
           timezone: 'Europe/Moscow',
+          verificationStatus: 'verified',
           isActive: true,
           ratingAvg: 4.92,
           ratingCount: 63,
@@ -151,14 +171,23 @@ async function main() {
       username: 'ivan_mentee',
       passwordHash,
       fullName: 'Иван Сидоров',
+      firstName: 'Иван',
+      lastName: 'Сидоров',
+      avatarUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=480&q=80',
       timezone: 'Europe/Moscow',
       role: UserRole.mentee,
       isEmailVerified: true,
       emailVerifiedAt: new Date(),
       menteeProfile: {
         create: {
+          education: 'ИТМО, программная инженерия',
+          position: 'Junior Backend Developer',
+          workplace: 'Fintech Lab',
+          activityFields: ['Backend', 'Databases'],
           background: 'Junior Backend Developer, 1.5 года опыта. Работаю с Node.js и PostgreSQL.',
           goals: ['Хочу вырасти до Middle/Senior уровня', 'Улучшить понимание архитектуры и системного дизайна'],
+          skills: ['Node.js', 'SQL', 'Docker'],
+          hobbies: ['Бег', 'Книги', 'Настольные игры'],
           interests: ['Backend', 'System Design', 'Databases'],
         },
       },
@@ -171,14 +200,23 @@ async function main() {
       username: 'anna_mentee',
       passwordHash,
       fullName: 'Анна Козлова',
+      firstName: 'Анна',
+      lastName: 'Козлова',
+      avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=480&q=80',
       timezone: 'Europe/Moscow',
       role: UserRole.mentee,
       isEmailVerified: true,
       emailVerifiedAt: new Date(),
       menteeProfile: {
         create: {
+          education: 'СПбГУ, прикладная информатика',
+          position: 'Middle Frontend Developer',
+          workplace: 'RetailTech',
+          activityFields: ['Frontend', 'Product'],
           background: 'Middle Frontend Developer, 3 года опыта. React, TypeScript.',
           goals: ['Планирую переход в Product Management', 'Нужна помощь с подготовкой и пониманием роли'],
+          skills: ['React', 'TypeScript', 'UX Research'],
+          hobbies: ['Фотография', 'Йога', 'Подкасты'],
           interests: ['Product Management', 'Career', 'Leadership'],
         },
       },
@@ -275,6 +313,67 @@ async function main() {
   });
 
   console.log(`   Created ${services1.count + services2.count} services`);
+
+  // ============================================
+  // Create Mentorship Plans and Approved Regalia
+  // ============================================
+  console.log('🧭 Creating mentorship plans and regalia...');
+
+  const plans = await prisma.mentorshipPlan.createMany({
+    data: [
+      {
+        mentorId: mentor1.id,
+        title: 'Senior Backend Fast Track',
+        description: '3 созвона в месяц, ревью архитектурных решений и персональный план роста.',
+        priceAmount: 12000,
+        currency: 'RUB',
+        billingIntervalMonths: 1,
+        callsPerMonth: 3,
+        sessionDurationMin: 60,
+        responseTimeHours: 24,
+        includesUnlimitedChat: true,
+      },
+      {
+        mentorId: mentor2.id,
+        title: 'Переход в Engineering Management',
+        description: 'Подготовка к роли EM: 1:1, hiring, performance review и коммуникация со стейкхолдерами.',
+        priceAmount: 15000,
+        currency: 'RUB',
+        billingIntervalMonths: 1,
+        callsPerMonth: 4,
+        sessionDurationMin: 60,
+        responseTimeHours: 24,
+        includesUnlimitedChat: true,
+      },
+    ],
+  });
+
+  await prisma.mentorRegalia.createMany({
+    data: [
+      {
+        mentorId: mentor1.id,
+        title: 'Сертификат Yandex Highload Architecture',
+        fileUrl: '/uploads/demo/alex-highload-certificate.pdf',
+        fileName: 'alex-highload-certificate.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: BigInt(524288),
+        status: 'approved',
+        reviewedAt: new Date(),
+      },
+      {
+        mentorId: mentor2.id,
+        title: 'Диплом программы Team Leadership',
+        fileUrl: '/uploads/demo/maria-team-leadership.pdf',
+        fileName: 'maria-team-leadership.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: BigInt(524288),
+        status: 'approved',
+        reviewedAt: new Date(),
+      },
+    ],
+  });
+
+  console.log(`   Created ${plans.count} mentorship plans and approved regalia`);
 
   // ============================================
   // Create Availability Rules

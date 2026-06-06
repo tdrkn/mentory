@@ -21,7 +21,7 @@
 | Домен | Что уже есть | Что мешает идеальному продукту |
 |---|---|---|
 | Auth | Email/username login, verification, password reset, lockout | 2FA для admin есть только как UI-поле, backend не подключен |
-| Profiles | Mentor/mentee profiles, avatar, skills, hobbies, regalia | Demo profiles пустые; нет хорошего наполнения под презентацию |
+| Profiles | Mentor/mentee profiles, avatar, skills, hobbies, regalia | Seed-профили уже пригодны для demo; production media/storage остается отдельной задачей |
 | Discovery | Каталог, фильтры, profile detail | Фильтры работают, но не все Figma/NFR поля являются first-class domain fields |
 | Booking | Hold, request goal/motivation, payment, mentor approve/reject, decision comment | Нет pixel-perfect detail screens для каждого request-типа |
 | Sessions | Session detail, notes, chat/video, review | Figma требует внешний video link; текущий room placeholder отличается |
@@ -74,11 +74,10 @@ PNG-версии лежат рядом после render pass.
 
 Что нужно для beta:
 
-1. Привести demo data к Figma: фото, навыки, хобби, achievements, RUB-only.
-2. Довести admin moderation до очередей и actionable cards.
-3. Закрыть finance UX: KPI, payout table, payout actions.
-4. Добавить cancel/reschedule policy UI.
-5. Заменить placeholders на production provider boundaries или явно выключенные post-MVP flags.
+1. Довести admin moderation до очередей и actionable cards.
+2. Закрыть finance UX: KPI, payout table, payout actions.
+3. Добавить cancel/reschedule policy UI.
+4. Заменить placeholders на production provider boundaries или явно выключенные post-MVP flags.
 
 Что нужно для production-grade:
 
