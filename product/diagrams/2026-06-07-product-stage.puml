@@ -1,0 +1,16 @@
+@startuml
+!theme plain
+title Mentory Product Stage (2026-06-07)
+
+left to right direction
+rectangle "Prototype" as A
+rectangle "Functional MVP" as B
+rectangle "Demo-ready alpha\nCURRENT" as C #DDEBFF
+rectangle "Beta" as D
+rectangle "Production-grade" as E
+
+A --> B
+B --> C
+C --> D : providers, cancel/reschedule,\nadmin queues, NFR evidence
+D --> E : SLA, monitoring,\nload tests, runbooks
+@enduml

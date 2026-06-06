@@ -1,0 +1,48 @@
+# Figma/Product Gap Report
+
+Дата: 2026-06-07
+
+## Краткий вывод
+
+Mentory стал заметно ближе к последним макетам и пользовательской логике, но Figma все еще шире текущей реализации в деталях заявок, финансах, админских очередях и некоторых состояниях подписок.
+
+## Закрыто в последнем pass
+
+| Gap | Было | Стало |
+|---|---|---|
+| Demo catalog | 2 ментора, мало данных | 15 менторов с фото, услугами, программами и слотами |
+| Photos | В карточках и header были initials/icon | Фото есть в каталоге и меню пользователя |
+| Sessions | Важные заявки терялись в табах | `На согласовании` идет первым, CTA понятный |
+| Meeting link/notes | Save без результата | Есть success/error feedback |
+| Chat | Enter не отправлял | Enter отправляет, Shift+Enter переносит строку |
+| Heavy terms | Траст, кредиты, регалии | Помощь, бонусный баланс, документы ментора |
+| Dark theme | Низкая читаемость | Контрастные токены для bg/surface/text/status |
+| Subscriptions | Ручной ID был основным сценарием | Основной UX через программы и заявки, ручной код спрятан |
+
+## Открытые различия с Figma
+
+| Area | Gap | Priority |
+|---|---|---:|
+| Requests | Нет отдельных 1:1 страниц деталей заявки на сессию/подписку | High |
+| Booking | Pay-first/session request screen отличается от target | High |
+| Subscriptions | Нет отдельной `/subscriptions/new?planId=` страницы из макета | Medium |
+| Finance | KPI, payout table, payment methods не доведены до Figma | High |
+| Admin support | Есть формы, но нет объектных очередей и карточек | High |
+| Cancel/reschedule | Политика и UI отсутствуют | High |
+| Notifications | Нет полноценного центра уведомлений и настроек | Medium |
+| Mobile polish | Основные экраны работают, но нужен полный visual pass | Medium |
+
+## Рекомендованный порядок закрытия
+
+1. **Requests detail screens:** самый заметный разрыв в CJM.
+2. **Cancel/reschedule:** без этого сложно считать scheduling продуктовым.
+3. **Finance UI:** нужен для доверия менторов.
+4. **Admin queues:** убрать ручные UUID и технические формы.
+5. **Provider readiness:** payments, payouts, storage.
+6. **Visual polish:** spacing, typography, empty/loading/error states.
+
+## Как оценивать дальше
+
+- Все новые UI flows проверять в браузере на desktop и mobile.
+- Для каждого gap делать difference-коммит с коротким QA evidence.
+- Если Figma противоречит коду, фиксировать решение в этом документе или в `product/README.md`.

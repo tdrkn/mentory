@@ -1,0 +1,29 @@
+@startuml
+!theme plain
+title Mentory C4 L1 - Context (2026-06-07)
+
+actor "Менти" as Mentee
+actor "Ментор" as Mentor
+actor "Администратор" as Admin
+
+rectangle "Mentory Platform" as Mentory {
+  rectangle "Web app" as Web
+  rectangle "API" as API
+}
+
+database "PostgreSQL" as DB
+queue "Redis" as Redis
+cloud "Email provider" as Email
+cloud "Payment provider\n(mock now, real target)" as Pay
+cloud "File storage\n(local now, S3 target)" as Files
+
+Mentee --> Web : ищет ментора,\nподает заявки,\nобщается
+Mentor --> Web : ведет профиль,\nпринимает заявки,\nпроводит сессии
+Admin --> Web : проверяет документы,\nразбирает обращения
+Web --> API : HTTPS / JSON
+API --> DB : Prisma
+API --> Redis : locks/cache
+API --> Email : уведомления
+API --> Pay : оплаты/возвраты target
+API --> Files : фото/документы
+@enduml

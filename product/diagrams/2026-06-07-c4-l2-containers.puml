@@ -1,0 +1,25 @@
+@startuml
+!theme plain
+title Mentory C4 L2 - Containers (2026-06-07)
+
+actor "Пользователь" as User
+node "Browser" {
+  rectangle "SvelteKit Web\napps/web" as Web
+}
+node "API container" {
+  rectangle "NestJS API\napps/api" as API
+  rectangle "Shared types\npackages/shared" as Shared
+}
+database "PostgreSQL" as DB
+queue "Redis" as Redis
+folder "Uploads" as Uploads
+node "Caddy" as Caddy
+
+User --> Caddy
+Caddy --> Web
+Web --> API : /api/*
+API --> Shared : TypeScript contracts
+API --> DB : Prisma
+API --> Redis : slots/locks/socket support
+API --> Uploads : local file adapter
+@enduml

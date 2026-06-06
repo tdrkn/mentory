@@ -31,6 +31,10 @@ product/
 
 ## Ключевые файлы
 
+- `handbook/mentory-leadership-intro.md` и `handbook/mentory-leadership-intro.pdf` - большой вводный документ для нового лидера проекта.
+- `reports/mini-report-2026-06-07.md` - свежий мини-отчет после pass по demo-data, фото, сессиям, чату, терминам, темной теме и подпискам.
+- `reports/framework-map-2026-06-07.md` - свежая раскладка продукта по technical/product/UI/C4/stage frameworks.
+- `gaps/figma-product-gap-2026-06-07.md` - свежая степень различий с Figma/product и порядок закрытия gaps.
 - `reports/mini-report-2026-05-25.md` - краткий отчет по стадии продукта, browser QA, степени расхождений с DOCX/Figma и недостающим частям до идеального продукта.
 - `reports/framework-map-2026-05-25.md` - раскладка продукта по technical/product/UI/C4/stage frameworks.
 - `gaps/requirements-gap.md` - главный документ для планирования доработок по отчету: архитектура, заявки, подписки, payout, video, uploads, admin/trust и NFR.
@@ -43,6 +47,7 @@ product/
 - `backlog/usm.txt` - User Story Map и Use Cases из последнего DOCX-отчета с пометками текущего статуса реализации.
 - `backlog/mentorcruise-fast-track-plan.md` - продуктовый fast-track план по MentorCruise-like опыту.
 - `diagrams/2026-05-25-*.puml/.png/.svg` - актуальные C4 L1/L2/L3, CJM, gap heatmap и product stage model.
+- `diagrams/2026-06-07-*.puml/.png/.svg` - свежие C4/CJM/deploy/stage схемы после последнего product pass.
 - `diagrams/legacy/с4_and_sequence/` - ранние C4/sequence диаграммы, сохранены как legacy reference.
 - `qa-screenshots/` - скриншоты browser QA, используемые как evidence по UI.
 
@@ -56,3 +61,10 @@ product/
 - Uploads: trust/chat/regalia data URL payloads сохраняются через local `FileStorageService`; в БД остается `/uploads/*` URL. MinIO/S3 - будущая production-замена.
 - Figma UI: профиль ментора на просмотре использует отдельные правые блоки `Планы подписки` и `Разовые сессии и услуги`; старые табы `Сессия/Подписка` не возвращать без нового согласования.
 - NFR: 50k users, 99.9%, RTO/RPO, retention, DWH и SLA поддержки пока являются target-only требованиями без нагрузочного/операционного evidence.
+
+## Current Stage 2026-06-07
+
+- Стадия: **demo-ready alpha / functional MVP+**.
+- Готовность: **72-76%** от идеального продукта.
+- Закрыто в последнем pass: богатый demo seed, фото в каталоге/header, понятные сессии и чат, простые термины, читаемая темная тема, упрощенные подписки.
+- Главные gaps до beta: real acquiring/refunds/payouts, cancel/reschedule, admin queues без UUID, production storage, monitoring/backups/load tests, финальный Figma polish.

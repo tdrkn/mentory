@@ -1,0 +1,18 @@
+@startuml
+!theme plain
+title Mentory Deploy Flow (2026-06-07)
+
+actor "Developer" as Dev
+cloud "GitHub\norigin/main" as GH
+node "Server 104.248.89.238\n/opt/mentory" as Server
+node "Docker Compose" as Compose
+database "PostgreSQL" as DB
+node "Caddy" as Caddy
+
+Dev -> GH : git push
+Server -> GH : git fetch + pull --ff-only
+Server -> Compose : build api web
+Compose -> DB : migrate deploy
+Server -> Compose : up -d db redis api web caddy
+Caddy -> Compose : route HTTP to web/api
+@enduml
