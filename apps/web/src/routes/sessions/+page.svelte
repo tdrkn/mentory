@@ -49,6 +49,10 @@
     isLoading = true;
     try {
       sessions = await api.get<SessionItem[]>('/sessions');
+      const explicitTab = parseTab($page.url.searchParams.get('tab'));
+      if (!explicitTab && sessions.some((s) => s.status === 'requested' || s.status === 'paid')) {
+        tab = 'pending';
+      }
     } finally {
       isLoading = false;
     }
@@ -134,11 +138,28 @@
   const formatSlotFull = (iso: string) =>
     new Date(iso).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 
+  const sessionActionLabel = (status: string) => {
+    if (status === 'requested' || status === 'paid') {
+      return $isMentor ? 'Согласовать встречу' : 'Посмотреть заявку';
+    }
+    if (status === 'completed' && !$isMentor) return 'Оценить ментора';
+    return 'Открыть сессию';
+  };
+
+  const sortSessions = (items: SessionItem[]) => {
+    return [...items].sort((a, b) => {
+      const pendingA = a.status === 'requested' || a.status === 'paid';
+      const pendingB = b.status === 'requested' || b.status === 'paid';
+      if (pendingA !== pendingB) return pendingA ? -1 : 1;
+      return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
+    });
+  };
+
   // Pending count badge
   $: pendingCount = sessions.filter((s) => s.status === 'requested' || s.status === 'paid').length;
 
   // Active tab list (reactive)
-  $: list = filtered(sessions, tab);
+  $: list = sortSessions(filtered(sessions, tab));
 </script>
 
 <div class="page">
@@ -158,17 +179,17 @@
 
       <!-- Tab row -->
       <div class="tab-row">
-        <button class="tab-btn {tab === 'upcoming' ? 'tab-active' : ''}" on:click={() => (tab = 'upcoming')}>
-          Предстоящие
-        </button>
-        <button class="tab-btn {tab === 'past' ? 'tab-active' : ''}" on:click={() => (tab = 'past')}>
-          Прошедшие
-        </button>
         <button class="tab-btn {tab === 'pending' ? 'tab-active' : ''}" on:click={() => (tab = 'pending')}>
           На согласовании
           {#if pendingCount > 0}
             <span class="badge-count">{pendingCount}</span>
           {/if}
+        </button>
+        <button class="tab-btn {tab === 'upcoming' ? 'tab-active' : ''}" on:click={() => (tab = 'upcoming')}>
+          Предстоящие
+        </button>
+        <button class="tab-btn {tab === 'past' ? 'tab-active' : ''}" on:click={() => (tab = 'past')}>
+          Прошедшие
         </button>
         <button class="tab-btn {tab === 'all' ? 'tab-active' : ''}" on:click={() => (tab = 'all')}>
           Все
@@ -203,7 +224,7 @@
               </div>
 
               <div class="session-actions">
-                <a class="btn btn-outline" href={`/sessions/${s.id}`}>Подробная информация</a>
+                <a class="btn btn-outline" href={`/sessions/${s.id}`}>{sessionActionLabel(s.status)}</a>
                 <a class="btn btn-ghost" href={`/chat?session=${s.id}`}>Чат с {$isMentor ? 'менти' : 'ментором'}</a>
               </div>
             </div>

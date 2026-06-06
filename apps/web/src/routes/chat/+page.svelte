@@ -133,6 +133,12 @@
     }
   };
 
+  const handleComposerKeydown = (event: KeyboardEvent) => {
+    if (event.key !== 'Enter' || event.shiftKey) return;
+    event.preventDefault();
+    handleSend();
+  };
+
   const handleSendEmoji = async (emoji: string) => {
     composerNotice = null;
     await sendPayload({ content: emoji, contentType: 'emoji' });
@@ -531,13 +537,15 @@
             {/if}
 
             <div class="chat-composer">
-              <input
-                class="input"
+              <textarea
+                class="input chat-input"
                 bind:value={newMessage}
                 placeholder="Введите сообщение..."
                 maxlength={1000}
                 on:input={handleTyping}
-              />
+                on:keydown={handleComposerKeydown}
+                rows="2"
+              ></textarea>
               <button class="btn btn-primary" on:click={handleSend} disabled={isSending || !newMessage.trim()}>
                 {isSending ? '...' : 'Отправить'}
               </button>
@@ -683,6 +691,7 @@
   .chat-message-bubble {
     max-width: 70%;
     word-break: break-word;
+    white-space: pre-wrap;
   }
 
   .chat-message-bubble.mine {
@@ -694,6 +703,13 @@
     display: flex;
     gap: 8px;
     margin-top: 12px;
+  }
+
+  .chat-input {
+    min-height: 46px;
+    max-height: 140px;
+    line-height: 1.35;
+    resize: vertical;
   }
 
   .chat-counter {

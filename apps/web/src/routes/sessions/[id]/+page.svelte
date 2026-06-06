@@ -39,10 +39,14 @@
   let reviewText = '';
   let showReviewForm = false;
   let decisionCommentInput = '';
+  let notesMessage: string | null = null;
+  let notesError: string | null = null;
 
   // Video link
   let videoLinkInput = '';
   let isSavingVideoLink = false;
+  let videoLinkMessage: string | null = null;
+  let videoLinkError: string | null = null;
 
   const loadSession = async () => {
     session = await api.get<SessionDetail>(`/sessions/${$page.params.id}`);
@@ -61,24 +65,35 @@
 
   const handleSaveNotes = async () => {
     isSaving = true;
-    await api.patch(`/sessions/${$page.params.id}/notes`, {
-      privateNotes: notes,
-      sharedSummary,
-    });
-    isSaving = false;
+    notesMessage = null;
+    notesError = null;
+    try {
+      await api.patch(`/sessions/${$page.params.id}/notes`, {
+        privateNotes: notes,
+        sharedSummary,
+      });
+      notesMessage = 'Заметки сохранены.';
+    } catch {
+      notesError = 'Не удалось сохранить заметки. Попробуйте ещё раз.';
+    } finally {
+      isSaving = false;
+    }
   };
 
   const handleSaveVideoLink = async () => {
     if (!session) return;
     isSavingVideoLink = true;
+    videoLinkMessage = null;
+    videoLinkError = null;
     try {
       const result = await api.patch<{ id: string; videoLink: string | null }>(
         `/sessions/${session.id}/video-link`,
         { videoLink: videoLinkInput.trim() || null },
       );
       if (session) session = { ...session, videoLink: result.videoLink };
+      videoLinkMessage = result.videoLink ? 'Ссылка на встречу сохранена.' : 'Ссылка на встречу очищена.';
     } catch {
-      // silent — link stays in input
+      videoLinkError = 'Не удалось сохранить ссылку. Проверьте формат и попробуйте ещё раз.';
     } finally {
       isSavingVideoLink = false;
     }
@@ -293,6 +308,16 @@
                   {isSavingVideoLink ? '...' : 'Сохранить'}
                 </button>
               </div>
+              {#if videoLinkMessage}
+                <div class="surface" style="margin-top:10px;background:var(--status-success-bg);border-color:var(--status-success-border);color:var(--status-success-ink);">
+                  {videoLinkMessage}
+                </div>
+              {/if}
+              {#if videoLinkError}
+                <div class="surface" style="margin-top:10px;background:var(--status-error-bg);border-color:var(--status-error-border);color:var(--status-error-ink);">
+                  {videoLinkError}
+                </div>
+              {/if}
               {#if videoLinkInput}
                 <a
                   href={videoLinkInput}
@@ -385,6 +410,16 @@
           <button class="btn btn-primary" style="margin-top:12px;" on:click={handleSaveNotes} disabled={isSaving}>
             {isSaving ? 'Сохранение...' : 'Сохранить заметки'}
           </button>
+          {#if notesMessage}
+            <div class="surface" style="margin-top:10px;background:var(--status-success-bg);border-color:var(--status-success-border);color:var(--status-success-ink);">
+              {notesMessage}
+            </div>
+          {/if}
+          {#if notesError}
+            <div class="surface" style="margin-top:10px;background:var(--status-error-bg);border-color:var(--status-error-border);color:var(--status-error-ink);">
+              {notesError}
+            </div>
+          {/if}
         </div>
       {/if}
     </main>
