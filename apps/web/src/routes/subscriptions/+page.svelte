@@ -153,6 +153,8 @@
   };
 
   $: selectedSubscription = subscriptions.find((item) => item.id === selectedSubscriptionId) || null;
+  $: selectedPlanForSubscription = mentorPlans.find((plan) => plan.id === subscribeForm.planId) || null;
+  $: sortedSubscriptions = sortSubscriptions(subscriptions);
   $: canManagePlans = $isMentor || $user?.role === 'admin';
   $: canCreateSubscription = $user?.role === 'mentee' || $user?.role === 'both' || $user?.role === 'admin';
   $: canUseCredits = $user?.role === 'mentee' || $user?.role === 'both' || $user?.role === 'admin';
@@ -271,7 +273,7 @@
       planForm.title = '';
       planForm.description = '';
       planForm.priceAmount = 0;
-      infoMessage = 'План создан';
+      infoMessage = 'Программа опубликована';
       await loadMyPlans();
     });
   }
@@ -294,7 +296,7 @@
       const targetPlanId = planId || subscribeForm.planId.trim();
 
       if (!targetPlanId) {
-        throw new Error('Укажите ID программы');
+        throw new Error('Выберите программу или вставьте код программы');
       }
 
       await api.post('/subscriptions', {
@@ -308,20 +310,20 @@
       subscribeForm.requestGoal = '';
       subscribeForm.requestMotivation = '';
       subscribeForm.notes = '';
-      infoMessage = 'Заявка на подписку отправлена ментору';
+      infoMessage = 'Заявка на подключение отправлена ментору';
       await loadSubscriptions();
     });
   }
 
   function selectPlanForSubscription(planId: string) {
     subscribeForm.planId = planId;
-    infoMessage = 'Программа выбрана. Нажмите «Оформить подписку».';
+    infoMessage = 'Программа выбрана. Расскажите ментору, с чем нужна помощь, и отправьте заявку.';
   }
 
   async function changeSubscriptionStatus(subscriptionId: string, status: MentorshipSubscription['status']) {
     await withBusy(async () => {
       await api.patch(`/subscriptions/${subscriptionId}/status`, { status });
-      infoMessage = 'Статус подписки обновлён';
+      infoMessage = 'Статус подключения обновлён';
       await loadSubscriptions();
     });
   }
@@ -498,6 +500,23 @@
     return item.status === 'pending' && ($user?.role === 'admin' || item.mentorId === $user?.id);
   }
 
+  function sortSubscriptions(items: MentorshipSubscription[]) {
+    const order: Record<MentorshipSubscription['status'], number> = {
+      pending: 0,
+      approved_pending_payment: 1,
+      active: 2,
+      paused: 3,
+      rejected: 4,
+      ended: 5,
+    };
+
+    return [...items].sort((a, b) => {
+      const statusDiff = order[a.status] - order[b.status];
+      if (statusDiff !== 0) return statusDiff;
+      return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
+    });
+  }
+
   function formatTaskStatus(status: MentorshipTask['status']) {
     if (status === 'todo') {
       return 'К выполнению';
@@ -573,8 +592,8 @@
     <main class="container section">
       <div class="page-head">
         <div>
-          <h1 class="section-title">Подписки и рабочее пространство</h1>
-          <p class="muted">Здесь вы ведёте менторство: подключение, задачи, материалы и прогресс.</p>
+          <h1 class="section-title">Менторские программы</h1>
+          <p class="muted">Подключения к менторам, рабочий план, задачи, материалы и оплата в одном месте.</p>
         </div>
         <button class="btn btn-outline" on:click={loadPage} disabled={isBusy}>Обновить</button>
       </div>
@@ -589,7 +608,7 @@
 
       <div class="grid cols-4 stats-row">
         <div class="card">
-          <div class="muted">Подписок всего</div>
+          <div class="muted">Подключений всего</div>
           <div class="kpi">{subscriptions.length}</div>
         </div>
         <div class="card">
@@ -597,7 +616,7 @@
           <div class="kpi kpi-accent">{subscriptions.filter((item) => item.status === 'active').length}</div>
         </div>
         <div class="card">
-          <div class="muted">На рассмотрении</div>
+          <div class="muted">Ждут решения</div>
           <div class="kpi kpi-warn">{subscriptions.filter((item) => item.status === 'pending').length}</div>
         </div>
         <div class="card">
@@ -610,32 +629,32 @@
         <h2 class="section-title">Как это работает</h2>
         <div class="grid cols-3 compact-grid">
           <div class="surface info-step">
-            <strong>1. Программа менторства</strong>
-            <p class="muted">Ментор создаёт программу с ценой, периодом и условиями.</p>
+            <strong>1. Выберите программу</strong>
+            <p class="muted">Откройте профиль ментора, сравните условия и отправьте заявку.</p>
           </div>
           <div class="surface info-step">
-            <strong>2. Подключение</strong>
-            <p class="muted">Менти выбирает программу и оформляет подписку.</p>
+            <strong>2. Дождитесь решения</strong>
+            <p class="muted">Ментор видит цель, принимает заявку, а вы оплачиваете подключение.</p>
           </div>
           <div class="surface info-step">
-            <strong>3. Рабочее пространство</strong>
-            <p class="muted">После подключения открываются общие задачи и полезные материалы.</p>
+            <strong>3. Работайте по плану</strong>
+            <p class="muted">После оплаты появляются задачи, дедлайны, материалы и общий прогресс.</p>
           </div>
         </div>
       </section>
 
       <section class="card">
-        <h2 class="section-title">Мои подписки</h2>
+        <h2 class="section-title">{canManagePlans ? 'Подключения учеников' : 'Мои подключения'}</h2>
         <p class="muted">
-          Подписка — это активная работа с ментором по выбранной программе.
-          Нажмите на карточку подписки, чтобы открыть рабочее пространство ниже.
+          Подключение — это активная работа с ментором по выбранной программе.
+          Нажмите на карточку, чтобы открыть рабочий план ниже.
         </p>
 
         {#if subscriptions.length === 0}
-          <p class="muted">Подписок пока нет.</p>
+          <p class="muted">Подключений пока нет.</p>
         {:else}
           <div class="stack">
-            {#each subscriptions as item}
+            {#each sortedSubscriptions as item}
               <div class="surface subscription-row {selectedSubscriptionId === item.id ? 'active-subscription' : ''}">
                 <button class="subscription-select" on:click={() => selectSubscription(item.id)} disabled={isBusy}>
                   <div class="subscription-main">
@@ -679,19 +698,19 @@
       </section>
 
       <section class="card bottom-card">
-        <h2 class="section-title">Рабочее пространство по подписке</h2>
+        <h2 class="section-title">Рабочий план</h2>
         <p class="muted workspace-description">
-          Рабочее пространство появляется после подключения к программе менторства.
-          Это совместная область ментора и менти: задачи, дедлайны и полезные материалы.
+          Рабочий план появляется после подключения к программе.
+          Это общая область ментора и менти: задачи, дедлайны и полезные материалы.
         </p>
 
         {#if !selectedSubscription || !workspace}
           <p class="muted">
             {selectedSubscription && !canOpenWorkspace(selectedSubscription.status)
               ? selectedSubscription.status === 'approved_pending_payment'
-                ? 'Рабочее пространство откроется после оплаты одобренной подписки.'
-                : 'Рабочее пространство откроется после одобрения заявки ментором.'
-              : 'Когда у вас будет подписка, здесь появится ваш рабочий план.'}
+                ? 'Рабочий план откроется после оплаты одобренной заявки.'
+                : 'Рабочий план откроется после одобрения заявки ментором.'
+              : 'Когда у вас будет подключение, здесь появится ваш рабочий план.'}
           </p>
         {:else}
           <div class="workspace-meta">
@@ -782,13 +801,13 @@
 
       {#if canManagePlans}
         <section class="card bottom-card">
-          <h2 class="section-title">Конструктор программы менторства</h2>
-          <p class="muted">Создайте программу, которую увидят и смогут подключить ваши менти.</p>
+          <h2 class="section-title">Мои программы</h2>
+          <p class="muted">Создайте программу, которую смогут выбрать ваши менти.</p>
 
           <div class="grid cols-2 compact-grid">
             <form class="stack-sm plan-form" on:submit|preventDefault={createPlan}>
               <div class="surface plan-form-group">
-                <h3 class="section-subtitle">1. Описание программы</h3>
+                <h3 class="section-subtitle">Описание программы</h3>
                 <label class="label" for="plan-title">Название программы</label>
                 <input id="plan-title" class="input" placeholder="Например: Рост до Middle за 3 месяца" bind:value={planForm.title} />
                 <label class="label" for="plan-description">Что входит в программу</label>
@@ -801,10 +820,10 @@
               </div>
 
               <div class="surface plan-form-group">
-                <h3 class="section-subtitle">2. Условия подписки</h3>
+                <h3 class="section-subtitle">Условия подключения</h3>
                 <div class="grid cols-2 compact-grid">
                   <div class="stack-sm">
-                    <label class="label" for="plan-price">Стоимость за период (RUB)</label>
+                    <label class="label" for="plan-price">Стоимость за период, руб.</label>
                     <input id="plan-price" class="input" type="number" min="0" step="0.01" bind:value={planForm.priceAmount} />
                   </div>
                   <div class="stack-sm">
@@ -840,7 +859,10 @@
                     <div class="muted">
                       Звонков: {plan.callsPerMonth ?? '—'} · Ответ: до {plan.responseTimeHours ?? '—'} ч.
                     </div>
-                    <div class="muted">ID программы: {plan.id}</div>
+                    <details class="muted plan-code">
+                      <summary>Код программы</summary>
+                      <div>{plan.id}</div>
+                    </details>
                   </div>
                 {/each}
               {/if}
@@ -851,17 +873,25 @@
 
       {#if canCreateSubscription}
         <section class="card bottom-card">
-          <h2 class="section-title">Подключение к программе менторства</h2>
-          <p class="muted">Этот раздел для менти: сначала выберите программу, затем оформите подписку.</p>
+          <h2 class="section-title">Подключиться к программе</h2>
+          <p class="muted">Сначала найдите ментора, выберите программу и расскажите, с чем нужна помощь.</p>
 
           <div class="grid cols-2 compact-grid">
             <div class="stack-sm">
-              <h3 class="section-subtitle">Шаг 1. Найти программы ментора</h3>
-              <p class="muted">Если ментор прислал свой ID, введите его и загрузите список программ.</p>
-              <div class="flex gap-sm">
-                <input class="input" placeholder="ID ментора" bind:value={mentorLookupId} />
-                <button class="btn btn-outline" on:click={searchMentorPlans} disabled={isBusy}>Показать программы</button>
-              </div>
+              <h3 class="section-subtitle">1. Найдите программы ментора</h3>
+              <p class="muted">Лучший путь — открыть профиль ментора в каталоге. Если ментор прислал код, используйте блок ниже.</p>
+              <a class="btn btn-outline" href="/mentors">Открыть каталог менторов</a>
+
+              <details class="surface manual-connect">
+                <summary>Подключиться по коду ментора</summary>
+                <div class="manual-connect-body">
+                  <p class="muted">Этот способ нужен для демо и прямых приглашений. Вставьте ID ментора, если он уже у вас есть.</p>
+                  <div class="flex gap-sm">
+                    <input class="input" placeholder="ID ментора" bind:value={mentorLookupId} />
+                    <button class="btn btn-outline" on:click={searchMentorPlans} disabled={isBusy}>Показать программы</button>
+                  </div>
+                </div>
+              </details>
 
               {#if mentorPlans.length > 0}
                 <div class="stack-sm">
@@ -870,10 +900,13 @@
                       <strong>{plan.title}</strong>
                       <div class="muted">Стоимость: {formatMoney(plan.priceAmount, plan.currency)} / {plan.billingIntervalMonths} мес.</div>
                       <div class="muted">Звонков в период: {plan.callsPerMonth ?? '—'} · Ответ: до {plan.responseTimeHours ?? '—'} ч.</div>
-                      <div class="muted">ID программы: {plan.id}</div>
                       <button class="btn btn-sm btn-primary" on:click={() => selectPlanForSubscription(plan.id)} disabled={isBusy}>
                         Выбрать программу
                       </button>
+                      <details class="muted plan-code">
+                        <summary>Код программы</summary>
+                        <div>{plan.id}</div>
+                      </details>
                     </div>
                   {/each}
                 </div>
@@ -883,13 +916,29 @@
             </div>
 
             <form class="stack-sm" on:submit|preventDefault={() => subscribeToPlan()}>
-              <h3 class="section-subtitle">Шаг 2. Оформить подписку</h3>
-              <p class="muted">ID программы можно выбрать слева или вставить вручную.</p>
-              <input class="input" placeholder="ID программы" bind:value={subscribeForm.planId} />
+              <h3 class="section-subtitle">2. Отправьте заявку</h3>
+              {#if selectedPlanForSubscription}
+                <div class="surface selected-plan">
+                  <div class="muted">Выбрана программа</div>
+                  <strong>{selectedPlanForSubscription.title}</strong>
+                  <div class="muted">
+                    {formatMoney(selectedPlanForSubscription.priceAmount, selectedPlanForSubscription.currency)}
+                    / {selectedPlanForSubscription.billingIntervalMonths} мес.
+                  </div>
+                </div>
+              {:else}
+                <p class="muted">Выберите программу слева. Ручной код нужен только для прямого приглашения.</p>
+              {/if}
+              <details class="surface manual-connect">
+                <summary>У меня есть код программы</summary>
+                <div class="manual-connect-body">
+                  <input class="input" placeholder="Код программы" bind:value={subscribeForm.planId} />
+                </div>
+              </details>
               <input class="input" placeholder="Цель менторства" bind:value={subscribeForm.requestGoal} maxlength="500" />
               <textarea class="textarea" placeholder="Мотивационное письмо для ментора" bind:value={subscribeForm.requestMotivation} maxlength="2000"></textarea>
               <textarea class="textarea" placeholder="Комментарий для ментора (необязательно)" bind:value={subscribeForm.notes}></textarea>
-              <button class="btn btn-primary" type="submit" disabled={isBusy}>Оформить подписку</button>
+              <button class="btn btn-primary" type="submit" disabled={isBusy || !subscribeForm.planId.trim()}>Отправить заявку</button>
             </form>
           </div>
         </section>
@@ -897,7 +946,8 @@
 
       {#if canUseCredits}
         <section class="card bottom-card">
-          <h2 class="section-title">Бонусный баланс</h2>
+          <h2 class="section-title">Оплата и бонусный баланс</h2>
+          <p class="muted">Здесь видны бонусные деньги для оплаты программ и последние операции по балансу.</p>
 
           <div class="grid cols-2 compact-grid">
             <div class="stack-sm">
@@ -1102,6 +1152,33 @@
   .plan-option {
     display: grid;
     gap: 6px;
+  }
+
+  .manual-connect {
+    display: grid;
+    gap: 10px;
+  }
+
+  .manual-connect summary,
+  .plan-code summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--ink-secondary);
+  }
+
+  .manual-connect-body {
+    display: grid;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .selected-plan {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-muted);
+  }
+
+  .plan-code {
+    word-break: break-all;
   }
 
   .tx-row {
