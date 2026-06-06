@@ -59,7 +59,7 @@
 | FR19 - верификация регалий | Частично | PDF до 128MB, approve/reject, комментарий и download есть; deep-link в чат по конкретной regalia-заявке требует доработки |
 | FR20 - модерация контента | Частично | Есть `moderation_actions` и audit; полноценный UI для профилей/отзывов/сообщений как "контент-модерация" не завершен |
 | FR21 - блокировка пользователей | Частично | `users.is_blocked`, `user_blocks`, запрет login для blocked users есть; workflow разблокировки/операторский UX неполный |
-| FR22 - обработка платежей админом | Частично | Admin payments cancel/refund-like действия и platform withdrawals частично есть; реального провайдера нет |
+| FR22 - обработка платежей админом | Частично | Admin payments cancel/refund-like действия, platform withdrawals и process-ready payouts доступны; реального провайдера нет |
 
 ## 3) Non-Functional Requirements
 

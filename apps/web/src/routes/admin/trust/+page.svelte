@@ -319,6 +319,17 @@
     });
   };
 
+  const processReadyPayouts = async () => {
+    await withBusy(async () => {
+      const result = await api.post<{ checked: number; completed: number; blocked: number }>(
+        '/admin/payments/payouts/process-ready',
+      );
+      notice = `Выплаты обработаны: проверено ${result.checked}, завершено ${result.completed}, заблокировано жалобами ${result.blocked}.`;
+      await loadBalance();
+      await loadAudit();
+    });
+  };
+
   const refreshAll = async () => {
     await Promise.all([loadComplaints(), loadRegalia(), loadAudit(), loadBalance()]);
   };
@@ -681,6 +692,11 @@
                 <input class="input" bind:value={withdrawCurrency} maxlength="3" placeholder="RUB" />
                 <input class="input" bind:value={withdrawProvider} placeholder="Провайдер (например manual)" />
                 <button class="btn btn-primary" on:click={withdrawPlatformFees} disabled={isBusy}>Создать вывод</button>
+              </div>
+              <div class="stack-sm">
+                <h3 style="margin:0;font-size:0.95rem;">Выплаты менторам</h3>
+                <p class="muted" style="margin:0;">Обрабатывает выплаты, у которых истек период холда и нет активных жалоб.</p>
+                <button class="btn btn-outline" on:click={processReadyPayouts} disabled={isBusy}>Обработать готовые выплаты</button>
               </div>
             </div>
           </section>

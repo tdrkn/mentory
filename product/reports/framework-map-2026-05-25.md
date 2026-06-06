@@ -27,7 +27,7 @@
 | Sessions | Session detail, notes, chat/video, review | Figma требует внешний video link; текущий room placeholder отличается |
 | Subscriptions | Plans, `pending -> approved_pending_payment -> active`, checkout after approval, workspace | Real acquiring остается production gap |
 | Scheduling | Rules, slots, weekly calendar | Базово хорошо; нужен UX-polish для больших календарей и timezone edge cases |
-| Payments/Payouts | Mock acquiring, delayed payout after completion | Нет real acquiring/refunds/payout provider и операторского payout UI |
+| Payments/Payouts | Mock acquiring, delayed payout after completion, admin process-ready UI | Нет real acquiring/refunds/payout provider |
 | Chat | REST + Socket.IO, messages/attachments | Базовый flow есть; notification/presence UX можно улучшать |
 | Trust/Admin | Complaints, regalia review, blocks, audit, custom admin pages | Admin moderation UI еще технический: UUID forms вместо очередей объектов |
 | Notifications | Email/in-app foundation | Нет push, settings center, SLA support workflow |
@@ -43,7 +43,7 @@
 | Booking/session request | Работает, но не полностью как Figma request screens | Высокая |
 | Subscription request | Есть approve-first flow и checkout after approval | Средняя: structure MVP, не 1:1 Figma detail screen |
 | Sessions | Есть основные страницы, но Figma требует отдельные states/details/review | Средняя-высокая |
-| Finance | Есть earnings/payout foundation | Высокая: Figma KPI/table/payment method UX не закрыт полностью |
+| Finance | Есть earnings/payout foundation и admin process-ready action | Средняя-высокая: Figma KPI/table/payment method UX не закрыт полностью |
 | Admin | Custom UI есть и работает | Средняя: dashboard близко, moderation database tab остается technical |
 
 ## 4. C4 artifact framework
@@ -75,7 +75,7 @@ PNG-версии лежат рядом после render pass.
 Что нужно для beta:
 
 1. Довести admin moderation до очередей и actionable cards.
-2. Закрыть finance UX: KPI, payout table, payout actions.
+2. Закрыть finance UX: KPI, payout table, payment methods.
 3. Добавить cancel/reschedule policy UI.
 4. Заменить placeholders на production provider boundaries или явно выключенные post-MVP flags.
 

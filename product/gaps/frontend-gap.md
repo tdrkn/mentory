@@ -54,6 +54,7 @@
 - `product/qa-screenshots/qa-2026-06-06-subscriptions-mentor.png`
 - `product/qa-screenshots/qa-2026-06-06-mentors-demo-data.png`
 - `product/qa-screenshots/qa-2026-06-06-mentor-profile-demo-data.png`
+- `product/qa-screenshots/qa-2026-06-06-admin-payout-processing.png`
 - `product/qa-screenshots/qa-2026-06-06-sessions-mentor-pending.png`
 
 Пройдено:
@@ -96,6 +97,7 @@
 | Подписки не имели checkout после одобрения ментором | Исправлено MVP | Добавлен `approved_pending_payment`, `/checkout/subscriptions/[subscriptionId]`, mock acquiring и активация подписки после webhook |
 | Reject/approve заявки не давали нормальный комментарий для менти | Исправлено MVP | Добавлен `decisionComment`, `rejected`, поле комментария в `/requests` и на детальной странице сессии |
 | Демо-профили выглядели пустыми: placeholder avatar, мало навыков/хобби/достижений, валютный шум | Исправлено MVP | Seed теперь создает avatar URL, career fields, skills, hobbies, verified profiles, RUB plans и approved regalia |
+| Admin payout processing был backend-only | Исправлено MVP | `AdminPaymentsController` подключен в `PaymentsModule`; `/admin/trust#database` получил кнопку `Обработать готовые выплаты` |
 
 ## Frontend-расхождения с отчетом
 
@@ -109,7 +111,7 @@
 | Уведомления | Push на телефон + email | Header не имеет полноценного notification center/settings UI; push delivery не реализован | Gap |
 | Верификация регалий | Админ проверяет документы, ментор получает статус и причину | Upload/review/status есть; deep-link коммуникация по конкретной regalia-заявке ограничена | Частично |
 | Подбор по критериям | Стаж, компания, специализация, цели и др. | Каталог фильтрует topic/price/rating/education/workplace/hobby/skill; нет обязательных gender/stage fields из части NFR | Частично |
-| Payout admin processing | Отчет описывает контроль выплат и жалоб | Backend endpoint `process-ready` есть; отдельной UI-кнопки в admin panel нет | Gap |
+| Payout admin processing | Отчет описывает контроль выплат и жалоб | В admin database/finances есть кнопка обработки ready payouts; endpoint возвращает checked/completed/blocked | Закрыто MVP |
 | Данные профилей в seed/runtime | Макеты показывают фото, навыки, хобби и достижения у демонстрационного ментора | Seed-профили заполнены фото, career fields, skills, hobbies, RUB plans и approved regalia | Закрыто MVP |
 
 ## Рекомендуемый frontend backlog
@@ -125,7 +127,3 @@
    - in-app list;
    - email/push toggles;
    - честно пометить push как disabled, пока нет delivery.
-4. Добавить UI для admin payout processing:
-   - список ready payouts;
-   - кнопка process-ready;
-   - журнал ошибок.

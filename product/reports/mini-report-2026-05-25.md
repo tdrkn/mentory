@@ -8,7 +8,7 @@ Mentory сейчас находится на стадии **functional MVP+ / de
 
 Оценка готовности: **65-70% от идеального продукта**.
 
-Обновление 2026-06-06: закрыты три важных gap - общий центр заявок с комментариями к решению, approve-first оплата подписки через mock acquiring и живые seed/demo профили. После этого продукт ближе к **70%**; главные открытые зоны сместились в production providers, cancel/reschedule, admin queues и NFR evidence.
+Обновление 2026-06-06: закрыты четыре важных gap - общий центр заявок с комментариями к решению, approve-first оплата подписки через mock acquiring, живые seed/demo профили и admin process-ready payouts. После этого продукт ближе к **70%**; главные открытые зоны сместились в production providers, cancel/reschedule, admin queues и NFR evidence.
 
 ## Что уже хорошо
 
@@ -48,7 +48,7 @@ Mentory сейчас находится на стадии **functional MVP+ / de
 1. **Admin database tab технический.** Сейчас это формы `targetType/targetId/action`; идеальный продукт требует очереди профилей/отзывов/сообщений с действиями.
 2. **Заявки закрыты MVP-уровнем, но не 1:1 Figma.** Есть `/requests`, комментарии и states, но не отдельные pixel-perfect detail screens для каждого типа заявки.
 3. **Video flow расходится с Figma.** Код имеет platform room placeholder, Figma просит внешнюю ссылку, прикрепляемую ментором.
-4. **Finance UX не финальный.** Нужны KPI, payout table, payment methods, process-ready admin UI.
+4. **Finance UX не финальный.** Нужны KPI, payout table и payment methods; process-ready admin action уже есть.
 
 ## Архитектурная оценка
 
@@ -74,7 +74,7 @@ Mentory сейчас находится на стадии **functional MVP+ / de
 
 - Real acquiring/refund integration.
 - Real payout provider + scheduled job.
-- Admin payout processing UI.
+- Более полный finance UI: payout history, payment methods, failed payout handling.
 - Support SLA workflow и очередь обращений.
 - Модерация контента без ручного UUID ввода.
 
