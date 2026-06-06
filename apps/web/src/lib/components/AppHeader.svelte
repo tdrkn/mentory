@@ -37,7 +37,7 @@
           <ClipboardList size={16} /> Заявки
         </a>
         <a class="nav-link {isActive('/trust') ? 'active' : ''}" href="/trust">
-          <ShieldCheck size={16} /> Траст
+          <ShieldCheck size={16} /> Помощь
         </a>
         <a class="nav-link {isActive('/chat') ? 'active' : ''}" href="/chat">
           <MessageCircle size={16} /> Чат
@@ -79,7 +79,7 @@
               <Settings size={16} /> Настройки профиля
             </a>
             <a class="user-dropdown-item" href="/trust">
-              <ShieldCheck size={16} /> Траст-центр
+              <ShieldCheck size={16} /> Помощь и безопасность
             </a>
             {#if $isAdmin}
               <a class="user-dropdown-item" href="/admin/trust">
@@ -125,7 +125,7 @@
             <ClipboardList size={18} /> Заявки
           </a>
           <a class="mobile-nav-link {isActive('/trust') ? 'active' : ''}" href="/trust" on:click={closeMenu}>
-            <ShieldCheck size={18} /> Траст
+            <ShieldCheck size={18} /> Помощь
           </a>
           <a class="mobile-nav-link {isActive('/chat') ? 'active' : ''}" href="/chat" on:click={closeMenu}>
             <MessageCircle size={18} /> Чат
@@ -148,7 +148,7 @@
             <Settings size={18} /> Настройки
           </a>
           <a class="mobile-nav-link" href="/trust" on:click={closeMenu}>
-            <ShieldCheck size={18} /> Траст-центр
+            <ShieldCheck size={18} /> Помощь и безопасность
           </a>
           {#if $isAdmin}
             <a class="mobile-nav-link" href="/admin/trust" on:click={closeMenu}>

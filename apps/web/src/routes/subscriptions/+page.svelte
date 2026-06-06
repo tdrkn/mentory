@@ -601,7 +601,7 @@
           <div class="kpi kpi-warn">{subscriptions.filter((item) => item.status === 'pending').length}</div>
         </div>
         <div class="card">
-          <div class="muted">Баланс кредитов</div>
+          <div class="muted">Бонусный баланс</div>
           <div class="kpi">{credits ? formatMoney((credits.balance.amountCents || 0) / 100, credits.balance.currency) : '—'}</div>
         </div>
       </div>
@@ -897,7 +897,7 @@
 
       {#if canUseCredits}
         <section class="card bottom-card">
-          <h2 class="section-title">Кредиты</h2>
+          <h2 class="section-title">Бонусный баланс</h2>
 
           <div class="grid cols-2 compact-grid">
             <div class="stack-sm">

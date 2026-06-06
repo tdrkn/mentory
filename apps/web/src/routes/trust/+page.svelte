@@ -69,11 +69,11 @@
 
   const MAX_UPLOAD_SIZE_BYTES = 128 * 1024 * 1024;
   const COMPLAINT_CATEGORIES: Array<{ value: ComplaintCategory; label: string }> = [
-    { value: 'platform_issue', label: 'Проблема платформы' },
+    { value: 'platform_issue', label: 'Проблема с сайтом' },
     { value: 'user_behavior', label: 'Поведение пользователя' },
-    { value: 'session_issue', label: 'Проблема сессии' },
-    { value: 'payment_issue', label: 'Проблема оплаты' },
-    { value: 'content_violation', label: 'Нарушение контента' },
+    { value: 'session_issue', label: 'Проблема со встречей' },
+    { value: 'payment_issue', label: 'Проблема с оплатой' },
+    { value: 'content_violation', label: 'Неподходящий контент' },
     { value: 'other', label: 'Другое' },
   ];
 
@@ -111,11 +111,11 @@
   };
 
   const categoryLabel: Record<ComplaintCategory, string> = {
-    platform_issue: 'Проблема платформы',
+    platform_issue: 'Проблема с сайтом',
     user_behavior: 'Поведение пользователя',
-    session_issue: 'Проблема сессии',
-    payment_issue: 'Проблема оплаты',
-    content_violation: 'Нарушение контента',
+    session_issue: 'Проблема со встречей',
+    payment_issue: 'Проблема с оплатой',
+    content_violation: 'Неподходящий контент',
     other: 'Другое',
   };
 
@@ -181,7 +181,7 @@
   const validateComplaintAttachment = (file: File) => {
     const extension = getFileExtension(file.name);
     if (!['.png', '.jpg', '.jpeg', '.pdf'].includes(extension)) {
-      error = 'Вложения жалобы: только .png, .jpg, .jpeg, .pdf.';
+      error = 'Вложения обращения: только .png, .jpg, .jpeg, .pdf.';
       return false;
     }
     if (file.size < 1 || file.size > MAX_UPLOAD_SIZE_BYTES) {
@@ -193,7 +193,7 @@
 
   const validateRegaliaFile = (file: File) => {
     if (getFileExtension(file.name) !== '.pdf') {
-      error = 'Для верификации регалий допускается только PDF.';
+      error = 'Для проверки документов ментора допускается только PDF.';
       return false;
     }
     if (file.size < 1 || file.size > MAX_UPLOAD_SIZE_BYTES) {
@@ -249,15 +249,15 @@
       return;
     }
     if (complaintScope === 'user' && !targetUserId.trim()) {
-      error = 'Для жалобы на пользователя нужно заполнить targetUserId.';
+      error = 'Для обращения по пользователю нужно указать ID пользователя.';
       return;
     }
     if (complaintScope === 'session' && !targetSessionId.trim()) {
-      error = 'Для жалобы на сессию нужно заполнить targetSessionId.';
+      error = 'Для обращения по встрече нужно указать ID сессии.';
       return;
     }
     if (complaintFiles.length > 3) {
-      error = 'Максимум 3 вложения к одной жалобе.';
+      error = 'Максимум 3 вложения к одному обращению.';
       return;
     }
     for (const file of complaintFiles) {
@@ -293,10 +293,10 @@
       targetUserId = '';
       targetSessionId = '';
       clearComplaintFiles();
-      notice = 'Жалоба отправлена.';
+      notice = 'Обращение отправлено.';
       await loadComplaints();
     } catch (err) {
-      error = extractError(err, 'Не удалось отправить жалобу.');
+      error = extractError(err, 'Не удалось отправить обращение.');
     } finally {
       isBusy = false;
     }
@@ -340,7 +340,7 @@
     notice = null;
     error = null;
     if (!regaliaFile) {
-      error = 'Выберите PDF-файл регалии.';
+      error = 'Выберите PDF-файл с документом ментора.';
       return;
     }
     if (!validateRegaliaFile(regaliaFile)) return;
@@ -358,7 +358,7 @@
       notice = 'Файл отправлен на проверку.';
       await loadRegalia();
     } catch (err) {
-      error = extractError(err, 'Не удалось отправить регалию.');
+      error = extractError(err, 'Не удалось отправить документ.');
     } finally {
       isBusy = false;
     }
@@ -376,7 +376,7 @@
         await loadRegalia();
       }
     } catch (err) {
-      error = extractError(err, 'Не удалось загрузить trust-данные.');
+      error = extractError(err, 'Не удалось загрузить данные раздела помощи.');
     } finally {
       isPageLoading = false;
     }
@@ -390,8 +390,8 @@
     <Loading />
   {:else}
     <main class="container section">
-      <h1 class="section-title">Траст-центр</h1>
-      <p class="muted">Жалобы, коммуникация с модерацией и верификация регалий.</p>
+      <h1 class="section-title">Помощь и безопасность</h1>
+      <p class="muted">Обращения в поддержку, спорные ситуации и проверка документов ментора.</p>
 
       {#if notice}
         <div class="surface" style="margin-top:12px;background:var(--status-success-bg);border-color:var(--status-success-border);color:var(--status-success-ink);">{notice}</div>
@@ -402,10 +402,10 @@
 
       <div class="grid trust-complaints-grid">
         <section class="card">
-          <h2 class="section-title">Новая жалоба</h2>
+          <h2 class="section-title">Новое обращение</h2>
           <div class="stack-sm">
             <label>
-              <div class="muted" style="margin-bottom:6px;">Сущность проблемы</div>
+              <div class="muted" style="margin-bottom:6px;">Тема обращения</div>
               <select class="input" bind:value={category}>
                 {#each COMPLAINT_CATEGORIES as option}
                   <option value={option.value}>{option.label}</option>
@@ -421,22 +421,22 @@
               <textarea class="input" bind:value={description} rows={4} maxlength="1000"></textarea>
             </label>
             <label>
-              <div class="muted" style="margin-bottom:6px;">Тип жалобы</div>
+              <div class="muted" style="margin-bottom:6px;">К чему относится обращение</div>
               <select class="input" bind:value={complaintScope}>
-                <option value="platform">На платформу</option>
-                <option value="user">На пользователя</option>
-                <option value="session">На сессию</option>
+                <option value="platform">К сайту</option>
+                <option value="user">К пользователю</option>
+                <option value="session">К встрече</option>
               </select>
             </label>
             {#if complaintScope === 'user'}
               <label>
-                <div class="muted" style="margin-bottom:6px;">Target User ID</div>
+                <div class="muted" style="margin-bottom:6px;">ID пользователя</div>
                 <input class="input" bind:value={targetUserId} placeholder="UUID пользователя" />
               </label>
             {/if}
             {#if complaintScope === 'session'}
               <label>
-                <div class="muted" style="margin-bottom:6px;">Target Session ID</div>
+                <div class="muted" style="margin-bottom:6px;">ID сессии</div>
                 <input class="input" bind:value={targetSessionId} placeholder="UUID сессии" />
               </label>
             {/if}
@@ -462,15 +462,15 @@
               </div>
             {/if}
             <button class="btn btn-primary" on:click={createComplaint} disabled={isBusy}>
-              {isBusy ? 'Отправка...' : 'Отправить жалобу'}
+              {isBusy ? 'Отправка...' : 'Отправить обращение'}
             </button>
           </div>
         </section>
 
         <section class="card">
-          <h2 class="section-title">Мои жалобы</h2>
+          <h2 class="section-title">Мои обращения</h2>
           {#if complaints.length === 0}
-            <p class="muted">Пока жалоб нет.</p>
+            <p class="muted">Пока обращений нет.</p>
           {:else}
             <div class="stack-sm">
               {#each complaints as complaint}
@@ -499,9 +499,9 @@
       </div>
 
       <section class="card" style="margin-top:20px;">
-        <h2 class="section-title">Детали жалобы</h2>
+        <h2 class="section-title">Детали обращения</h2>
         {#if !selectedComplaint}
-          <p class="muted">Выберите жалобу из списка выше.</p>
+          <p class="muted">Выберите обращение из списка выше.</p>
         {:else}
           <div class="surface" style="margin-bottom:12px;">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -541,7 +541,7 @@
           </div>
 
           <div style="margin-top:12px;display:flex;gap:8px;">
-            <textarea class="input" rows={2} bind:value={complaintMessage} placeholder="Сообщение по жалобе..."></textarea>
+            <textarea class="input" rows={2} bind:value={complaintMessage} placeholder="Сообщение по обращению..."></textarea>
             <button class="btn btn-outline" on:click={sendComplaintMessage} disabled={isBusy || !complaintMessage.trim()}>
               Отправить
             </button>
@@ -551,7 +551,7 @@
 
       {#if isMentorRole()}
         <section class="card" style="margin-top:20px;">
-          <h2 class="section-title">Регалии ментора</h2>
+          <h2 class="section-title">Документы ментора</h2>
           <div class="grid trust-regalia-grid">
             <div class="stack-sm">
               <label>
@@ -571,13 +571,13 @@
                 </div>
               {/if}
               <button class="btn btn-primary" on:click={uploadRegalia} disabled={isBusy}>
-                {isBusy ? 'Отправка...' : 'Отправить на верификацию'}
+                {isBusy ? 'Отправка...' : 'Отправить на проверку'}
               </button>
             </div>
 
             <div>
               {#if regalia.length === 0}
-                <p class="muted">Вы ещё не отправляли регалии.</p>
+                <p class="muted">Вы ещё не отправляли документы.</p>
               {:else}
                 <div class="stack-sm">
                   {#each regalia as item}

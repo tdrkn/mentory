@@ -207,7 +207,7 @@
         status: complaintStatusUpdate,
         resolutionComment: complaintResolution.trim() || undefined,
       });
-      notice = 'Статус жалобы обновлён.';
+      notice = 'Статус обращения обновлён.';
       await loadComplaints();
       await openComplaint(selectedComplaint.id);
     });
@@ -235,7 +235,7 @@
         status,
         rejectionReason: status === 'rejected' ? regaliaReasonById[regaliaId]?.trim() || undefined : undefined,
       });
-      notice = status === 'approved' ? 'Регалия одобрена.' : 'Регалия отклонена.';
+      notice = status === 'approved' ? 'Документ одобрен.' : 'Документ отклонён.';
       await loadRegalia();
     });
   };
@@ -324,7 +324,7 @@
       const result = await api.post<{ checked: number; completed: number; blocked: number }>(
         '/admin/payments/payouts/process-ready',
       );
-      notice = `Выплаты обработаны: проверено ${result.checked}, завершено ${result.completed}, заблокировано жалобами ${result.blocked}.`;
+      notice = `Выплаты обработаны: проверено ${result.checked}, завершено ${result.completed}, заблокировано обращениями ${result.blocked}.`;
       await loadBalance();
       await loadAudit();
     });
@@ -457,7 +457,7 @@
       {#if activeTab === 'verification'}
         <section id="verification" class="tab-content">
           <div class="section-head">
-            <h2>Верификация регалий</h2>
+            <h2>Проверка документов ментора</h2>
             <div class="section-controls">
               <select class="input" bind:value={regaliaFilter}>
                 <option value="">Все статусы</option>
@@ -470,7 +470,7 @@
           </div>
 
           {#if regaliaItems.length === 0}
-            <p class="muted">Регалий не найдено.</p>
+            <p class="muted">Документы не найдены.</p>
           {:else}
             <div class="stack-sm">
               {#each regaliaItems as item}
@@ -523,7 +523,7 @@
       {#if activeTab === 'support'}
         <section id="support" class="tab-content">
           <div class="section-head">
-            <h2>Жалобы</h2>
+            <h2>Обращения</h2>
             <div class="section-controls">
               <select class="input" bind:value={complaintFilter}>
                 <option value="">Все статусы</option>
@@ -539,7 +539,7 @@
             <!-- List -->
             <div class="stack-sm complaints-list">
               {#if complaints.length === 0}
-                <p class="muted">Жалобы не найдены.</p>
+                <p class="muted">Обращения не найдены.</p>
               {:else}
                 {#each complaints as complaint}
                   <button class="surface complaint-btn" on:click={() => openComplaint(complaint.id)}>
@@ -567,7 +567,7 @@
             <!-- Detail -->
             <div class="complaint-detail">
               {#if !selectedComplaint}
-                <p class="muted">Выберите жалобу для обработки.</p>
+                <p class="muted">Выберите обращение для обработки.</p>
               {:else}
                 <div class="surface">
                   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
@@ -695,7 +695,7 @@
               </div>
               <div class="stack-sm">
                 <h3 style="margin:0;font-size:0.95rem;">Выплаты менторам</h3>
-                <p class="muted" style="margin:0;">Обрабатывает выплаты, у которых истек период холда и нет активных жалоб.</p>
+                <p class="muted" style="margin:0;">Обрабатывает выплаты, у которых истек период удержания и нет активных обращений.</p>
                 <button class="btn btn-outline" on:click={processReadyPayouts} disabled={isBusy}>Обработать готовые выплаты</button>
               </div>
             </div>
