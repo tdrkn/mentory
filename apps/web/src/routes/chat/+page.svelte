@@ -8,7 +8,7 @@
   import { user, isAuthenticated, isLoading as authLoading } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
   import type { Socket } from 'socket.io-client';
-  import { Phone } from 'lucide-svelte';
+  import { FileText, ImageIcon, Link2, Phone, Send, Smile, X } from 'lucide-svelte';
 
   type MessageType = 'text' | 'emoji' | 'image' | 'file';
 
@@ -27,7 +27,7 @@
     mentee: { id: string; fullName: string };
     lastMessage?: { content: string; contentType?: MessageType; createdAt: string; senderId: string } | null;
     unreadCount: number;
-    session?: { id: string; startAt: string; status: string } | null;
+    session?: { id: string; startAt: string; status: string; videoLink?: string | null } | null;
   }
 
   interface Message {
@@ -64,6 +64,8 @@
   let documentFile: File | null = null;
   let imageInput: HTMLInputElement | null = null;
   let documentInput: HTMLInputElement | null = null;
+  let showEmojiPicker = false;
+  let showVideoLinkEditor = false;
   let typingTimeout: any;
 
   const extractApiError = (error: unknown, fallback: string) => {
@@ -108,6 +110,11 @@
     try {
       const message = await api.post<Message>(`/chat/${activeConversation}/messages`, payload);
       pushMessageIfMissing(message);
+      conversations = conversations.map((conversation) =>
+        conversation.id === activeConversation
+          ? { ...conversation, lastMessage: { ...message, contentType: message.contentType || 'text' } }
+          : conversation,
+      );
       return true;
     } catch (error) {
       composerError = extractApiError(error, 'Не удалось отправить сообщение.');
@@ -130,6 +137,7 @@
       newMessage = '';
       emitTyping(false);
       composerNotice = null;
+      showEmojiPicker = false;
     }
   };
 
@@ -142,6 +150,7 @@
   const handleSendEmoji = async (emoji: string) => {
     composerNotice = null;
     await sendPayload({ content: emoji, contentType: 'emoji' });
+    showEmojiPicker = false;
   };
 
   const fileToDataUrl = (file: File) =>
@@ -185,6 +194,7 @@
   const handleImageFileChange = (event: Event) => {
     const target = event.currentTarget as HTMLInputElement;
     imageFile = target.files?.[0] || null;
+    documentFile = null;
     composerError = null;
     composerNotice = null;
   };
@@ -192,6 +202,7 @@
   const handleDocumentFileChange = (event: Event) => {
     const target = event.currentTarget as HTMLInputElement;
     documentFile = target.files?.[0] || null;
+    imageFile = null;
     composerError = null;
     composerNotice = null;
   };
@@ -286,14 +297,47 @@
 
     const sent = await sendPayload({ content: candidate, contentType: 'text' });
     if (sent) {
+      if (activeConversationData?.session?.id && $user?.id === activeConversationData.mentor.id) {
+        try {
+          const updated = await api.patch<{ id: string; videoLink: string | null }>(
+            `/sessions/${activeConversationData.session.id}/video-link`,
+            { videoLink: candidate },
+          );
+          conversations = conversations.map((conversation) =>
+            conversation.id === activeConversation
+              ? {
+                  ...conversation,
+                  session: conversation.session ? { ...conversation.session, videoLink: updated.videoLink } : conversation.session,
+                }
+              : conversation,
+          );
+        } catch {
+          composerNotice = 'Ссылка отправлена в чат, но не сохранилась в карточке сессии.';
+        }
+      }
       videoLink = '';
-      composerNotice = 'Ссылка на видеовстречу отправлена в чат.';
+      if (!composerNotice) composerNotice = 'Ссылка на видеовстречу отправлена.';
+      showVideoLinkEditor = false;
     }
   };
 
   const getFirstHttpLink = (content: string) => {
     const match = content.match(/https?:\/\/[^\s]+/i);
     return match ? match[0] : null;
+  };
+
+  const getLastHttpLink = (messageList: Message[], fallbackLink?: string | null) => {
+    for (let index = messageList.length - 1; index >= 0; index -= 1) {
+      const link = getFirstHttpLink(messageList[index].content);
+      if (link) return link;
+    }
+    return fallbackLink || null;
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    if (bytes >= 1024) return `${Math.ceil(bytes / 1024)} KB`;
+    return `${bytes} B`;
   };
 
   const ensureSocket = () => {
@@ -338,17 +382,13 @@
     return $user?.id === conv.mentor.id ? conv.mentee.fullName : conv.mentor.fullName;
   };
 
-  const handleJoinCall = async () => {
-    if (!activeConversationData?.session?.id) return;
-    const room = await api.get<{ joinUrlMentor?: string; joinUrlMentee?: string }>(
-      `/sessions/${activeConversationData.session.id}/video`,
-    );
-    const isMentorSide = $user?.id === activeConversationData.mentor.id;
-    const url = isMentorSide ? room.joinUrlMentor : room.joinUrlMentee;
-    const fallbackUrl = room.joinUrlMentor || room.joinUrlMentee;
-    if (url || fallbackUrl) {
-      window.open(url || fallbackUrl, '_blank');
+  const handleJoinCall = () => {
+    const link = latestMeetingLink;
+    if (!link) {
+      composerNotice = 'Ссылка на встречу пока не отправлена.';
+      return;
     }
+    window.open(link, '_blank', 'noopener,noreferrer');
   };
 
   onMount(async () => {
@@ -403,6 +443,7 @@
   };
 
   $: activeConversationData = conversations.find((conv) => conv.id === activeConversation) || null;
+  $: latestMeetingLink = getLastHttpLink(messages, activeConversationData?.session?.videoLink);
 </script>
 
 <div class="page">
@@ -455,18 +496,16 @@
           {:else}
             <div class="surface chat-thread-header">
               <div class="chat-thread-header-main">
-                <button
-                  class="btn btn-ghost btn-sm"
-                  on:click={handleJoinCall}
-                  disabled={!activeConversationData?.session?.id}
-                >
-                  <Phone size={14} /> Видеозвонок
-                </button>
                 <strong>{activeConversationData ? partnerName(activeConversationData) : ''}</strong>
+                {#if latestMeetingLink}
+                  <button class="btn btn-ghost btn-sm chat-call-button" on:click={handleJoinCall} title="Открыть последнюю ссылку из чата">
+                    <Phone size={14} /> Открыть встречу
+                  </button>
+                {/if}
               </div>
               <span class="muted chat-thread-status">
                 {#if activeConversationData?.session?.id}
-                  Сессия привязана
+                  {latestMeetingLink ? 'Последняя ссылка из чата' : 'Ссылка на встречу появится в чате'}
                 {:else}
                   Без сессии
                 {/if}
@@ -536,78 +575,89 @@
               <div class="muted" style="font-size:0.85rem;margin-top:8px;">Печатает...</div>
             {/if}
 
-            <div class="chat-composer">
-              <textarea
-                class="input chat-input"
-                bind:value={newMessage}
-                placeholder="Введите сообщение..."
-                maxlength={1000}
-                on:input={handleTyping}
-                on:keydown={handleComposerKeydown}
-                rows="2"
-              ></textarea>
-              <button class="btn btn-primary" on:click={handleSend} disabled={isSending || !newMessage.trim()}>
-                {isSending ? '...' : 'Отправить'}
-              </button>
-            </div>
-            <div class="muted chat-counter">
-              {newMessage.length}/1000
-            </div>
-            <details class="surface chat-tools">
-              <summary class="chat-tools-summary">
-                Инструменты чата
-                <span class="muted chat-tools-caption">Эмодзи, фото, документы, ВКС</span>
-              </summary>
-
-              <div style="display:grid;gap:10px;margin-top:10px;">
-                <div>
-                  <div class="muted" style="font-size:0.8rem;margin-bottom:8px;">Эмодзи</div>
-                  <div style="display:flex;flex-wrap:wrap;gap:6px;">
-                    {#each ALLOWED_CHAT_EMOJIS as emoji}
-                      <button class="btn btn-ghost btn-sm" on:click={() => handleSendEmoji(emoji)} disabled={isSending}>
-                        {emoji}
-                      </button>
-                    {/each}
-                  </div>
-                </div>
-
-                <div>
-                  <div class="muted" style="font-size:0.8rem;margin-bottom:8px;">Фото (JPG/PNG и другие image/*)</div>
-                  <div class="chat-attach-row">
-                    <input bind:this={imageInput} type="file" accept="image/*" on:change={handleImageFileChange} />
-                    <button class="btn btn-outline btn-sm" on:click={handleSendImage} disabled={isSending || !imageFile}>
-                      Отправить фото
+            <div class="chat-composer-shell">
+              {#if showEmojiPicker}
+                <div class="emoji-picker" aria-label="Эмодзи">
+                  {#each ALLOWED_CHAT_EMOJIS as emoji}
+                    <button class="emoji-button" on:click={() => handleSendEmoji(emoji)} disabled={isSending} title={`Отправить ${emoji}`}>
+                      {emoji}
                     </button>
+                  {/each}
+                </div>
+              {/if}
+
+              {#if imageFile || documentFile}
+                <div class="attachment-preview">
+                  <div class="attachment-preview-main">
                     {#if imageFile}
-                      <span class="muted" style="font-size:0.8rem;word-break:break-all;">{imageFile.name}</span>
+                      <ImageIcon size={16} />
+                      <span>{imageFile.name}</span>
+                      <span class="muted">{formatFileSize(imageFile.size)}</span>
+                    {:else if documentFile}
+                      <FileText size={16} />
+                      <span>{documentFile.name}</span>
+                      <span class="muted">{formatFileSize(documentFile.size)}</span>
+                    {/if}
+                  </div>
+                  <div class="attachment-preview-actions">
+                    {#if imageFile}
+                      <button class="btn btn-primary btn-sm" on:click={handleSendImage} disabled={isSending}>Отправить</button>
+                      <button class="icon-button" on:click={resetImageSelection} title="Убрать фото"><X size={16} /></button>
+                    {:else if documentFile}
+                      <button class="btn btn-primary btn-sm" on:click={handleSendDocument} disabled={isSending}>Отправить</button>
+                      <button class="icon-button" on:click={resetDocumentSelection} title="Убрать документ"><X size={16} /></button>
                     {/if}
                   </div>
                 </div>
+              {/if}
 
-                <div>
-                  <div class="muted" style="font-size:0.8rem;margin-bottom:8px;">Документ (.pptx, .pdf, .txt, .mvd)</div>
-                  <div class="chat-attach-row">
-                    <input bind:this={documentInput} type="file" accept=".pptx,.pdf,.txt,.mvd" on:change={handleDocumentFileChange} />
-                    <button class="btn btn-outline btn-sm" on:click={handleSendDocument} disabled={isSending || !documentFile}>
-                      Отправить документ
-                    </button>
-                    {#if documentFile}
-                      <span class="muted" style="font-size:0.8rem;word-break:break-all;">{documentFile.name}</span>
-                    {/if}
-                  </div>
+              {#if showVideoLinkEditor}
+                <div class="meeting-link-panel">
+                  <Link2 size={16} />
+                  <input class="input meeting-link-input" bind:value={videoLink} placeholder="https://zoom.us/... или https://meet.google.com/..." />
+                  <button class="btn btn-primary btn-sm" on:click={handleSendVideoLink} disabled={isSending || !videoLink.trim()}>
+                    Отправить
+                  </button>
+                  <button class="icon-button" on:click={() => { showVideoLinkEditor = false; videoLink = ''; }} title="Закрыть"><X size={16} /></button>
                 </div>
+              {/if}
 
-                <div>
-                  <div class="muted" style="font-size:0.8rem;margin-bottom:8px;">Ссылка на видеовстречу</div>
-                  <div class="chat-attach-row">
-                    <input class="input" bind:value={videoLink} placeholder="https://zoom.us/..." />
-                    <button class="btn btn-outline btn-sm" on:click={handleSendVideoLink} disabled={isSending || !videoLink.trim()}>
-                      Отправить ссылку
-                    </button>
-                  </div>
-                </div>
+              <div class="chat-composer">
+                <textarea
+                  class="input chat-input"
+                  bind:value={newMessage}
+                  placeholder="Сообщение"
+                  maxlength={1000}
+                  on:input={handleTyping}
+                  on:keydown={handleComposerKeydown}
+                  rows="1"
+                ></textarea>
+                <button class="send-button" on:click={handleSend} disabled={isSending || !newMessage.trim()} title="Отправить">
+                  <Send size={18} />
+                </button>
               </div>
-            </details>
+
+              <div class="composer-toolbar">
+                <button class="icon-button" on:click={() => { showEmojiPicker = !showEmojiPicker; showVideoLinkEditor = false; }} title="Эмодзи">
+                  <Smile size={18} />
+                </button>
+                <button class="icon-button" on:click={() => imageInput?.click()} title="Фото">
+                  <ImageIcon size={18} />
+                </button>
+                <button class="icon-button" on:click={() => documentInput?.click()} title="Документ">
+                  <FileText size={18} />
+                </button>
+                {#if activeConversationData?.session?.id}
+                  <button class="icon-button" on:click={() => { showVideoLinkEditor = !showVideoLinkEditor; showEmojiPicker = false; }} title="Ссылка на встречу">
+                    <Link2 size={18} />
+                  </button>
+                {/if}
+                <span class="chat-counter">{newMessage.length}/1000</span>
+              </div>
+
+              <input bind:this={imageInput} class="visually-hidden-file" type="file" accept="image/*" on:change={handleImageFileChange} />
+              <input bind:this={documentInput} class="visually-hidden-file" type="file" accept=".pptx,.pdf,.txt,.mvd" on:change={handleDocumentFileChange} />
+            </div>
 
             {#if composerNotice}
               <div class="muted" style="font-size:0.8rem;color:var(--status-success-ink);margin-top:8px;">{composerNotice}</div>
@@ -660,6 +710,11 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .chat-call-button {
+    padding-inline: 12px;
   }
 
   .chat-thread-status {
@@ -699,48 +754,152 @@
     color: var(--on-accent);
   }
 
+  .chat-composer-shell {
+    position: relative;
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    padding: 10px;
+  }
+
   .chat-composer {
     display: flex;
     gap: 8px;
-    margin-top: 12px;
+    align-items: flex-end;
   }
 
   .chat-input {
-    min-height: 46px;
+    min-height: 44px;
     max-height: 140px;
     line-height: 1.35;
     resize: vertical;
+    border: 0;
+    box-shadow: none;
+    padding: 10px 8px;
+    background: transparent;
+  }
+
+  .chat-input:focus {
+    box-shadow: none;
+  }
+
+  .send-button,
+  .icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: var(--bg-alt);
+    color: var(--ink-secondary);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .send-button {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .send-button:disabled,
+  .icon-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .icon-button:hover:not(:disabled) {
+    background: var(--accent-muted);
+    color: var(--accent-link);
+    border-color: var(--border);
+  }
+
+  .composer-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-light);
   }
 
   .chat-counter {
     font-size: 0.8rem;
-    margin-top: 6px;
-    text-align: right;
+    color: var(--muted);
+    margin-left: auto;
   }
 
-  .chat-tools {
-    margin-top: 10px;
+  .emoji-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-alt);
   }
 
-  .chat-tools-summary {
+  .emoji-button {
+    width: 36px;
+    height: 32px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 1rem;
+  }
+
+  .emoji-button:hover:not(:disabled) {
+    border-color: var(--accent);
+  }
+
+  .attachment-preview,
+  .meeting-link-panel {
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 12px;
-    font-weight: 600;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-alt);
   }
 
-  .chat-tools-caption {
-    font-size: 0.78rem;
-    font-weight: 500;
-  }
-
-  .chat-attach-row {
+  .attachment-preview-main,
+  .attachment-preview-actions {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
+    min-width: 0;
+  }
+
+  .attachment-preview-main span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .meeting-link-panel {
+    cursor: default;
+  }
+
+  .meeting-link-input {
+    min-width: 180px;
+    padding: 9px 12px;
+  }
+
+  .visually-hidden-file {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    opacity: 0;
+    pointer-events: none;
   }
 
   @media (max-width: 900px) {
@@ -770,21 +929,23 @@
       padding: 14px;
     }
 
-    .chat-thread-header-main {
-      flex-wrap: wrap;
-    }
-
     .chat-composer {
-      flex-direction: column;
+      align-items: flex-end;
     }
 
-    .chat-composer .btn {
+    .attachment-preview,
+    .meeting-link-panel {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .attachment-preview-actions {
+      justify-content: flex-end;
+    }
+
+    .meeting-link-panel .btn,
+    .meeting-link-panel .meeting-link-input {
       width: 100%;
-    }
-
-    .chat-tools-summary {
-      flex-direction: column;
-      align-items: flex-start;
     }
 
     .chat-message-bubble {

@@ -251,7 +251,7 @@
 
   /* CTA block */
   .cta-block {
-    background: linear-gradient(135deg, var(--accent-soft) 0%, var(--violet-soft, var(--accent-muted)) 100%);
+    background: var(--surface);
     border: 1px solid var(--accent);
     border-radius: var(--radius-xl);
     padding: 64px 32px;

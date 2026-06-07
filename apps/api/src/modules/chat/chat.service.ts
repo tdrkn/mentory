@@ -66,12 +66,12 @@ export class ChatService {
         mentor: { select: { id: true, fullName: true, avatarUrl: true } },
         mentee: { select: { id: true, fullName: true, avatarUrl: true } },
         session: {
-          select: { id: true, startAt: true, status: true },
+          select: { id: true, startAt: true, status: true, videoLink: true },
         },
         messages: {
           take: 1,
           orderBy: { createdAt: 'desc' },
-          select: { id: true, content: true, createdAt: true, senderId: true },
+          select: { id: true, content: true, contentType: true, createdAt: true, senderId: true },
         },
       },
       orderBy: { updatedAt: 'desc' },
@@ -124,6 +124,9 @@ export class ChatService {
       include: {
         mentor: { select: { id: true, fullName: true, avatarUrl: true } },
         mentee: { select: { id: true, fullName: true, avatarUrl: true } },
+        session: {
+          select: { id: true, startAt: true, status: true, videoLink: true },
+        },
       },
     });
 
@@ -137,6 +140,9 @@ export class ChatService {
         include: {
           mentor: { select: { id: true, fullName: true, avatarUrl: true } },
           mentee: { select: { id: true, fullName: true, avatarUrl: true } },
+          session: {
+            select: { id: true, startAt: true, status: true, videoLink: true },
+          },
         },
       });
     } else if (conversation.sessionId !== sessionId) {
@@ -146,6 +152,9 @@ export class ChatService {
         include: {
           mentor: { select: { id: true, fullName: true, avatarUrl: true } },
           mentee: { select: { id: true, fullName: true, avatarUrl: true } },
+          session: {
+            select: { id: true, startAt: true, status: true, videoLink: true },
+          },
         },
       });
     }
@@ -160,7 +169,7 @@ export class ChatService {
         mentor: { select: { id: true, fullName: true, avatarUrl: true } },
         mentee: { select: { id: true, fullName: true, avatarUrl: true } },
         session: {
-          select: { id: true, startAt: true, endAt: true, status: true },
+          select: { id: true, startAt: true, endAt: true, status: true, videoLink: true },
         },
       },
     });
