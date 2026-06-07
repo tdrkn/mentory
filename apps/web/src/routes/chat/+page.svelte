@@ -674,26 +674,34 @@
 
 <style>
   .chat-main {
-    padding-bottom: 40px;
+    height: calc(100vh - 72px);
+    padding-top: 16px;
+    padding-bottom: 16px;
+    overflow: hidden;
   }
 
   .chat-layout {
     display: grid;
     grid-template-columns: 280px 1fr;
     gap: 20px;
-    min-height: 540px;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .chat-sidebar {
     border-right: 1px solid var(--border);
     padding-right: 16px;
     min-width: 0;
+    min-height: 0;
+    overflow: auto;
   }
 
   .chat-thread {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    min-height: 0;
   }
 
   .chat-thread-header {
@@ -724,11 +732,15 @@
 
   .chat-messages {
     flex: 1;
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     gap: 12px;
     min-width: 0;
+    min-height: 0;
+    padding-right: 4px;
+    overscroll-behavior: contain;
   }
 
   .chat-message-row {
@@ -752,6 +764,7 @@
   .chat-message-bubble.mine {
     background: var(--accent);
     color: var(--on-accent);
+    border-color: color-mix(in srgb, var(--accent) 82%, var(--border));
   }
 
   .chat-composer-shell {
@@ -903,8 +916,17 @@
   }
 
   @media (max-width: 900px) {
+    .chat-main {
+      height: auto;
+      min-height: calc(100vh - 61px);
+      overflow: visible;
+    }
+
     .chat-layout {
       grid-template-columns: 1fr;
+      height: auto;
+      min-height: calc(100vh - 93px);
+      overflow: visible;
     }
 
     .chat-sidebar {
@@ -912,6 +934,12 @@
       border-bottom: 1px solid var(--border);
       padding-right: 0;
       padding-bottom: 12px;
+      max-height: 260px;
+    }
+
+    .chat-messages {
+      min-height: 360px;
+      max-height: 55vh;
     }
 
     .chat-message-bubble {
@@ -921,6 +949,7 @@
 
   @media (max-width: 640px) {
     .chat-main {
+      height: auto;
       padding-bottom: 24px;
     }
 
