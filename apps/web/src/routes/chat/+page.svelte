@@ -94,6 +94,13 @@
     conversations = await api.get<Conversation[]>('/conversations');
   };
 
+  const putConversationFirst = (conversation: Conversation) => {
+    conversations = [
+      conversation,
+      ...conversations.filter((item) => item.id !== conversation.id),
+    ];
+  };
+
   const loadMessages = async () => {
     if (!activeConversation) return;
     messages = await api.get<Message[]>(`/conversations/${activeConversation}/messages?limit=50`);
@@ -401,12 +408,21 @@
 
     const sessionId = $page.url.searchParams.get('session');
     const mentorId = $page.url.searchParams.get('mentorId');
+    const userId = $page.url.searchParams.get('userId');
     if (sessionId) {
       const conv = await api.post<Conversation>(`/conversations/${sessionId}`);
       activeConversation = conv.id;
-    } else if (mentorId) {
-      const match = conversations.find((c) => c.mentor?.id === mentorId || c.mentee?.id === mentorId);
-      activeConversation = match?.id ?? (conversations.length > 0 ? conversations[0].id : null);
+      putConversationFirst(conv);
+    } else if (mentorId || userId) {
+      const targetUserId = mentorId || userId;
+      const existing = conversations.find((c) => c.mentor?.id === targetUserId || c.mentee?.id === targetUserId);
+      if (existing) {
+        activeConversation = existing.id;
+      } else if (targetUserId) {
+        const conv = await api.post<Conversation>('/conversations/direct', { targetUserId });
+        activeConversation = conv.id;
+        putConversationFirst(conv);
+      }
     } else if (conversations.length > 0) {
       activeConversation = conversations[0].id;
     }

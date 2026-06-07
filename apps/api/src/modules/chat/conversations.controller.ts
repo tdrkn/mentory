@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards';
 import { CurrentUser } from '../auth/decorators';
 import { ChatService } from './chat.service';
+import { DirectConversationDto } from './dto/direct-conversation.dto';
 
 @Controller('conversations')
 @UseGuards(JwtAuthGuard)
@@ -24,6 +25,19 @@ export class ConversationsController {
       limit ? parseInt(limit) : 20,
       offset ? parseInt(offset) : 0,
     );
+  }
+
+  /**
+   * POST /api/conversations/direct
+   * Get or create a direct conversation with a user.
+   * Admins can start support chats with mentors/mentees.
+   */
+  @Post('direct')
+  async getOrCreateDirectConversation(
+    @CurrentUser() user: { id: string; role: string },
+    @Body() dto: DirectConversationDto,
+  ) {
+    return this.chatService.getOrCreateDirectConversation(user, dto.targetUserId);
   }
 
   /**

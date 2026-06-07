@@ -162,6 +162,94 @@ export class ChatService {
     return conversation;
   }
 
+  async getOrCreateDirectConversation(currentUser: { id: string; role: string }, targetUserId: string) {
+    if (currentUser.id === targetUserId) {
+      throw new BadRequestException('Cannot start a conversation with yourself');
+    }
+
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, role: true, fullName: true, avatarUrl: true },
+    });
+
+    if (!targetUser) {
+      throw new NotFoundException('Target user not found');
+    }
+
+    const pair = this.resolveDirectConversationPair(currentUser, targetUser);
+
+    const include = {
+      mentor: { select: { id: true, fullName: true, avatarUrl: true } },
+      mentee: { select: { id: true, fullName: true, avatarUrl: true } },
+      session: {
+        select: { id: true, startAt: true, status: true, videoLink: true },
+      },
+      messages: {
+        take: 1,
+        orderBy: { createdAt: 'desc' as const },
+        select: { id: true, content: true, contentType: true, createdAt: true, senderId: true },
+      },
+    };
+
+    const conversation = await this.prisma.conversation.upsert({
+      where: {
+        mentorId_menteeId: {
+          mentorId: pair.mentorId,
+          menteeId: pair.menteeId,
+        },
+      },
+      update: {},
+      create: {
+        mentorId: pair.mentorId,
+        menteeId: pair.menteeId,
+      },
+      include,
+    });
+
+    const unreadCount = await this.prisma.message.count({
+      where: {
+        conversationId: conversation.id,
+        senderId: { not: currentUser.id },
+        isRead: false,
+      },
+    });
+
+    return {
+      ...conversation,
+      lastMessage: conversation.messages[0] || null,
+      unreadCount,
+    };
+  }
+
+  private resolveDirectConversationPair(
+    currentUser: { id: string; role: string },
+    targetUser: { id: string; role: string },
+  ) {
+    const currentCanMentor = currentUser.role === 'mentor' || currentUser.role === 'both';
+    const currentCanMentee = currentUser.role === 'mentee' || currentUser.role === 'both';
+    const targetCanMentor = targetUser.role === 'mentor' || targetUser.role === 'both';
+    const targetCanMentee = targetUser.role === 'mentee' || targetUser.role === 'both';
+
+    if (currentUser.role === 'admin') {
+      if (targetCanMentor) {
+        return { mentorId: targetUser.id, menteeId: currentUser.id };
+      }
+      if (targetCanMentee) {
+        return { mentorId: currentUser.id, menteeId: targetUser.id };
+      }
+    }
+
+    if (currentCanMentee && targetCanMentor) {
+      return { mentorId: targetUser.id, menteeId: currentUser.id };
+    }
+
+    if (currentCanMentor && targetCanMentee) {
+      return { mentorId: currentUser.id, menteeId: targetUser.id };
+    }
+
+    throw new ForbiddenException('Direct chat is available only between mentor and mentee sides');
+  }
+
   async getConversationDetails(userId: string, conversationId: string) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
