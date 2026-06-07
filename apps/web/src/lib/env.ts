@@ -8,13 +8,24 @@ import { env } from '$env/dynamic/public';
  * Works on any server without config changes.
  */
 export function getApiUrl(): string {
-  if (env.PUBLIC_API_URL) {
-    // Keep only origin-level base URL; api client adds `/api` itself.
-    return env.PUBLIC_API_URL.replace(/\/+$/, '').replace(/\/api$/, '');
-  }
-
   if (browser) {
     const { origin, protocol, hostname, port } = window.location;
+
+    if (env.PUBLIC_API_URL) {
+      // Keep only origin-level base URL; api client adds `/api` itself.
+      const configuredUrl = env.PUBLIC_API_URL.replace(/\/+$/, '').replace(/\/api$/, '');
+
+      try {
+        const configured = new URL(configuredUrl);
+        const isMixedContent = protocol === 'https:' && configured.protocol === 'http:';
+
+        if (!isMixedContent) {
+          return configuredUrl;
+        }
+      } catch {
+        return configuredUrl;
+      }
+    }
 
     // Behind reverse proxy on standard ports: API is available on same origin.
     if (!port || port === '80' || port === '443') {
@@ -29,12 +40,23 @@ export function getApiUrl(): string {
 }
 
 export function getMinioUrl(): string {
-  if (env.PUBLIC_MINIO_URL) {
-    return env.PUBLIC_MINIO_URL.replace(/\/+$/, '');
-  }
-
   if (browser) {
     const { protocol, hostname } = window.location;
+    if (env.PUBLIC_MINIO_URL) {
+      const configuredUrl = env.PUBLIC_MINIO_URL.replace(/\/+$/, '');
+
+      try {
+        const configured = new URL(configuredUrl);
+        const isMixedContent = protocol === 'https:' && configured.protocol === 'http:';
+
+        if (!isMixedContent) {
+          return configuredUrl;
+        }
+      } catch {
+        return configuredUrl;
+      }
+    }
+
     return `${protocol}//${hostname}:9000`;
   }
   return 'http://minio:9000';
