@@ -66,5 +66,5 @@ product/
 
 - Стадия: **demo-ready alpha / functional MVP+**.
 - Готовность: **73-77%** от идеального продукта.
-- Закрыто в последнем pass: богатый demo seed, фото в каталоге/header, понятные сессии и чат, простые термины, читаемая темная тема, упрощенные подписки, отмена встречи с причиной.
+- Закрыто в последнем pass: богатый demo seed с профилем автора проекта Растяпина Данила, фото в каталоге/header, понятные сессии и чат, простые термины, читаемая темная тема, упрощенные подписки, отмена встречи с причиной.
 - Главные gaps до beta: real acquiring/refunds/payouts, reschedule, admin queues без UUID, production storage, monitoring/backups/load tests, финальный Figma polish.

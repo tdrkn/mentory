@@ -86,6 +86,8 @@ const topicNames = [
   'Leadership',
   'Finance & Career',
   'Mobile Development',
+  'AI Product Engineering',
+  'Full-Stack Development',
 ];
 
 const demoMentors: DemoMentor[] = [
@@ -600,6 +602,41 @@ const demoMentors: DemoMentor[] = [
     ratingAvg: 4.71,
     ratingCount: 12,
     schedule: [{ weekdays: [1, 4], startTime: '18:00', endTime: '22:00' }],
+  },
+  {
+    email: 'danil.rastyapin@example.com',
+    username: 'danil_rastyapin',
+    fullName: 'Растяпин Данил',
+    firstName: 'Данил',
+    lastName: 'Растяпин',
+    avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=480&q=80',
+    headline: 'Создатель Mentory, Product Engineer',
+    bio: 'Автор и главный разработчик Mentory. Собрал большую часть продукта: путь менти и ментора, профиль, каталог, заявки, сессии, чат, подписки, помощь, документацию и деплой. Помогаю превращать идею в работающий MVP без лишней сложности.',
+    education: 'Проектная школа Mentory: продуктовая разработка, архитектура и запуск',
+    position: 'Founder / Product Engineer',
+    workplace: 'Mentory',
+    activityFields: ['Product Engineering', 'Full-Stack', 'Startup', 'Architecture'],
+    skills: ['Product Thinking', 'SvelteKit', 'NestJS', 'Prisma', 'PostgreSQL', 'UX/CJM', 'Docker', 'AI-assisted Development'],
+    hobbies: ['Продуктовые эксперименты', 'Дизайн интерфейсов', 'Автоматизация', 'Документирование'],
+    languages: ['Русский', 'English'],
+    topics: ['AI Product Engineering', 'Full-Stack Development', 'Product Management', 'System Design', 'Startup & Entrepreneurship'],
+    services: [
+      { title: 'Разбор MVP и продуктовой логики', durationMin: 60, priceAmount: 5000 },
+      { title: 'Архитектура full-stack проекта', durationMin: 90, priceAmount: 7500 },
+      { title: 'Запуск проекта от идеи до демо', durationMin: 75, priceAmount: 6500 },
+    ],
+    plans: [
+      {
+        title: 'MVP под ключ: от идеи до работающего продукта',
+        description: 'Еженедельные созвоны, разбор CJM, архитектуры, фичей, рисков и плана запуска.',
+        priceAmount: 22000,
+        callsPerMonth: 4,
+        sessionDurationMin: 75,
+      },
+    ],
+    ratingAvg: 5.0,
+    ratingCount: 77,
+    schedule: [{ weekdays: [1, 2, 3, 4, 5], startTime: '14:00', endTime: '18:00' }],
   },
 ];
 
@@ -1120,6 +1157,7 @@ async function main() {
   console.log(`Demo sessions: ${createdSessions.length}`);
   console.log('\nAccounts:');
   console.log('admin@mentory.local / change-me-admin');
+  console.log('danil.rastyapin@example.com / password123');
   console.log('alex.mentor@example.com / password123');
   console.log('maria.mentor@example.com / password123');
   console.log('ivan.mentee@example.com / password123');

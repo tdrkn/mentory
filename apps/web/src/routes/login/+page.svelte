@@ -201,6 +201,10 @@
       <div class="test-accounts">
         <div class="test-accounts-header">Тестовые аккаунты <span class="test-hint">(нажмите, чтобы заполнить)</span></div>
         <div class="test-accounts-grid">
+          <button class="test-account" type="button" on:click={() => fillTestAccount('danil.rastyapin@example.com', 'password123')}>
+            <span class="test-role">Ментор</span>
+            <code>danil.rastyapin@example.com</code>
+          </button>
           <button class="test-account" type="button" on:click={() => fillTestAccount('maria.mentor@example.com', 'password123')}>
             <span class="test-role">Ментор</span>
             <code>maria.mentor@example.com</code>

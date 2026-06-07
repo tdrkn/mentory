@@ -15,7 +15,7 @@
 - Web: `http://localhost:3000`
 - API: `http://localhost:4000`
 - База/Redis: Docker Compose dev stack.
-- Seed accounts: `ivan.mentee@example.com`, `alex.mentor@example.com`, `admin@mentory.local`.
+- Seed accounts: `danil.rastyapin@example.com`, `ivan.mentee@example.com`, `alex.mentor@example.com`, `admin@mentory.local`.
 
 Скриншоты QA сохранены в корне репозитория через Playwright MCP:
 

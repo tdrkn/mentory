@@ -79,8 +79,42 @@ async function main() {
     prisma.topic.create({ data: { name: 'Data Science' } }),
     prisma.topic.create({ data: { name: 'DevOps & Infrastructure' } }),
     prisma.topic.create({ data: { name: 'Startup & Entrepreneurship' } }),
+    prisma.topic.create({ data: { name: 'AI Product Engineering' } }),
+    prisma.topic.create({ data: { name: 'Full-Stack Development' } }),
   ]);
   console.log(`✓ Topics: ${topics.length}`);
+
+  // Mentor 0: project author
+  const mentor0 = await prisma.user.create({
+    data: {
+      email: 'danil.rastyapin@example.com',
+      username: 'danil_rastyapin',
+      passwordHash,
+      fullName: 'Растяпин Данил',
+      firstName: 'Данил',
+      lastName: 'Растяпин',
+      avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=480&q=80',
+      timezone: 'Europe/Moscow',
+      role: 'mentor',
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
+      mentorProfile: { create: {
+        headline: 'Создатель Mentory, Product Engineer',
+        bio: 'Автор и главный разработчик Mentory. Собрал большую часть продукта: путь менти и ментора, профиль, каталог, заявки, сессии, чат, подписки, помощь, документацию и деплой.',
+        education: 'Проектная школа Mentory: продуктовая разработка, архитектура и запуск',
+        position: 'Founder / Product Engineer',
+        workplace: 'Mentory',
+        activityFields: ['Product Engineering', 'Full-Stack', 'Startup', 'Architecture'],
+        skills: ['Product Thinking', 'SvelteKit', 'NestJS', 'Prisma', 'PostgreSQL', 'UX/CJM', 'Docker'],
+        hobbies: ['Продуктовые эксперименты', 'Дизайн интерфейсов', 'Автоматизация'],
+        languages: ['Русский', 'English'],
+        timezone: 'Europe/Moscow',
+        isActive: true,
+        ratingAvg: 5.0,
+        ratingCount: 77,
+      }},
+    },
+  });
 
   // Mentor 1
   const mentor1 = await prisma.user.create({
@@ -165,10 +199,15 @@ async function main() {
       }},
     },
   });
-  console.log(`✓ Users: ${mentor1.fullName}, ${mentor2.fullName}, ${mentee1.fullName}, ${mentee2.fullName}`);
+  console.log(`✓ Users: ${mentor0.fullName}, ${mentor1.fullName}, ${mentor2.fullName}, ${mentee1.fullName}, ${mentee2.fullName}`);
 
   // Topics for mentors
   await prisma.mentorTopic.createMany({ data: [
+    { mentorId: mentor0.id, topicId: topics[8].id },
+    { mentorId: mentor0.id, topicId: topics[9].id },
+    { mentorId: mentor0.id, topicId: topics[4].id },
+    { mentorId: mentor0.id, topicId: topics[2].id },
+    { mentorId: mentor0.id, topicId: topics[7].id },
     { mentorId: mentor1.id, topicId: topics[0].id },
     { mentorId: mentor1.id, topicId: topics[2].id },
     { mentorId: mentor1.id, topicId: topics[6].id },
@@ -179,6 +218,9 @@ async function main() {
 
   // Services
   await prisma.mentorService.createMany({ data: [
+    { mentorId: mentor0.id, title: 'Разбор MVP и продуктовой логики', durationMin: 60, priceAmount: 5000, currency: 'RUB' },
+    { mentorId: mentor0.id, title: 'Архитектура full-stack проекта', durationMin: 90, priceAmount: 7500, currency: 'RUB' },
+    { mentorId: mentor0.id, title: 'Запуск проекта от идеи до демо', durationMin: 75, priceAmount: 6500, currency: 'RUB' },
     { mentorId: mentor1.id, title: 'Разбор кода / Code Review', durationMin: 45, priceAmount: 3000, currency: 'RUB' },
     { mentorId: mentor1.id, title: 'Карьерная консультация', durationMin: 60, priceAmount: 4500, currency: 'RUB' },
     { mentorId: mentor1.id, title: 'System Design Interview Prep', durationMin: 90, priceAmount: 6000, currency: 'RUB' },
@@ -190,11 +232,17 @@ async function main() {
 
   // Agreements
   await prisma.userAgreement.createMany({ data: [
-    mentor1.id, mentor2.id, mentee1.id, mentee2.id
+    mentor0.id, mentor1.id, mentor2.id, mentee1.id, mentee2.id
   ].map(userId => ({ userId, documentType: 'terms', documentVersion: '1.0' }))});
 
   // Availability rules
   const rules = [
+    // Mentor 0: Mon-Fri 14:00-18:00 MSK
+    { mentorId: mentor0.id, weekday: 1, startTime: '14:00', endTime: '18:00', timezone: 'Europe/Moscow' },
+    { mentorId: mentor0.id, weekday: 2, startTime: '14:00', endTime: '18:00', timezone: 'Europe/Moscow' },
+    { mentorId: mentor0.id, weekday: 3, startTime: '14:00', endTime: '18:00', timezone: 'Europe/Moscow' },
+    { mentorId: mentor0.id, weekday: 4, startTime: '14:00', endTime: '18:00', timezone: 'Europe/Moscow' },
+    { mentorId: mentor0.id, weekday: 5, startTime: '14:00', endTime: '18:00', timezone: 'Europe/Moscow' },
     // Mentor 1: Mon-Fri 10:00-13:00 MSK
     { mentorId: mentor1.id, weekday: 1, startTime: '10:00', endTime: '13:00', timezone: 'Europe/Moscow' },
     { mentorId: mentor1.id, weekday: 2, startTime: '10:00', endTime: '13:00', timezone: 'Europe/Moscow' },
@@ -259,6 +307,7 @@ async function main() {
   console.log(`✓ Slots: ${slotsData.length}`);
 
   console.log('\n✅ Seed done!');
+  console.log('  danil.rastyapin@example.com / password123');
   console.log('  alex.mentor@example.com / password123');
   console.log('  maria.mentor@example.com / password123');
   console.log('  ivan.mentee@example.com / password123');
