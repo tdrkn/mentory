@@ -58,18 +58,36 @@ jobs:
       - name: Add server host key
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT != '' && secrets.DEPLOY_PORT || '22' }}
+          RAW_DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
         run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
-          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+          if [ -z "$DEPLOY_HOST" ]; then
+            echo "::error::DEPLOY_HOST secret is empty"
+            exit 1
+          fi
+
+          DEPLOY_PORT="${RAW_DEPLOY_PORT:-22}"
+          if ! ssh-keyscan -T 20 -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts; then
+            if [ "$DEPLOY_PORT" != "22" ]; then
+              echo "::warning::ssh-keyscan failed on configured DEPLOY_PORT; retrying port 22"
+              DEPLOY_PORT=22
+              ssh-keyscan -T 20 -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+            else
+              exit 1
+            fi
+          fi
+
+          echo "DEPLOY_PORT=$DEPLOY_PORT" >> "$GITHUB_ENV"
 
       - name: Deploy on server
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT != '' && secrets.DEPLOY_PORT || '22' }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
+          set -euo pipefail
           ssh -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'EOF'
           set -euo pipefail
           cd "$DEPLOY_PATH"
