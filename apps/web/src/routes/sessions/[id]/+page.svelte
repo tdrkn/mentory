@@ -35,6 +35,7 @@
   let isSubmittingReview = false;
   let error: string | null = null;
   let actionMessage: string | null = null;
+  let actionTone: 'success' | 'error' = 'success';
   let reviewRating = 5;
   let reviewText = '';
   let showReviewForm = false;
@@ -47,6 +48,9 @@
   let isSavingVideoLink = false;
   let videoLinkMessage: string | null = null;
   let videoLinkError: string | null = null;
+  let showCancelForm = false;
+  let cancelReasonInput = '';
+  let isCanceling = false;
 
   const loadSession = async () => {
     session = await api.get<SessionDetail>(`/sessions/${$page.params.id}`);
@@ -105,9 +109,11 @@
     actionMessage = null;
     try {
       await api.patch(`/sessions/${session.id}/complete`, {});
+      actionTone = 'success';
       actionMessage = 'Сессия завершена. Выплата будет начислена автоматически.';
       session = await api.get<SessionDetail>(`/sessions/${$page.params.id}`);
     } catch {
+      actionTone = 'error';
       actionMessage = 'Не удалось завершить сессию.';
     } finally {
       isCompleting = false;
@@ -122,9 +128,11 @@
       await api.patch(`/sessions/${session.id}/confirm`, {
         reason: decisionCommentInput.trim() || undefined,
       });
+      actionTone = 'success';
       actionMessage = 'Заявка подтверждена.';
       await loadSession();
     } catch {
+      actionTone = 'error';
       actionMessage = 'Не удалось подтвердить заявку.';
     } finally {
       isReviewingRequest = false;
@@ -139,12 +147,35 @@
       await api.patch(`/sessions/${session.id}/reject`, {
         reason: decisionCommentInput.trim() || 'Ментор отклонил заявку',
       });
+      actionTone = 'success';
       actionMessage = 'Заявка отклонена.';
       await loadSession();
     } catch {
+      actionTone = 'error';
       actionMessage = 'Не удалось отклонить заявку.';
     } finally {
       isReviewingRequest = false;
+    }
+  };
+
+  const handleCancelSession = async () => {
+    if (!session) return;
+    isCanceling = true;
+    actionMessage = null;
+    try {
+      await api.patch(`/sessions/${session.id}/cancel`, {
+        reason: cancelReasonInput.trim() || 'Встреча отменена участником',
+      });
+      actionTone = 'success';
+      actionMessage = 'Встреча отменена. Слот освобождён, оплата будет возвращена в рамках текущего платежного потока.';
+      showCancelForm = false;
+      cancelReasonInput = '';
+      await loadSession();
+    } catch {
+      actionTone = 'error';
+      actionMessage = 'Не удалось отменить встречу.';
+    } finally {
+      isCanceling = false;
     }
   };
 
@@ -154,9 +185,11 @@
     actionMessage = null;
     try {
       await api.post(`/reviews/${session.id}`, { rating: reviewRating, text: reviewText.trim() || undefined });
+      actionTone = 'success';
       actionMessage = 'Отзыв успешно сохранён!';
       showReviewForm = false;
     } catch {
+      actionTone = 'error';
       actionMessage = 'Не удалось сохранить отзыв.';
     } finally {
       isSubmittingReview = false;
@@ -181,6 +214,9 @@
         return status;
     }
   };
+
+  const canCancelSession = () =>
+    !!session && (session.status === 'requested' || session.status === 'paid' || session.status === 'booked');
 
   onMount(async () => {
     if (!$isAuthenticated && !$authLoading) {
@@ -246,7 +282,7 @@
         </div>
 
         {#if actionMessage}
-          <div class="surface" style="margin-top:14px;background:var(--status-success-bg);border-color:var(--status-success-border);color:var(--status-success-ink);">
+          <div class="surface status-{actionTone}" style="margin-top:14px;">
             {actionMessage}
           </div>
         {/if}
@@ -282,6 +318,12 @@
         {#if session.status === 'rejected' && (session.decisionComment || session.cancelReason)}
           <div style="margin-top:18px;padding:16px;background:var(--status-error-bg);border:1px solid var(--status-error-border);border-radius:var(--radius-md);color:var(--status-error-ink);">
             Причина отклонения: {session.decisionComment || session.cancelReason}
+          </div>
+        {/if}
+
+        {#if session.status === 'canceled' && session.cancelReason}
+          <div style="margin-top:18px;padding:16px;background:var(--status-error-bg);border:1px solid var(--status-error-border);border-radius:var(--radius-md);color:var(--status-error-ink);">
+            Причина отмены: {session.cancelReason}
           </div>
         {/if}
 
@@ -356,7 +398,38 @@
               {isCompleting ? 'Завершение...' : 'Завершить сессию'}
             </button>
           {/if}
+          {#if canCancelSession()}
+            <button class="btn btn-outline" on:click={() => (showCancelForm = !showCancelForm)} disabled={isCanceling}>
+              Отменить встречу
+            </button>
+          {/if}
         </div>
+
+        {#if showCancelForm && canCancelSession()}
+          <div class="surface" style="margin-top:14px;">
+            <h3 style="margin:0 0 10px;">Отмена встречи</h3>
+            <p class="muted" style="margin:0 0 10px;">
+              После отмены слот снова станет свободным. Если оплата уже была проведена, платеж будет помечен к возврату.
+            </p>
+            <textarea
+              class="textarea"
+              bind:value={cancelReasonInput}
+              maxlength={1000}
+              placeholder="Причина отмены для второй стороны"
+            ></textarea>
+            <div class="muted" style="font-size:0.82rem;margin-top:6px;">
+              {cancelReasonInput.length}/1000
+            </div>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+              <button class="btn btn-primary" on:click={handleCancelSession} disabled={isCanceling}>
+                {isCanceling ? 'Отмена...' : 'Подтвердить отмену'}
+              </button>
+              <button class="btn btn-ghost" on:click={() => (showCancelForm = false)} disabled={isCanceling}>
+                Оставить встречу
+              </button>
+            </div>
+          </div>
+        {/if}
 
         {#if !$isMentor && session.status === 'completed'}
           <div style="margin-top:16px;">

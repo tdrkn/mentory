@@ -20,12 +20,13 @@
 - `/admin/login`, `/admin`, `/admin/trust#verification|support|database`: вход, dashboard, hash-вкладки, mobile overflow и русские labels финансов.
 - `/requests`: общий центр заявок для mentor/mentee, разделение разовых сессий и подписок, комментарий к решению.
 - `/checkout/subscriptions/:id`: approve-first оплата подписки после решения ментора.
+- `/sessions/:id`: участники могут отменить `requested/paid/booked` встречу с причиной; слот освобождается, платеж переводится в refund/fail state.
 
 Не закрыто:
 
 - Отдельные pixel-perfect страницы деталей заявок `/requests/:id/session` и `/requests/:id/subscription`.
 - UI обработки ready payouts.
-- Демо-данные профилей: часть seed/runtime менторов пока без фото, навыков, хобби и достижений.
+- Перенос встречи в новый слот с подтверждением второй стороны.
 
 ---
 
@@ -74,6 +75,7 @@
 **Цель:** реализовать full session-request screen и pay-first flow.
 
 ### 3.1 Frontend (`/booking/new`)
+
 - [ ] Новая страница: `/booking/new?serviceId=&mentorId=`.
   - Контактная информация: Имя/Фамилия/Email (prefilled, editable).
   - Мотивационное письмо (опционально, single textarea).
@@ -82,6 +84,7 @@
   - Кнопка `Оплатить` (вместо текущего `/checkout`).
 
 ### 3.2 Backend
+
 - [ ] `POST /api/booking/hold` принимает `requestMotivation` (без `requestGoal`), создаёт session со статусом `requested`.
 - [ ] После создания → создаётся `Payment` в state `pending`, mentee redirected на checkout.
 - [ ] После успешного payment → session.status = `paid_pending_approval` (новый статус).
@@ -163,11 +166,11 @@
 
 **Цель:** убрать `video_rooms` placeholder, перейти на user-pasted external link.
 
-- [ ] Миграция Prisma: добавить `sessions.video_link` (nullable String). Можно мигрировать данные из старых `video_rooms` если есть.
-- [ ] `PATCH /sessions/:id` (mentor only) принимает `videoLink`.
-- [ ] Mentor session detail (`/sessions/:id`) показывает input «Прикрепить ссылку на сессию», сохраняет на blur.
-- [ ] Mentee session detail показывает ссылку как readonly + clickable (если есть).
-- [ ] Старый `video_rooms` endpoint depreciated (оставить шим на квартал).
+- [x] Prisma содержит `sessions.video_link` (nullable String). `video_rooms` оставлен как legacy shim.
+- [x] `PATCH /sessions/:id/video-link` (mentor only) принимает `videoLink`.
+- [x] Mentor session detail (`/sessions/:id`) показывает input «Прикрепить ссылку на сессию», сохраняет на blur/кнопку.
+- [x] Mentee session detail показывает ссылку как readonly + clickable (если есть).
+- [ ] Старый `video_rooms` endpoint deprecated в API-документации (оставить шим на квартал).
 
 **Тест:** mentor вставляет URL, mentee видит и кликает.
 
@@ -264,7 +267,7 @@
 
 ---
 
-## Итерация 16 — Календарь сессий (большой блок, можно 2 PR) 
+## Итерация 16 — Календарь сессий (большой блок, можно 2 PR)
 
 - [ ] `/schedule/calendar`: weekly view с временными ячейками, занятые сессии показываются с менти+услуга, навигация по неделям.
 - [ ] Кнопка `Добавить новые слоты` справа сверху.

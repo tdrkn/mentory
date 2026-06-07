@@ -33,10 +33,7 @@ export class SessionsController {
    * Access: Session participant
    */
   @Get(':id')
-  async getSession(
-    @CurrentUser('id') userId: string,
-    @Param('id') sessionId: string,
-  ) {
+  async getSession(@CurrentUser('id') userId: string, @Param('id') sessionId: string) {
     return this.sessionsService.getSessionDetails(userId, sessionId);
   }
 
@@ -46,10 +43,7 @@ export class SessionsController {
    * Access: Session participant
    */
   @Get(':id/video')
-  async getVideoRoom(
-    @CurrentUser('id') userId: string,
-    @Param('id') sessionId: string,
-  ) {
+  async getVideoRoom(@CurrentUser('id') userId: string, @Param('id') sessionId: string) {
     return this.sessionsService.getOrCreateVideoRoom(userId, sessionId);
   }
 
@@ -59,10 +53,7 @@ export class SessionsController {
    * Access: Mentor of the session
    */
   @Get(':id/notes')
-  async getSessionNotes(
-    @CurrentUser('id') userId: string,
-    @Param('id') sessionId: string,
-  ) {
+  async getSessionNotes(@CurrentUser('id') userId: string, @Param('id') sessionId: string) {
     return this.sessionsService.getSessionNotes(userId, sessionId);
   }
 
@@ -109,15 +100,26 @@ export class SessionsController {
   }
 
   /**
+   * PATCH /api/sessions/:id/cancel
+   * Cancel a requested, paid or booked session
+   * Access: Session participant
+   */
+  @Patch(':id/cancel')
+  async cancelSession(
+    @CurrentUser('id') userId: string,
+    @Param('id') sessionId: string,
+    @Body() dto?: CancelSessionDto,
+  ) {
+    return this.sessionsService.cancelSession(userId, sessionId, dto?.reason);
+  }
+
+  /**
    * PATCH /api/sessions/:id/complete
    * Mark session as completed
    * Access: Mentor
    */
   @Patch(':id/complete')
-  async completeSession(
-    @CurrentUser('id') userId: string,
-    @Param('id') sessionId: string,
-  ) {
+  async completeSession(@CurrentUser('id') userId: string, @Param('id') sessionId: string) {
     return this.sessionsService.completeSession(userId, sessionId);
   }
 

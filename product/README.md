@@ -65,6 +65,6 @@ product/
 ## Current Stage 2026-06-07
 
 - Стадия: **demo-ready alpha / functional MVP+**.
-- Готовность: **72-76%** от идеального продукта.
-- Закрыто в последнем pass: богатый demo seed, фото в каталоге/header, понятные сессии и чат, простые термины, читаемая темная тема, упрощенные подписки.
-- Главные gaps до beta: real acquiring/refunds/payouts, cancel/reschedule, admin queues без UUID, production storage, monitoring/backups/load tests, финальный Figma polish.
+- Готовность: **73-77%** от идеального продукта.
+- Закрыто в последнем pass: богатый demo seed, фото в каталоге/header, понятные сессии и чат, простые термины, читаемая темная тема, упрощенные подписки, отмена встречи с причиной.
+- Главные gaps до beta: real acquiring/refunds/payouts, reschedule, admin queues без UUID, production storage, monitoring/backups/load tests, финальный Figma polish.
