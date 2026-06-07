@@ -84,7 +84,7 @@ async function main() {
   ]);
   console.log(`✓ Topics: ${topics.length}`);
 
-  // Mentor 0: project author
+  // Mentor 0
   const mentor0 = await prisma.user.create({
     data: {
       email: 'danil.rastyapin@example.com',
@@ -99,11 +99,11 @@ async function main() {
       isEmailVerified: true,
       emailVerifiedAt: new Date(),
       mentorProfile: { create: {
-        headline: 'Создатель Mentory, Product Engineer',
-        bio: 'Автор и главный разработчик Mentory. Собрал большую часть продукта: путь менти и ментора, профиль, каталог, заявки, сессии, чат, подписки, помощь, документацию и деплой.',
-        education: 'Проектная школа Mentory: продуктовая разработка, архитектура и запуск',
-        position: 'Founder / Product Engineer',
-        workplace: 'Mentory',
+        headline: 'Product Engineer',
+        bio: 'Помогаю разбирать продуктовую логику, собирать MVP, приводить интерфейсы и архитектуру к понятному рабочему состоянию без лишней сложности.',
+        education: 'НИУ ВШЭ, бизнес-информатика',
+        position: 'Product Engineer',
+        workplace: 'Проектная разработка',
         activityFields: ['Product Engineering', 'Full-Stack', 'Startup', 'Architecture'],
         skills: ['Product Thinking', 'SvelteKit', 'NestJS', 'Prisma', 'PostgreSQL', 'UX/CJM', 'Docker'],
         hobbies: ['Продуктовые эксперименты', 'Дизайн интерфейсов', 'Автоматизация'],
