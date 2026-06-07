@@ -362,6 +362,7 @@
           timezone: $formData.timezone || 'Europe/Moscow',
         });
         await api.put('/profile/mentor/topics', { topicIds: selectedTopicIds });
+        await api.patch('/profile/mentor/activate');
       } else {
         await api.patch('/profile/mentee', {
           age: $formData.age,
@@ -378,7 +379,7 @@
         });
       }
 
-      message = 'Изменения сохранены.';
+      message = isProfileMentor ? 'Изменения сохранены. Профиль опубликован в каталоге.' : 'Изменения сохранены.';
     } finally {
       saving = false;
     }

@@ -61,6 +61,7 @@ describe('AuthService', () => {
     service = module.get<AuthService>(AuthService);
 
     jest.clearAllMocks();
+    mockConfigService.get.mockImplementation((_key: string, fallback?: string) => fallback);
   });
 
   describe('register', () => {
@@ -102,6 +103,46 @@ describe('AuthService', () => {
       );
       expect(txUserAgreementCreate).toHaveBeenCalled();
       expect(mockEmailService.sendEmail).toHaveBeenCalled();
+    });
+
+    it('should verify user and return token when verification email cannot be sent', async () => {
+      mockPrismaService.user.findFirst.mockResolvedValue(null);
+      mockConfigService.get.mockImplementation((key: string, fallback?: string) => {
+        if (key === 'ALLOW_EMAIL_VERIFICATION_FALLBACK') return 'true';
+        return fallback;
+      });
+      mockEmailService.sendEmail.mockRejectedValueOnce(new Error('SMTP unavailable'));
+      txUserCreate.mockResolvedValue({
+        id: 'user-id',
+        email: registerDto.email,
+        username: registerDto.username,
+        fullName: registerDto.fullName,
+        firstName: null,
+        lastName: null,
+        role: registerDto.role,
+        createdAt: new Date(),
+      });
+      userUpdate.mockResolvedValue({
+        id: 'user-id',
+        email: registerDto.email,
+        username: registerDto.username,
+        fullName: registerDto.fullName,
+        firstName: null,
+        lastName: null,
+        role: registerDto.role,
+        createdAt: new Date(),
+      });
+
+      const result = await service.register(registerDto);
+
+      expect(result).toHaveProperty('accessToken', 'mock-jwt-token');
+      expect(result).toHaveProperty('requiresEmailVerification', false);
+      expect(result).toHaveProperty('verificationEmailSent', false);
+      expect(userUpdate).toHaveBeenCalledWith({
+        where: { id: 'user-id' },
+        data: { isEmailVerified: true, emailVerifiedAt: expect.any(Date) },
+        select: expect.any(Object),
+      });
     });
 
     it('should throw ConflictException if email already exists', async () => {

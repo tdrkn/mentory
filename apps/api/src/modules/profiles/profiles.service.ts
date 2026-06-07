@@ -13,22 +13,25 @@ export class ProfilesService {
   ) {}
 
   async getFullProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        mentorProfile: {
-          include: {
-            topics: {
-              include: { topic: true },
-            },
-          },
-        },
-        menteeProfile: true,
-      },
-    });
+    const user = await this.getUserWithProfiles(userId);
 
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    if ((user.role === 'mentor' || user.role === 'both') && !user.mentorProfile) {
+      await this.ensureMentorProfile(userId);
+    }
+
+    if ((user.role === 'mentee' || user.role === 'both') && !user.menteeProfile) {
+      await this.ensureMenteeProfile(userId);
+    }
+
+    if (
+      ((user.role === 'mentor' || user.role === 'both') && !user.mentorProfile) ||
+      ((user.role === 'mentee' || user.role === 'both') && !user.menteeProfile)
+    ) {
+      return this.getUserWithProfiles(userId);
     }
 
     return user;
@@ -77,23 +80,8 @@ export class ProfilesService {
   }
 
   async getMentorProfile(userId: string) {
-    const profile = await this.prisma.mentorProfile.findUnique({
-      where: { userId },
-      include: {
-        topics: {
-          include: { topic: true },
-        },
-        user: {
-          select: {
-            id: true,
-            email: true,
-            fullName: true,
-            avatarUrl: true,
-            timezone: true,
-          },
-        },
-      },
-    });
+    await this.ensureMentorProfile(userId);
+    const profile = await this.findMentorProfile(userId);
 
     if (!profile) {
       throw new NotFoundException('Mentor profile not found');
@@ -108,6 +96,7 @@ export class ProfilesService {
       birthDate: dto.birthDate ? new Date(dto.birthDate) : dto.birthDate,
     };
 
+    await this.ensureMentorProfile(userId);
     return this.prisma.mentorProfile.update({
       where: { userId },
       data,
@@ -115,8 +104,16 @@ export class ProfilesService {
   }
 
   async addMentorTopic(userId: string, topicId: string) {
-    return this.prisma.mentorTopic.create({
-      data: {
+    await this.ensureMentorProfile(userId);
+    return this.prisma.mentorTopic.upsert({
+      where: {
+        mentorId_topicId: {
+          mentorId: userId,
+          topicId,
+        },
+      },
+      update: {},
+      create: {
         mentorId: userId,
         topicId,
       },
@@ -136,6 +133,7 @@ export class ProfilesService {
   }
 
   async setMentorTopics(userId: string, topicIds: string[]) {
+    await this.ensureMentorProfile(userId);
     // Transaction: delete all, then create new
     await this.prisma.$transaction([
       this.prisma.mentorTopic.deleteMany({
@@ -157,6 +155,7 @@ export class ProfilesService {
   }
 
   async setMentorActive(userId: string, isActive: boolean) {
+    await this.ensureMentorProfile(userId);
     return this.prisma.mentorProfile.update({
       where: { userId },
       data: { isActive },
@@ -164,19 +163,8 @@ export class ProfilesService {
   }
 
   async getMenteeProfile(userId: string) {
-    const profile = await this.prisma.menteeProfile.findUnique({
-      where: { userId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            fullName: true,
-            timezone: true,
-          },
-        },
-      },
-    });
+    await this.ensureMenteeProfile(userId);
+    const profile = await this.findMenteeProfile(userId);
 
     if (!profile) {
       throw new NotFoundException('Mentee profile not found');
@@ -186,6 +174,7 @@ export class ProfilesService {
   }
 
   async updateMenteeProfile(userId: string, dto: UpdateMenteeProfileDto) {
+    await this.ensureMenteeProfile(userId);
     return this.prisma.menteeProfile.update({
       where: { userId },
       data: dto,
@@ -224,5 +213,96 @@ export class ProfilesService {
     }
 
     return profile;
+  }
+
+  private getUserWithProfiles(userId: string) {
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        mentorProfile: {
+          include: {
+            topics: {
+              include: { topic: true },
+            },
+          },
+        },
+        menteeProfile: true,
+      },
+    });
+  }
+
+  private findMentorProfile(userId: string) {
+    return this.prisma.mentorProfile.findUnique({
+      where: { userId },
+      include: {
+        topics: {
+          include: { topic: true },
+        },
+        user: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            avatarUrl: true,
+            timezone: true,
+          },
+        },
+      },
+    });
+  }
+
+  private findMenteeProfile(userId: string) {
+    return this.prisma.menteeProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            timezone: true,
+          },
+        },
+      },
+    });
+  }
+
+  private async ensureMentorProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    await this.prisma.mentorProfile.upsert({
+      where: { userId },
+      update: {},
+      create: {
+        userId,
+        timezone: 'Europe/Moscow',
+        verificationStatus: 'unverified',
+        isActive: false,
+      },
+    });
+  }
+
+  private async ensureMenteeProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    await this.prisma.menteeProfile.upsert({
+      where: { userId },
+      update: {},
+      create: { userId },
+    });
   }
 }

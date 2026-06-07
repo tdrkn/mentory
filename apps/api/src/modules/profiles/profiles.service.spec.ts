@@ -14,18 +14,23 @@ describe('ProfilesService', () => {
     },
     mentorProfile: {
       findUnique: jest.fn(),
+      upsert: jest.fn(),
       update: jest.fn(),
     },
     menteeProfile: {
       findUnique: jest.fn(),
+      upsert: jest.fn(),
       update: jest.fn(),
     },
     mentorTopic: {
       create: jest.fn(),
+      upsert: jest.fn(),
       delete: jest.fn(),
       deleteMany: jest.fn(),
       createMany: jest.fn(),
+      findMany: jest.fn(),
     },
+    $transaction: jest.fn((operations: unknown[]) => Promise.all(operations)),
   };
   const mockFileStorageService = {
     storeDataUrlIfNeeded: jest.fn((fileUrl: string) => Promise.resolve(fileUrl)),
@@ -78,6 +83,41 @@ describe('ProfilesService', () => {
         NotFoundException,
       );
     });
+
+    it('should create missing mentor profile for mentor users', async () => {
+      const userWithoutProfile = {
+        id: 'user-id',
+        email: 'mentor@example.com',
+        fullName: 'Mentor User',
+        role: 'mentor',
+        mentorProfile: null,
+        menteeProfile: null,
+      };
+      const userWithProfile = {
+        ...userWithoutProfile,
+        mentorProfile: { userId: 'user-id', topics: [] },
+      };
+
+      mockPrismaService.user.findUnique
+        .mockResolvedValueOnce(userWithoutProfile)
+        .mockResolvedValueOnce({ id: 'user-id' })
+        .mockResolvedValueOnce(userWithProfile);
+      mockPrismaService.mentorProfile.upsert.mockResolvedValue({ userId: 'user-id' });
+
+      const result = await service.getFullProfile('user-id');
+
+      expect(result).toEqual(userWithProfile);
+      expect(mockPrismaService.mentorProfile.upsert).toHaveBeenCalledWith({
+        where: { userId: 'user-id' },
+        update: {},
+        create: {
+          userId: 'user-id',
+          timezone: 'Europe/Moscow',
+          verificationStatus: 'unverified',
+          isActive: false,
+        },
+      });
+    });
   });
 
   describe('updateMentorProfile', () => {
@@ -91,6 +131,8 @@ describe('ProfilesService', () => {
         userId: 'user-id',
         ...updateDto,
       });
+      mockPrismaService.user.findUnique.mockResolvedValue({ id: 'user-id' });
+      mockPrismaService.mentorProfile.upsert.mockResolvedValue({ userId: 'user-id' });
 
       const result = await service.updateMentorProfile('user-id', updateDto);
 
@@ -115,6 +157,8 @@ describe('ProfilesService', () => {
       };
 
       mockPrismaService.menteeProfile.findUnique.mockResolvedValue(mockProfile);
+      mockPrismaService.user.findUnique.mockResolvedValue({ id: 'user-id' });
+      mockPrismaService.menteeProfile.upsert.mockResolvedValue({ userId: 'user-id' });
 
       const result = await service.getMenteeProfile('user-id');
 
@@ -122,12 +166,19 @@ describe('ProfilesService', () => {
       expect(result.goals).toContain('Learn programming');
     });
 
-    it('should throw NotFoundException if mentee profile not found', async () => {
+    it('should create missing mentee profile before reading it', async () => {
       mockPrismaService.menteeProfile.findUnique.mockResolvedValue(null);
+      mockPrismaService.user.findUnique.mockResolvedValue({ id: 'user-id' });
+      mockPrismaService.menteeProfile.upsert.mockResolvedValue({ userId: 'user-id' });
 
-      await expect(service.getMenteeProfile('non-existent')).rejects.toThrow(
+      await expect(service.getMenteeProfile('user-id')).rejects.toThrow(
         NotFoundException,
       );
+      expect(mockPrismaService.menteeProfile.upsert).toHaveBeenCalledWith({
+        where: { userId: 'user-id' },
+        update: {},
+        create: { userId: 'user-id' },
+      });
     });
   });
 });

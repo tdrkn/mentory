@@ -83,12 +83,16 @@ export class AuthService {
           fullName,
           firstName,
           lastName,
-          timezone: dto.timezone || 'UTC',
+          timezone: dto.timezone || 'Europe/Moscow',
           role: dto.role as UserRole,
           isEmailVerified: false,
           emailVerifiedAt: null,
           ...(dto.role === 'mentor' && {
-            mentorProfile: { create: {} },
+            mentorProfile: {
+              create: {
+                timezone: dto.timezone || 'Europe/Moscow',
+              },
+            },
           }),
           ...(dto.role === 'mentee' && {
             menteeProfile: { create: {} },
@@ -140,6 +144,36 @@ export class AuthService {
       verificationEmailSent = false;
       const message = error instanceof Error ? error.message : 'unknown error';
       this.logger.warn(`User ${user.id} created but verification email failed: ${message}`);
+    }
+
+    const allowEmailFallback =
+      this.config.get<string>('ALLOW_EMAIL_VERIFICATION_FALLBACK', 'true') === 'true';
+    if (!verificationEmailSent && allowEmailFallback) {
+      const verifiedUser = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { isEmailVerified: true, emailVerifiedAt: new Date() },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          fullName: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          createdAt: true,
+        },
+      });
+      const token = this.jwtService.sign({
+        sub: verifiedUser.id,
+        email: verifiedUser.email,
+        role: verifiedUser.role,
+      });
+      return {
+        user: verifiedUser,
+        accessToken: token,
+        requiresEmailVerification: false,
+        verificationEmailSent: false,
+      };
     }
 
     return {
@@ -247,7 +281,49 @@ export class AuthService {
   }
 
   async getProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    let user = await this.findUserProfile(userId);
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if ((user.role === UserRole.mentor || user.role === UserRole.both) && !user.mentorProfile) {
+      await this.prisma.mentorProfile.upsert({
+        where: { userId },
+        update: {},
+        create: {
+          userId,
+          timezone: user.timezone || 'Europe/Moscow',
+          verificationStatus: 'unverified',
+          isActive: false,
+        },
+      });
+    }
+
+    if ((user.role === UserRole.mentee || user.role === UserRole.both) && !user.menteeProfile) {
+      await this.prisma.menteeProfile.upsert({
+        where: { userId },
+        update: {},
+        create: { userId },
+      });
+    }
+
+    if (
+      ((user.role === UserRole.mentor || user.role === UserRole.both) && !user.mentorProfile) ||
+      ((user.role === UserRole.mentee || user.role === UserRole.both) && !user.menteeProfile)
+    ) {
+      user = await this.findUserProfile(userId);
+    }
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return user;
+  }
+
+  private findUserProfile(userId: string) {
+    return this.prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -266,12 +342,6 @@ export class AuthService {
         menteeProfile: true,
       },
     });
-
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    return user;
   }
 
   async logout(userId: string) {
