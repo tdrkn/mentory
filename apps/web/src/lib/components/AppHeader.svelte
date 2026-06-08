@@ -56,7 +56,9 @@
           <a class="nav-link-icon {isActive('/schedule') ? 'active' : ''}" href="/schedule" title="Расписание">
             <Calendar size={20} />
           </a>
-          <a class="nav-link-icon {isActive('/earnings') ? 'active' : ''}" href="/earnings" title="Заработок">
+        {/if}
+        {#if !$isAdmin}
+          <a class="nav-link-icon {isActive('/earnings') ? 'active' : ''}" href="/earnings" title="Финансы">
             <Wallet size={20} />
           </a>
         {/if}
@@ -130,6 +132,11 @@
           <a class="mobile-nav-link {isActive('/chat') ? 'active' : ''}" href="/chat" on:click={closeMenu}>
             <MessageCircle size={18} /> Чат
           </a>
+          {#if !$isAdmin}
+            <a class="mobile-nav-link {isActive('/earnings') ? 'active' : ''}" href="/earnings" on:click={closeMenu}>
+              <Wallet size={18} /> Финансы
+            </a>
+          {/if}
           {#if $isMentor}
             <div class="mobile-nav-divider"></div>
             <span class="mobile-nav-label">Ментору</span>
@@ -138,9 +145,6 @@
             </a>
             <a class="mobile-nav-link {isActive('/schedule') ? 'active' : ''}" href="/schedule" on:click={closeMenu}>
               <Calendar size={18} /> Расписание
-            </a>
-            <a class="mobile-nav-link {isActive('/earnings') ? 'active' : ''}" href="/earnings" on:click={closeMenu}>
-              <Wallet size={18} /> Заработок
             </a>
           {/if}
           <div class="mobile-nav-divider"></div>

@@ -1,6 +1,6 @@
 # Карта фреймворков Mentory
 
-Дата: 2026-06-07
+Дата: 2026-06-08
 
 Документ раскладывает продукт по фреймворкам: система, домен, UI, CJM, C4, стадия зрелости.
 
@@ -28,22 +28,23 @@
 | Subscriptions | Programs, request, approval, checkout, workspace                                  | Program marketplace UX, billing automation        |
 | Chat          | REST + Socket.IO, attachments, Enter behavior                                     | Notifications, read receipts polish               |
 | Help/Safety   | Appeals, mentor docs, admin review                                                | SLA queues, object cards without UUID             |
-| Payments      | Mock acquiring, delayed payout                                                    | Real acquiring, refunds, provider reconciliation  |
+| Payments      | Mock acquiring, mentor/mentee finance UI, payment history, delayed payout         | Real acquiring, refunds, provider reconciliation  |
 | Admin         | Trust, finance, audit, moderation actions                                         | Queues instead of raw technical forms             |
 
 ## 3. UI framework
 
-| Surface        | Status                              | Gap level   |
-| -------------- | ----------------------------------- | ----------- |
-| Landing        | Stable demo                         | Low         |
-| Mentor catalog | 15 rich profiles, photos, RUB       | Low         |
-| Mentor detail  | Matches latest profile logic        | Low-medium  |
-| Mentor edit    | Main blocks from PNG                | Medium      |
-| Sessions       | Better CTA and pending priority     | Medium      |
-| Chat           | Enter/Shift+Enter fixed             | Low-medium  |
-| Subscriptions  | Simpler workspace, less technical   | Medium      |
-| Help/Safety    | Renamed and simplified              | Medium      |
-| Admin          | Functional, but technical in places | Medium-high |
+| Surface        | Status                                             | Gap level   |
+| -------------- | -------------------------------------------------- | ----------- |
+| Landing        | Stable demo                                        | Low         |
+| Mentor catalog | 15 rich profiles, photos, RUB                      | Low         |
+| Mentor detail  | Matches latest profile logic                       | Low-medium  |
+| Mentor edit    | Main blocks from PNG                               | Medium      |
+| Sessions       | Better CTA and pending priority                    | Medium      |
+| Chat           | Enter/Shift+Enter fixed                            | Low-medium  |
+| Subscriptions  | Simpler workspace, less technical                  | Medium      |
+| Finance        | Mentor KPI/history/payout + mentee payment history | Medium      |
+| Help/Safety    | Renamed and simplified                             | Medium      |
+| Admin          | Functional, but technical in places                | Medium-high |
 
 ## 4. C4 framework
 

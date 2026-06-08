@@ -2,8 +2,17 @@
   import AppHeader from '$lib/components/AppHeader.svelte';
   import Loading from '$lib/components/Loading.svelte';
   import { api, ApiError } from '$lib/api';
-  import { isMentor, isAuthenticated, isLoading as authLoading } from '$lib/stores/auth';
+  import { isMentor, isAuthenticated, isLoading as authLoading, user } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
+
+  type FinanceRole = 'mentor' | 'mentee';
+  type SubscriptionStatus = 'pending' | 'approved_pending_payment' | 'active' | 'paused' | 'ended' | 'rejected';
+
+  interface UserRef {
+    id: string;
+    fullName: string;
+    email?: string;
+  }
 
   interface Balance {
     totalEarned: number;
@@ -18,16 +27,45 @@
   interface PaymentItem {
     id: string;
     amount: number;
-    mentorAmount: number;
+    mentorAmount?: number | null;
     currency: string;
     status: string;
     createdAt: string;
     paidAt?: string | null;
-    session: {
+    session?: {
       id: string;
       startAt: string;
-      mentee: { id: string; fullName: string };
+      mentee: UserRef;
+      mentor?: UserRef;
       service: { id: string; title: string };
+    } | null;
+    subscription?: {
+      id: string;
+      status: SubscriptionStatus;
+      mentor: UserRef;
+      mentee: UserRef;
+      plan?: {
+        id: string;
+        title: string;
+        priceAmount: number | string;
+        currency: string;
+        billingIntervalMonths: number;
+      };
+    } | null;
+  }
+
+  interface MentorshipSubscription {
+    id: string;
+    status: SubscriptionStatus;
+    startedAt: string;
+    monthlyPrice?: number | string | null;
+    currency: string;
+    mentor?: UserRef;
+    plan?: {
+      id: string;
+      title: string;
+      priceAmount: number | string;
+      currency: string;
     };
   }
 
@@ -39,6 +77,7 @@
 
   let balance: Balance | null = null;
   let payments: PaymentItem[] = [];
+  let subscriptions: MentorshipSubscription[] = [];
   let payoutMethods: PayoutMethod[] = [];
   let selectedMethod: PayoutMethod['id'] | '' = '';
   let isLoading = true;
@@ -47,35 +86,59 @@
   let errorMsg: string | null = null;
   let didLoad = false;
 
-  const loadData = async () => {
-    isLoading = true;
-    try {
-      const [bal, pmts, methods] = await Promise.all([
-        api.get<Balance>('/payouts/balance'),
-        api.get<PaymentItem[]>('/payments?role=mentor'),
-        api.get<PayoutMethod[]>('/payouts/methods'),
-      ]);
-      balance = bal;
-      payments = pmts;
-      payoutMethods = methods;
-      if (!selectedMethod && methods.length > 0) {
-        selectedMethod = methods[0].id;
-      }
-    } finally {
-      isLoading = false;
-    }
-  };
+  $: financeRole = ($isMentor ? 'mentor' : 'mentee') as FinanceRole;
+  $: pendingSubscriptions = subscriptions.filter((item) => item.status === 'approved_pending_payment');
+  $: activeSubscriptions = subscriptions.filter((item) => item.status === 'active' || item.status === 'paused');
+  $: paidTotal = payments
+    .filter((payment) => payment.status === 'succeeded' || payment.status === 'paid')
+    .reduce((sum, payment) => sum + payment.amount, 0);
+  $: refundedTotal = payments
+    .filter((payment) => payment.status === 'refunded')
+    .reduce((sum, payment) => sum + payment.amount, 0);
 
   $: if (!$authLoading) {
     if (!$isAuthenticated) {
       goto('/login');
-    } else if (!$isMentor) {
-      goto('/mentors');
     } else if (!didLoad) {
       didLoad = true;
-      loadData();
+      loadData(financeRole);
     }
   }
+
+  const loadData = async (role: FinanceRole = financeRole) => {
+    isLoading = true;
+    errorMsg = null;
+
+    try {
+      if (role === 'mentor') {
+        const [bal, pmts, methods] = await Promise.all([
+          api.get<Balance>('/payouts/balance'),
+          api.get<PaymentItem[]>('/payments?role=mentor'),
+          api.get<PayoutMethod[]>('/payouts/methods'),
+        ]);
+        balance = bal;
+        payments = pmts;
+        payoutMethods = methods;
+        subscriptions = [];
+        if (!selectedMethod && methods.length > 0) {
+          selectedMethod = methods[0].id;
+        }
+      } else {
+        const [pmts, subs] = await Promise.all([
+          api.get<PaymentItem[]>('/payments?role=mentee'),
+          api.get<MentorshipSubscription[]>('/subscriptions/mine'),
+        ]);
+        balance = null;
+        payments = pmts;
+        payoutMethods = [];
+        subscriptions = subs;
+      }
+    } catch (err) {
+      errorMsg = extractError(err);
+    } finally {
+      isLoading = false;
+    }
+  };
 
   const requestPayout = async () => {
     if (!selectedMethod || !balance || balance.available <= 0) return;
@@ -86,40 +149,100 @@
     try {
       await api.post('/payouts/request', { method: selectedMethod });
       message = 'Заявка на выплату создана.';
-      await loadData();
+      await loadData('mentor');
     } catch (err) {
-      errorMsg = err instanceof ApiError ? err.data?.message || 'Не удалось создать выплату.' : 'Не удалось создать выплату.';
+      errorMsg = extractError(err);
     } finally {
       isSubmitting = false;
     }
   };
 
-  const formatMoney = (amount: number, currency: string) =>
-    `${Number(amount).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ${currency}`;
+  const formatCents = (amount: number | null | undefined, currency = 'RUB') =>
+    new Intl.NumberFormat('ru-RU', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(Number(amount || 0) / 100);
+
+  const formatMajorMoney = (amount: number | string | null | undefined, currency = 'RUB') =>
+    new Intl.NumberFormat('ru-RU', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(Number(amount || 0));
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const paymentStatusLabel = (status: string) => {
     switch (status) {
-      case 'succeeded': return 'Оплачено';
-      case 'pending':   return 'Ожидает';
-      case 'failed':    return 'Ошибка';
-      case 'refunded':  return 'Возврат';
-      default:          return status;
+      case 'succeeded':
+      case 'paid':
+        return 'Оплачено';
+      case 'pending':
+        return 'Ожидает';
+      case 'failed':
+        return 'Ошибка';
+      case 'refunded':
+        return 'Возврат';
+      default:
+        return status;
     }
   };
 
   const paymentStatusClass = (status: string) => {
     switch (status) {
-      case 'succeeded': return 'st-success';
-      case 'pending':   return 'st-warning';
-      case 'failed':    return 'st-error';
-      case 'refunded':  return 'st-muted';
-      default:          return '';
+      case 'succeeded':
+      case 'paid':
+        return 'st-success';
+      case 'pending':
+        return 'st-warning';
+      case 'failed':
+        return 'st-error';
+      case 'refunded':
+        return 'st-muted';
+      default:
+        return '';
     }
   };
+
+  const paymentKindLabel = (payment: PaymentItem) => (payment.subscription ? 'Подписка' : 'Сессия');
+
+  const paymentSubject = (payment: PaymentItem) =>
+    payment.session?.service.title || payment.subscription?.plan?.title || 'Платеж Mentory';
+
+  const paymentPartner = (payment: PaymentItem) => {
+    if (financeRole === 'mentor') {
+      return payment.session?.mentee.fullName || payment.subscription?.mentee.fullName || 'Менти';
+    }
+
+    return payment.session?.mentor?.fullName || payment.subscription?.mentor.fullName || 'Ментор';
+  };
+
+  const paymentAmount = (payment: PaymentItem) =>
+    financeRole === 'mentor' ? (payment.mentorAmount ?? payment.amount) : payment.amount;
+
+  const subscriptionPrice = (subscription: MentorshipSubscription) =>
+    formatMajorMoney(
+      subscription.monthlyPrice ?? subscription.plan?.priceAmount,
+      subscription.currency || subscription.plan?.currency || 'RUB',
+    );
+
+  const extractError = (err: unknown) => {
+    if (err instanceof ApiError) {
+      const message = err.data?.message;
+      if (Array.isArray(message)) return message.join(', ');
+      if (typeof message === 'string') return message;
+      return `Ошибка API (${err.status})`;
+    }
+    if (err instanceof Error) return err.message;
+    return 'Не удалось загрузить финансы.';
+  };
 </script>
+
+<svelte:head>
+  <title>Финансы — Mentory</title>
+</svelte:head>
 
 <div class="page">
   <AppHeader />
@@ -128,7 +251,17 @@
     <Loading />
   {:else}
     <main class="shell">
-      <h1 class="page-title">Финансы</h1>
+      <header class="page-head">
+        <div>
+          <h1 class="page-title">Финансы</h1>
+          <p class="page-subtitle">
+            {financeRole === 'mentor'
+              ? 'Доходы, история оплат и вывод средств по вашим консультациям.'
+              : 'История оплат, возвраты и заявки на подписки, ожидающие оплаты.'}
+          </p>
+        </div>
+        <button class="btn btn-outline" on:click={() => loadData(financeRole)} disabled={isSubmitting}>Обновить</button>
+      </header>
 
       {#if message}
         <div class="alert alert-success">{message}</div>
@@ -137,37 +270,54 @@
         <div class="alert alert-error">{errorMsg}</div>
       {/if}
 
-      <!-- ── 4 KPI cards ── -->
-      <div class="kpi-grid">
-        <div class="kpi-card">
-          <p class="kpi-label">Общий заработок</p>
-          <p class="kpi-value accent">{formatMoney(balance?.totalEarned ?? 0, balance?.currency ?? 'RUB')}</p>
+      {#if financeRole === 'mentor'}
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <p class="kpi-label">Общий заработок</p>
+            <p class="kpi-value accent">{formatCents(balance?.totalEarned, balance?.currency ?? 'RUB')}</p>
+          </div>
+          <div class="kpi-card">
+            <p class="kpi-label">Доступно к выводу</p>
+            <p class="kpi-value">{formatCents(balance?.available, balance?.currency ?? 'RUB')}</p>
+          </div>
+          <div class="kpi-card">
+            <p class="kpi-label">Проведённые сессии</p>
+            <p class="kpi-value">{balance?.sessionsCount ?? 0}</p>
+          </div>
+          <div class="kpi-card">
+            <p class="kpi-label">Рейтинг</p>
+            <p class="kpi-value">
+              {balance?.ratingAvg ? Number(balance.ratingAvg).toFixed(1) : '—'}
+              {#if balance?.ratingCount}
+                <span class="kpi-sub">({balance.ratingCount} отз.)</span>
+              {/if}
+            </p>
+          </div>
         </div>
-        <div class="kpi-card">
-          <p class="kpi-label">Доступно к выводу</p>
-          <p class="kpi-value">{formatMoney(balance?.available ?? 0, balance?.currency ?? 'RUB')}</p>
+      {:else}
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <p class="kpi-label">Оплачено</p>
+            <p class="kpi-value accent">{formatCents(paidTotal)}</p>
+          </div>
+          <div class="kpi-card">
+            <p class="kpi-label">Активные программы</p>
+            <p class="kpi-value">{activeSubscriptions.length}</p>
+          </div>
+          <div class="kpi-card">
+            <p class="kpi-label">Ожидают оплаты</p>
+            <p class="kpi-value">{pendingSubscriptions.length}</p>
+          </div>
+          <div class="kpi-card">
+            <p class="kpi-label">Возвраты</p>
+            <p class="kpi-value">{formatCents(refundedTotal)}</p>
+          </div>
         </div>
-        <div class="kpi-card">
-          <p class="kpi-label">Проведённые сессии</p>
-          <p class="kpi-value">{balance?.sessionsCount ?? 0}</p>
-        </div>
-        <div class="kpi-card">
-          <p class="kpi-label">Рейтинг</p>
-          <p class="kpi-value">
-            {balance?.ratingAvg ? Number(balance.ratingAvg).toFixed(1) : '—'}
-            {#if balance?.ratingCount}
-              <span class="kpi-sub">({balance.ratingCount} отз.)</span>
-            {/if}
-          </p>
-        </div>
-      </div>
+      {/if}
 
-      <!-- ── Main content ── -->
       <div class="content-grid">
-
-        <!-- Payment history table -->
-        <div class="history-section">
-          <h2>История платежей</h2>
+        <section class="history-section">
+          <h2>{financeRole === 'mentor' ? 'История платежей' : 'История оплат'}</h2>
 
           {#if payments.length === 0}
             <p class="empty-text">Платежей пока нет.</p>
@@ -176,72 +326,96 @@
               <table class="history-table">
                 <thead>
                   <tr>
-                    <th>Менти</th>
-                    <th>Сессия</th>
+                    <th>Тип</th>
+                    <th>{financeRole === 'mentor' ? 'Менти' : 'Ментор'}</th>
+                    <th>Услуга</th>
                     <th>Дата</th>
                     <th>Статус</th>
-                    <th class="col-amount">Сумма</th>
+                    <th class="col-amount">{financeRole === 'mentor' ? 'К выплате' : 'Сумма'}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {#each payments as pmt}
+                  {#each payments as payment}
                     <tr>
-                      <td class="td-name">{pmt.session.mentee.fullName}</td>
-                      <td class="td-service">{pmt.session.service.title}</td>
-                      <td class="td-date">{formatDate(pmt.paidAt || pmt.createdAt)}</td>
+                      <td>{paymentKindLabel(payment)}</td>
+                      <td class="td-name">{paymentPartner(payment)}</td>
+                      <td class="td-service">{paymentSubject(payment)}</td>
+                      <td class="td-date">{formatDate(payment.paidAt || payment.createdAt)}</td>
                       <td>
-                        <span class="st-badge {paymentStatusClass(pmt.status)}">
-                          {paymentStatusLabel(pmt.status)}
+                        <span class="st-badge {paymentStatusClass(payment.status)}">
+                          {paymentStatusLabel(payment.status)}
                         </span>
                       </td>
-                      <td class="td-amount">
-                        {formatMoney(pmt.mentorAmount ?? pmt.amount, pmt.currency)}
-                      </td>
+                      <td class="td-amount">{formatCents(paymentAmount(payment), payment.currency)}</td>
                     </tr>
                   {/each}
                 </tbody>
               </table>
             </div>
           {/if}
-        </div>
+        </section>
 
-        <!-- Payout widget -->
-        <aside class="payout-aside">
-          <div class="payout-card">
-            <h2>Вывести средства</h2>
+        {#if financeRole === 'mentor'}
+          <aside class="side-panel">
+            <div class="panel-box">
+              <h2>Вывести средства</h2>
 
-            <div class="payout-balance">
-              <span>Доступно</span>
-              <strong>{formatMoney(balance?.available ?? 0, balance?.currency ?? 'RUB')}</strong>
+              <div class="payout-balance">
+                <span>Доступно</span>
+                <strong>{formatCents(balance?.available, balance?.currency ?? 'RUB')}</strong>
+              </div>
+
+              <p class="section-label">Способ получения</p>
+              <div class="method-list">
+                {#each payoutMethods as method}
+                  <button
+                    class="method-item {selectedMethod === method.id ? 'method-selected' : ''}"
+                    on:click={() => (selectedMethod = method.id)}
+                  >
+                    <span class="method-name">{method.label}</span>
+                    <span class="method-desc">{method.description}</span>
+                  </button>
+                {/each}
+              </div>
+
+              <button
+                class="btn btn-primary withdraw-btn"
+                on:click={requestPayout}
+                disabled={isSubmitting || !selectedMethod || (balance?.available ?? 0) <= 0}
+              >
+                {isSubmitting ? 'Отправка...' : 'Вывести средства'}
+              </button>
+
+              <p class="panel-note">
+                Реквизиты не хранятся в Mentory. Реальный процессинг выплат остается production gap.
+              </p>
             </div>
+          </aside>
+        {:else}
+          <aside class="side-panel">
+            <div class="panel-box">
+              <h2>Ожидают оплаты</h2>
 
-            <!-- Method list -->
-            <p class="section-label">Способ получения</p>
-            <div class="method-list">
-              {#each payoutMethods as method}
-                <button
-                  class="method-item {selectedMethod === method.id ? 'method-selected' : ''}"
-                  on:click={() => (selectedMethod = method.id)}
-                >
-                  <span class="method-name">{method.label}</span>
-                  <span class="method-desc">{method.description}</span>
-                </button>
-              {/each}
+              {#if pendingSubscriptions.length === 0}
+                <p class="empty-text">Нет одобренных заявок, ожидающих оплаты.</p>
+              {:else}
+                <div class="subscription-list">
+                  {#each pendingSubscriptions as subscription}
+                    <article class="subscription-item">
+                      <div>
+                        <strong>{subscription.plan?.title || 'Программа менторства'}</strong>
+                        <span>{subscription.mentor?.fullName || 'Ментор'} · {subscriptionPrice(subscription)}</span>
+                      </div>
+                      <a class="btn btn-primary btn-sm" href={`/checkout/subscriptions/${subscription.id}`}>Оплатить</a>
+                    </article>
+                  {/each}
+                </div>
+              {/if}
+
+              <a class="btn btn-outline support-link" href="/trust">Помощь с оплатой</a>
             </div>
-
-            <button
-              class="btn btn-primary withdraw-btn"
-              on:click={requestPayout}
-              disabled={isSubmitting || !selectedMethod || (balance?.available ?? 0) <= 0}
-            >
-              {isSubmitting ? 'Отправка...' : 'Вывести средства'}
-            </button>
-
-            <p class="payout-note">
-              Данные карты и платёжные реквизиты не хранятся в Mentory. Реальный процессинг — в разработке.
-            </p>
-          </div>
-        </aside>
+          </aside>
+        {/if}
       </div>
     </main>
   {/if}
@@ -249,16 +423,30 @@
 
 <style>
   .shell {
-    max-width: 1100px;
+    max-width: 1120px;
     margin: 0 auto;
     padding: 48px 20px 100px;
+  }
+
+  .page-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 28px;
   }
 
   .page-title {
     font-size: 1.75rem;
     font-weight: 800;
     color: var(--ink);
-    margin: 0 0 28px;
+    margin: 0 0 6px;
+  }
+
+  .page-subtitle {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.5;
   }
 
   .alert-success,
@@ -281,7 +469,6 @@
     color: var(--status-error-ink);
   }
 
-  /* KPI grid */
   .kpi-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -301,7 +488,7 @@
     color: var(--muted);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0;
     margin: 0 0 8px;
   }
 
@@ -326,16 +513,15 @@
     color: var(--muted);
   }
 
-  /* Content grid */
   .content-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-columns: minmax(0, 1fr) 320px;
     gap: 24px;
     align-items: start;
   }
 
-  /* History table */
-  .history-section h2 {
+  .history-section h2,
+  .panel-box h2 {
     font-size: 1.1rem;
     font-weight: 700;
     color: var(--ink);
@@ -346,6 +532,7 @@
     color: var(--muted);
     font-size: 0.9rem;
     margin: 0;
+    line-height: 1.5;
   }
 
   .table-wrap {
@@ -371,7 +558,7 @@
     font-weight: 700;
     color: var(--muted);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0;
     white-space: nowrap;
   }
 
@@ -393,7 +580,7 @@
   }
 
   .td-service {
-    max-width: 200px;
+    max-width: 220px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -416,7 +603,6 @@
     white-space: nowrap;
   }
 
-  /* Status badges */
   .st-badge {
     display: inline-block;
     padding: 3px 10px;
@@ -446,13 +632,12 @@
     color: var(--muted);
   }
 
-  /* Payout aside */
-  .payout-aside {
+  .side-panel {
     position: sticky;
     top: 24px;
   }
 
-  .payout-card {
+  .panel-box {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
@@ -460,13 +645,6 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-  }
-
-  .payout-card h2 {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: var(--ink);
-    margin: 0;
   }
 
   .payout-balance {
@@ -494,15 +672,16 @@
     font-size: 0.78rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0;
     color: var(--muted);
     margin: 0;
   }
 
-  .method-list {
+  .method-list,
+  .subscription-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
   }
 
   .method-item {
@@ -539,12 +718,33 @@
     color: var(--muted);
   }
 
-  .withdraw-btn {
+  .subscription-item {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-alt);
+  }
+
+  .subscription-item strong,
+  .subscription-item span {
+    display: block;
+  }
+
+  .subscription-item span {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 0.84rem;
+  }
+
+  .withdraw-btn,
+  .support-link {
     width: 100%;
     justify-content: center;
   }
 
-  .payout-note {
+  .panel-note {
     font-size: 0.76rem;
     color: var(--muted);
     margin: 0;
@@ -557,12 +757,12 @@
     }
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 800px) {
     .content-grid {
       grid-template-columns: minmax(0, 1fr);
     }
 
-    .payout-aside {
+    .side-panel {
       position: static;
     }
   }
@@ -572,8 +772,17 @@
       padding: 28px 16px 80px;
     }
 
+    .page-head {
+      flex-direction: column;
+    }
+
+    .page-head .btn {
+      width: 100%;
+      justify-content: center;
+    }
+
     .kpi-grid {
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
     }
 
     .kpi-value {

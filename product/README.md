@@ -32,8 +32,9 @@ product/
 ## Ключевые файлы
 
 - `handbook/mentory-leadership-intro.md` и `handbook/mentory-leadership-intro.pdf` - большой вводный документ для нового лидера проекта.
-- `reports/mini-report-2026-06-07.md` - свежий мини-отчет после pass по demo-data, фото, сессиям, чату, терминам, темной теме и подпискам.
-- `reports/framework-map-2026-06-07.md` - свежая раскладка продукта по technical/product/UI/C4/stage frameworks.
+- `reports/mini-report-2026-06-08.md` - свежий мини-отчет после pass по finance UI для mentor/mentee и сверке с Drive/Figma-derived материалами.
+- `reports/mini-report-2026-06-07.md` - мини-отчет после pass по demo-data, фото, сессиям, чату, терминам, темной теме и подпискам.
+- `reports/framework-map-2026-06-07.md` - свежая раскладка продукта по technical/product/UI/C4/stage frameworks, обновлена 2026-06-08.
 - `gaps/figma-product-gap-2026-06-07.md` - свежая степень различий с Figma/product и порядок закрытия gaps.
 - `reports/mini-report-2026-05-25.md` - краткий отчет по стадии продукта, browser QA, степени расхождений с DOCX/Figma и недостающим частям до идеального продукта.
 - `reports/framework-map-2026-05-25.md` - раскладка продукта по technical/product/UI/C4/stage frameworks.
@@ -57,14 +58,15 @@ product/
 - Заявки: отдельной таблицы `applications` нет; текущий аналог заявки - `sessions.status = requested/paid` плюс `requestGoal`, `requestMotivation`, `decisionComment`.
 - Booking/payment: `paid` означает "оплачено и ждет решения ментора"; `booked` означает "ментор подтвердил"; `rejected` означает отказ ментора с сохраненной причиной.
 - Подписки: заявка проходит `pending -> approved_pending_payment -> active`; workspace доступен только после оплаты одобренной подписки.
+- Finance UI: `/earnings` является общим разделом `Финансы`; ментор видит KPI/историю/вывод, менти видит историю оплат, возвраты и одобренные подписки к оплате.
 - Payout: после `completeSession` создается delayed pending payout с `availableAt` через 5 рабочих дней; активные complaints блокируют создание/процессинг выплаты.
 - Uploads: trust/chat/regalia data URL payloads сохраняются через local `FileStorageService`; в БД остается `/uploads/*` URL. MinIO/S3 - будущая production-замена.
 - Figma UI: профиль ментора на просмотре использует отдельные правые блоки `Планы подписки` и `Разовые сессии и услуги`; старые табы `Сессия/Подписка` не возвращать без нового согласования.
 - NFR: 50k users, 99.9%, RTO/RPO, retention, DWH и SLA поддержки пока являются target-only требованиями без нагрузочного/операционного evidence.
 
-## Current Stage 2026-06-07
+## Current Stage 2026-06-08
 
 - Стадия: **demo-ready alpha / functional MVP+**.
-- Готовность: **73-77%** от идеального продукта.
-- Закрыто в последнем pass: богатый demo seed с профилем Растяпина Данила, фото в каталоге/header, понятные сессии и чат, простые термины, читаемая темная тема, упрощенные подписки, отмена встречи с причиной.
-- Главные gaps до beta: real acquiring/refunds/payouts, reschedule, admin queues без UUID, production storage, monitoring/backups/load tests, финальный Figma polish.
+- Готовность: **76-79%** от идеального продукта.
+- Закрыто в последнем pass: finance UI стал role-aware для mentor/mentee, история оплат поддерживает session/subscription payments, суммы из cents отображаются как рубли, навигация `Финансы` доступна менти.
+- Главные gaps до beta: real acquiring/refunds/payouts, reschedule, request detail screens, admin queues без UUID, production storage, monitoring/backups/load tests, финальный Figma polish.

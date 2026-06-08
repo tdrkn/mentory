@@ -1,6 +1,6 @@
 # Frontend gap-анализ: DOCX/Figma vs текущий web UI
 
-Дата ревизии: 2026-06-06
+Дата ревизии: 2026-06-08
 
 Источник сравнения:
 
@@ -61,6 +61,8 @@
 - `product/qa-screenshots/qa-2026-06-06-requests-rub.png`
 - `product/qa-screenshots/qa-2026-06-06-admin-rub.png`
 - `product/qa-screenshots/qa-2026-06-06-sessions-mentor-pending.png`
+- `product/qa-screenshots/qa-2026-06-08-finance-mentee-desktop.png`
+- `product/qa-screenshots/qa-2026-06-08-finance-mentee-mobile.png`
 
 Пройдено:
 
@@ -84,26 +86,28 @@
 | 2026-05-25 visual QA                | Работает: landing, catalog, mentor profile, profile edit, calendar, admin dashboard/trust; на проверенных desktop/mobile viewport horizontal overflow = 0                                                |
 | 2026-06-06 requests/subscription QA | Работает: mentor/mentee `/requests`, `/subscriptions`, `/sessions?tab=pending`, `/checkout/subscriptions/:id`; protected routes не падают в 401, horizontal overflow = 0                                 |
 | 2026-06-06 RUB/ru localization QA   | Работает: `/mentors`, `/profile/edit`, `/subscriptions`, `/requests`, `/admin/trust#database`; видимого `USD`/`$` нет, новые defaults в API/Prisma переведены на `RUB`, даты форматируются через `ru-RU` |
+| 2026-06-08 mentee finance QA        | Работает: `/earnings` для `ivan.mentee@example.com`; видны `Финансы`, история оплат, активные программы, блок `Ожидают оплаты`; desktop/mobile horizontal overflow = 0                                   |
 
 ## Найденные и исправленные frontend/runtime дефекты
 
-| Дефект                                                                                                                                  | Статус         | Исправление                                                                                                                          |
-| --------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `/admin/trust` UI дергал `/api/admin/trust/*`, но backend регистрировал REST admin routes без `/api`, из-за чего страница получала 404  | Исправлено     | `apps/api/src/main.ts`: глобальный prefix теперь применяется к Nest controllers; AdminJS остается на `/admin` как Express middleware |
-| `GET /api/health/ready` был `degraded` в Docker из-за `REDIS_HOST=localhost` из `.env`                                                  | Исправлено     | `apps/api/src/health/health.controller.ts`: readiness использует `REDIS_URL` с приоритетом                                           |
-| Детальная страница сессии показывала raw status `booked`                                                                                | Исправлено     | `apps/web/src/routes/sessions/[id]/+page.svelte`: добавлен `statusLabel`                                                             |
-| Admin/trust и trust grids были слишком плотными на mobile из-за inline `grid-template-columns`                                          | Исправлено     | Добавлены responsive classes в `admin/trust` и `trust` routes                                                                        |
-| `/admin/login` сохранял JWT в `localStorage`, но не обновлял Svelte auth store; после входа админ мог сразу вернуться на login          | Исправлено     | `apps/web/src/routes/admin/login/+page.svelte`: вход идет через общий `authLogin`                                                    |
-| `/admin/trust` зависел от состояния auth store в момент mount и ломал прямые hash-входы; после SSR фикса отдельно проверен `200 OK`     | Исправлено     | `apps/web/src/routes/admin/trust/+page.svelte`: загрузка привязана к завершению auth loading, hash sync защищен `browser` guard      |
-| На admin/trust в блоке финансов были английские labels `Total fees`, `Total withdrawn`, `Available`                                     | Исправлено     | Labels переведены на `Всего комиссий`, `Выведено`, `Доступно к выводу`                                                               |
-| В SvelteKit live announcer попадал `untitled page`; это было видно в browser QA как технический артефакт                                | Исправлено     | Добавлен default `<title>` в layout, page titles для ключевых экранов и visually-hidden стиль для `#svelte-announcer`                |
-| Ссылки на `/uploads/*` в trust/admin открывались с web-host `:3000`, хотя файлы раздает API `:4000`                                     | Исправлено     | Добавлен `resolveFileUrl()` в trust/admin маршруты                                                                                   |
-| Публичный профиль ментора показывал старый таб-переключатель `Сессия/Подписка`, хотя последний макет требует два отдельных блока справа | Исправлено     | `apps/web/src/routes/mentors/[id]/+page.svelte`: правый sidebar пересобран в `Планы подписки` + `Разовые сессии и услуги`            |
-| На mobile `/admin/trust#database` вкладки давали небольшой body overflow                                                                | Исправлено     | Tabs теперь wrap'ятся и уменьшают padding на narrow viewport                                                                         |
-| Подписки не имели checkout после одобрения ментором                                                                                     | Исправлено MVP | Добавлен `approved_pending_payment`, `/checkout/subscriptions/[subscriptionId]`, mock acquiring и активация подписки после webhook   |
-| Reject/approve заявки не давали нормальный комментарий для менти                                                                        | Исправлено MVP | Добавлен `decisionComment`, `rejected`, поле комментария в `/requests` и на детальной странице сессии                                |
-| Демо-профили выглядели пустыми: placeholder avatar, мало навыков/хобби/достижений, валютный шум                                         | Исправлено MVP | Seed теперь создает avatar URL, career fields, skills, hobbies, verified profiles, RUB plans и approved regalia                      |
-| Admin payout processing был backend-only                                                                                                | Исправлено MVP | `AdminPaymentsController` подключен в `PaymentsModule`; `/admin/trust#database` получил кнопку `Обработать готовые выплаты`          |
+| Дефект                                                                                                                                  | Статус         | Исправление                                                                                                                            |
+| --------------------------------------------------------------------------------------------------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `/admin/trust` UI дергал `/api/admin/trust/*`, но backend регистрировал REST admin routes без `/api`, из-за чего страница получала 404  | Исправлено     | `apps/api/src/main.ts`: глобальный prefix теперь применяется к Nest controllers; AdminJS остается на `/admin` как Express middleware   |
+| `GET /api/health/ready` был `degraded` в Docker из-за `REDIS_HOST=localhost` из `.env`                                                  | Исправлено     | `apps/api/src/health/health.controller.ts`: readiness использует `REDIS_URL` с приоритетом                                             |
+| Детальная страница сессии показывала raw status `booked`                                                                                | Исправлено     | `apps/web/src/routes/sessions/[id]/+page.svelte`: добавлен `statusLabel`                                                               |
+| Admin/trust и trust grids были слишком плотными на mobile из-за inline `grid-template-columns`                                          | Исправлено     | Добавлены responsive classes в `admin/trust` и `trust` routes                                                                          |
+| `/admin/login` сохранял JWT в `localStorage`, но не обновлял Svelte auth store; после входа админ мог сразу вернуться на login          | Исправлено     | `apps/web/src/routes/admin/login/+page.svelte`: вход идет через общий `authLogin`                                                      |
+| `/admin/trust` зависел от состояния auth store в момент mount и ломал прямые hash-входы; после SSR фикса отдельно проверен `200 OK`     | Исправлено     | `apps/web/src/routes/admin/trust/+page.svelte`: загрузка привязана к завершению auth loading, hash sync защищен `browser` guard        |
+| На admin/trust в блоке финансов были английские labels `Total fees`, `Total withdrawn`, `Available`                                     | Исправлено     | Labels переведены на `Всего комиссий`, `Выведено`, `Доступно к выводу`                                                                 |
+| В SvelteKit live announcer попадал `untitled page`; это было видно в browser QA как технический артефакт                                | Исправлено     | Добавлен default `<title>` в layout, page titles для ключевых экранов и visually-hidden стиль для `#svelte-announcer`                  |
+| Ссылки на `/uploads/*` в trust/admin открывались с web-host `:3000`, хотя файлы раздает API `:4000`                                     | Исправлено     | Добавлен `resolveFileUrl()` в trust/admin маршруты                                                                                     |
+| Публичный профиль ментора показывал старый таб-переключатель `Сессия/Подписка`, хотя последний макет требует два отдельных блока справа | Исправлено     | `apps/web/src/routes/mentors/[id]/+page.svelte`: правый sidebar пересобран в `Планы подписки` + `Разовые сессии и услуги`              |
+| На mobile `/admin/trust#database` вкладки давали небольшой body overflow                                                                | Исправлено     | Tabs теперь wrap'ятся и уменьшают padding на narrow viewport                                                                           |
+| Подписки не имели checkout после одобрения ментором                                                                                     | Исправлено MVP | Добавлен `approved_pending_payment`, `/checkout/subscriptions/[subscriptionId]`, mock acquiring и активация подписки после webhook     |
+| Reject/approve заявки не давали нормальный комментарий для менти                                                                        | Исправлено MVP | Добавлен `decisionComment`, `rejected`, поле комментария в `/requests` и на детальной странице сессии                                  |
+| Демо-профили выглядели пустыми: placeholder avatar, мало навыков/хобби/достижений, валютный шум                                         | Исправлено MVP | Seed теперь создает avatar URL, career fields, skills, hobbies, verified profiles, RUB plans и approved regalia                        |
+| Admin payout processing был backend-only                                                                                                | Исправлено MVP | `AdminPaymentsController` подключен в `PaymentsModule`; `/admin/trust#database` получил кнопку `Обработать готовые выплаты`            |
+| `/earnings` был mentor-only и падал бы на subscription payments без `session`                                                           | Исправлено MVP | `apps/web/src/routes/earnings/+page.svelte`: role-aware `Финансы`, session/subscription history, cents -> RUB display, mentee payments |
 
 ## Frontend-расхождения с отчетом
 
@@ -119,6 +123,7 @@
 | Подбор по критериям              | Стаж, компания, специализация, цели и др.                                        | Каталог фильтрует topic/price/rating/education/workplace/hobby/skill; нет обязательных gender/stage fields из части NFR                                                                    | Частично                                            |
 | Payout admin processing          | Отчет описывает контроль выплат и жалоб                                          | В admin database/finances есть кнопка обработки ready payouts; endpoint возвращает checked/completed/blocked                                                                               | Закрыто MVP                                         |
 | Данные профилей в seed/runtime   | Макеты показывают фото, навыки, хобби и достижения у демонстрационного ментора   | Seed-профили заполнены фото, career fields, skills, hobbies, RUB plans и approved regalia                                                                                                  | Закрыто MVP                                         |
+| Финансы менти                    | В Figma у менти есть пункт «Финансы», содержание не уточнено                     | `/earnings` теперь показывает менти историю оплат, возвраты, активные программы и одобренные подписки с CTA оплаты                                                                         | Закрыто MVP; расширенная аналитика post-MVP         |
 
 ## Рекомендуемый frontend backlog
 
