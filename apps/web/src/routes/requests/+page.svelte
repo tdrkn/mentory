@@ -307,7 +307,7 @@
                 {/if}
 
                 <div class="actions">
-                  <a class="btn btn-outline" href={`/sessions/${item.id}`}>Открыть</a>
+                  <a class="btn btn-outline" href={`/requests/sessions/${item.id}`}>Открыть заявку</a>
                   {#if isMentorScope && item.mentorId === $user?.id && (item.status === 'requested' || item.status === 'paid')}
                     <input
                       class="input decision-input"
@@ -356,7 +356,7 @@
                 {/if}
 
                 <div class="actions">
-                  <a class="btn btn-outline" href="/subscriptions">Открыть подписки</a>
+                  <a class="btn btn-outline" href={`/requests/subscriptions/${item.id}`}>Открыть заявку</a>
                   {#if isMentorScope && item.mentorId === $user?.id && item.status === 'pending'}
                     <input
                       class="input decision-input"

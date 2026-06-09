@@ -1,6 +1,6 @@
 # Карта фреймворков Mentory
 
-Дата: 2026-06-08
+Дата: 2026-06-09
 
 Документ раскладывает продукт по фреймворкам: система, домен, UI, CJM, C4, стадия зрелости.
 
@@ -25,7 +25,7 @@
 | Discovery     | Каталог, фильтры, карточки, профиль                                               | Saved filters, ranking, richer cards              |
 | Booking       | Hold, payment, mentor decision, session lifecycle, participant cancel with reason | Reschedule, refund policy                         |
 | Sessions      | Notes, meeting link, chat, complete, review                                       | Dedicated review screen, reminders                |
-| Subscriptions | Programs, request, approval, checkout, workspace                                  | Program marketplace UX, billing automation        |
+| Subscriptions | Programs, request detail, approval, checkout, workspace                           | Program marketplace UX, billing automation        |
 | Chat          | REST + Socket.IO, attachments, Enter behavior                                     | Notifications, read receipts polish               |
 | Help/Safety   | Appeals, mentor docs, admin review                                                | SLA queues, object cards without UUID             |
 | Payments      | Mock acquiring, mentor/mentee finance UI, payment history, delayed payout         | Real acquiring, refunds, provider reconciliation  |
@@ -40,6 +40,7 @@
 | Mentor detail  | Matches latest profile logic                       | Low-medium  |
 | Mentor edit    | Main blocks from PNG                               | Medium      |
 | Sessions       | Better CTA and pending priority                    | Medium      |
+| Requests       | Dedicated session/subscription detail pages        | Low-medium  |
 | Chat           | Enter/Shift+Enter fixed                            | Low-medium  |
 | Subscriptions  | Simpler workspace, less technical                  | Medium      |
 | Finance        | Mentor KPI/history/payout + mentee payment history | Medium      |

@@ -197,7 +197,9 @@ export class SubscriptionsService {
     });
 
     if (existing) {
-      throw new BadRequestException('Pending, active or paused subscription already exists for this mentor');
+      throw new BadRequestException(
+        'Pending, active or paused subscription already exists for this mentor',
+      );
     }
 
     const now = new Date();
@@ -241,6 +243,10 @@ export class SubscriptionsService {
     });
   }
 
+  async getSubscription(user: CurrentUser, subscriptionId: string) {
+    return this.getSubscriptionForParticipant(user, subscriptionId);
+  }
+
   async updateSubscriptionStatus(
     user: CurrentUser,
     subscriptionId: string,
@@ -249,7 +255,10 @@ export class SubscriptionsService {
     const subscription = await this.getSubscriptionForParticipant(user, subscriptionId);
     const now = new Date();
 
-    if (dto.status === MentorshipSubscriptionStatus.active && subscription.status === MentorshipSubscriptionStatus.ended) {
+    if (
+      dto.status === MentorshipSubscriptionStatus.active &&
+      subscription.status === MentorshipSubscriptionStatus.ended
+    ) {
       throw new BadRequestException('Ended subscriptions cannot be re-activated');
     }
 
@@ -260,7 +269,9 @@ export class SubscriptionsService {
       user.role !== 'admin' &&
       subscription.mentorId !== user.id
     ) {
-      throw new ForbiddenException('Only mentor or admin can approve or reject subscription requests');
+      throw new ForbiddenException(
+        'Only mentor or admin can approve or reject subscription requests',
+      );
     }
 
     if (subscription.status === MentorshipSubscriptionStatus.rejected) {
@@ -282,9 +293,10 @@ export class SubscriptionsService {
       throw new BadRequestException('Only pending subscriptions can be approved for payment');
     }
 
-    const intervalMonths = subscription.plan.kind === MentorshipPlanKind.subscription
-      ? Math.max(subscription.plan.billingIntervalMonths || 1, 1)
-      : 1;
+    const intervalMonths =
+      subscription.plan.kind === MentorshipPlanKind.subscription
+        ? Math.max(subscription.plan.billingIntervalMonths || 1, 1)
+        : 1;
     const activatingPending =
       dto.status === MentorshipSubscriptionStatus.active &&
       (subscription.status === MentorshipSubscriptionStatus.pending ||
@@ -302,9 +314,10 @@ export class SubscriptionsService {
             : null,
         currentPeriodStart: activatingPending ? now : undefined,
         currentPeriodEnd: activatingPending ? this.addMonths(now, intervalMonths) : undefined,
-        nextBillingAt: activatingPending && subscription.plan.kind === MentorshipPlanKind.subscription
-          ? this.addMonths(now, intervalMonths)
-          : undefined,
+        nextBillingAt:
+          activatingPending && subscription.plan.kind === MentorshipPlanKind.subscription
+            ? this.addMonths(now, intervalMonths)
+            : undefined,
         notes: dto.reason ? this.mergeNotes(subscription.notes, dto.reason) : undefined,
       },
       include: {
@@ -386,7 +399,11 @@ export class SubscriptionsService {
     }
 
     if (dto.assigneeId) {
-      this.ensureAssigneeInSubscription(dto.assigneeId, subscription.mentorId, subscription.menteeId);
+      this.ensureAssigneeInSubscription(
+        dto.assigneeId,
+        subscription.mentorId,
+        subscription.menteeId,
+      );
     }
 
     return this.prisma.mentorshipTask.update({
@@ -398,11 +415,8 @@ export class SubscriptionsService {
         startDate: this.toDate(dto.startDate),
         dueDate: this.toDate(dto.dueDate),
         status: dto.status,
-        completedAt: dto.status === MentorshipTaskStatus.done
-          ? new Date()
-          : dto.status
-            ? null
-            : undefined,
+        completedAt:
+          dto.status === MentorshipTaskStatus.done ? new Date() : dto.status ? null : undefined,
       },
     });
   }
@@ -417,7 +431,11 @@ export class SubscriptionsService {
     });
   }
 
-  async createBookmark(user: CurrentUser, subscriptionId: string, dto: CreateMentorshipBookmarkDto) {
+  async createBookmark(
+    user: CurrentUser,
+    subscriptionId: string,
+    dto: CreateMentorshipBookmarkDto,
+  ) {
     const subscription = await this.getSubscriptionForParticipant(user, subscriptionId);
     this.ensureWorkspaceOpen(subscription.status);
 
@@ -515,7 +533,11 @@ export class SubscriptionsService {
         where: { menteeId: userId },
       });
 
-      if (existingBalance && existingBalance.currency !== currency && existingBalance.amountCents > 0) {
+      if (
+        existingBalance &&
+        existingBalance.currency !== currency &&
+        existingBalance.amountCents > 0
+      ) {
         throw new BadRequestException('Cannot top up with a different currency');
       }
 
@@ -646,7 +668,11 @@ export class SubscriptionsService {
       throw new NotFoundException('Subscription not found');
     }
 
-    if (user.role !== 'admin' && subscription.mentorId !== user.id && subscription.menteeId !== user.id) {
+    if (
+      user.role !== 'admin' &&
+      subscription.mentorId !== user.id &&
+      subscription.menteeId !== user.id
+    ) {
       throw new ForbiddenException('Access denied');
     }
 
@@ -717,7 +743,10 @@ export class SubscriptionsService {
   }
 
   private resolveRedeemCode(code: string) {
-    const catalog: Record<string, { amountCents: number; currency: string; description: string; expiresAt: Date | null }> = {
+    const catalog: Record<
+      string,
+      { amountCents: number; currency: string; description: string; expiresAt: Date | null }
+    > = {
       'MENTORY-START-10': {
         amountCents: 100000,
         currency: 'RUB',

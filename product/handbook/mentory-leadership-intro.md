@@ -1,6 +1,6 @@
 # Mentory: вводный документ для нового лидера проекта
 
-Дата: 2026-06-07
+Дата: 2026-06-09
 
 ## 1. Что такое Mentory
 
@@ -10,11 +10,11 @@ Mentory - платформа, где менти находит ментора, �
 
 ## 2. Главные роли
 
-| Роль | Что делает |
-|---|---|
-| Менти | Ищет ментора, отправляет заявки, оплачивает, ходит на встречи, выполняет задачи |
-| Ментор | Заполняет профиль, создает услуги и программы, принимает заявки, проводит встречи |
-| Администратор | Проверяет документы, разбирает обращения, смотрит выплаты и аудит |
+| Роль          | Что делает                                                                        |
+| ------------- | --------------------------------------------------------------------------------- |
+| Менти         | Ищет ментора, отправляет заявки, оплачивает, ходит на встречи, выполняет задачи   |
+| Ментор        | Заполняет профиль, создает услуги и программы, принимает заявки, проводит встречи |
+| Администратор | Проверяет документы, разбирает обращения, смотрит выплаты и аудит                 |
 
 ## 3. Как устроен пользовательский путь
 
@@ -39,16 +39,16 @@ Mentory - платформа, где менти находит ментора, �
 
 ## 6. Основные части системы
 
-| Часть | Технология | Зачем |
-|---|---|---|
-| Web | SvelteKit | Рисует сайт и админку |
-| API | NestJS | Бизнес-логика и HTTP endpoints |
-| Shared | TypeScript package | Общие типы между web и API |
-| Database | PostgreSQL + Prisma | Хранит пользователей, сессии, платежи |
-| Redis | Redis | Locks, future queues, realtime support |
-| Files | Local uploads now, MinIO/S3 target | Фото, документы, вложения |
-| Proxy | Caddy | Отдает сайт по IP/домену |
-| Docker | Docker Compose | Запуск локально и на сервере |
+| Часть    | Технология                         | Зачем                                  |
+| -------- | ---------------------------------- | -------------------------------------- |
+| Web      | SvelteKit                          | Рисует сайт и админку                  |
+| API      | NestJS                             | Бизнес-логика и HTTP endpoints         |
+| Shared   | TypeScript package                 | Общие типы между web и API             |
+| Database | PostgreSQL + Prisma                | Хранит пользователей, сессии, платежи  |
+| Redis    | Redis                              | Locks, future queues, realtime support |
+| Files    | Local uploads now, MinIO/S3 target | Фото, документы, вложения              |
+| Proxy    | Caddy                              | Отдает сайт по IP/домену               |
+| Docker   | Docker Compose                     | Запуск локально и на сервере           |
 
 ## 7. Важные домены
 
@@ -128,14 +128,14 @@ pnpm --filter @mentory/web check
 
 ## 12. Тестовые аккаунты
 
-| Роль | Логин | Пароль |
-|---|---|---|
-| Админ | `admin@mentory.local` | `change-me-admin` |
-| Ментор | `danil.rastyapin@example.com` | `password123` |
-| Ментор | `maria.mentor@example.com` | `password123` |
-| Ментор | `alex.mentor@example.com` | `password123` |
-| Менти | `ivan.mentee@example.com` | `password123` |
-| Менти | `anna.mentee@example.com` | `password123` |
+| Роль   | Логин                         | Пароль            |
+| ------ | ----------------------------- | ----------------- |
+| Админ  | `admin@mentory.local`         | `change-me-admin` |
+| Ментор | `danil.rastyapin@example.com` | `password123`     |
+| Ментор | `maria.mentor@example.com`    | `password123`     |
+| Ментор | `alex.mentor@example.com`     | `password123`     |
+| Менти  | `ivan.mentee@example.com`     | `password123`     |
+| Менти  | `anna.mentee@example.com`     | `password123`     |
 
 ## 13. Что уже недавно исправлено
 
@@ -147,6 +147,7 @@ pnpm --filter @mentory/web check
 - Тяжелые термины заменены на простые.
 - Темная тема стала читаемой.
 - Подписки стали рабочим пространством программ.
+- Добавлены отдельные страницы деталей заявок на сессию и подписку.
 
 ## 14. Что еще не хватает до идеального продукта
 
@@ -164,12 +165,12 @@ Medium priority:
 - saved filters;
 - profile completeness score;
 - mobile visual polish;
-- отдельные detail screens заявок.
+- pixel-perfect shortcuts в карточках заявок: профиль участника, чат, плотность карточек по Figma.
 
 ## 15. Где читать дальше
 
 - `product/README.md` - карта папки product.
-- `product/reports/mini-report-2026-06-07.md` - краткая стадия продукта.
+- `product/reports/mini-report-2026-06-09.md` - краткая стадия продукта.
 - `product/reports/framework-map-2026-06-07.md` - раскладка по фреймворкам.
 - `product/gaps/figma-product-gap-2026-06-07.md` - различия с Figma/product.
 - `apps/api/prisma/schema.prisma` - настоящая модель данных.

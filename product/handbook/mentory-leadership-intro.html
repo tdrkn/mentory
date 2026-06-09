@@ -1,155 +1,372 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Mentory handbook</title><style>
-@page { margin: 18mm 16mm; }
-body { font-family: Inter, Arial, sans-serif; color:#111827; line-height:1.48; font-size:13px; }
-h1 { font-size:28px; margin:0 0 18px; color:#0f172a; }
-h2 { font-size:20px; margin:24px 0 8px; color:#0f172a; break-after: avoid; }
-h3 { font-size:16px; margin:18px 0 6px; color:#1f2937; }
-p { margin:7px 0; }
-table { width:100%; border-collapse:collapse; margin:10px 0 16px; font-size:12px; }
-th, td { border:1px solid #d1d5db; padding:7px 8px; vertical-align:top; }
-th { background:#eff6ff; text-align:left; }
-code { background:#f3f4f6; padding:1px 4px; border-radius:4px; }
-pre { background:#0f172a; color:#e5e7eb; padding:12px; border-radius:8px; white-space:pre-wrap; font-size:11px; overflow:hidden; }
-ul, ol { margin:7px 0 12px 22px; padding:0; }
-li { margin:4px 0; }
-figure { margin:12px 0 18px; padding:10px; border:1px solid #d1d5db; border-radius:8px; background:#f8fafc; break-inside:avoid; }
-figure img { display:block; max-width:100%; margin:0 auto; }
-figcaption { color:#6b7280; font-size:11px; text-align:center; margin-top:6px; }
-</style></head><body><h1>Mentory: вводный документ для нового лидера проекта</h1>
-<p>Дата: 2026-06-07</p>
-<h2>1. Что такое Mentory</h2>
-<p>Mentory - платформа, где менти находит ментора, выбирает разовую консультацию или программу, отправляет заявку, оплачивает работу и дальше ведет прогресс через сессии, чат, задачи и материалы.</p>
-<p>Простая аналогия: Mentory похож на учебный центр с ресепшеном, расписанием, переговорными, бухгалтерией и службой поддержки. Только все это собрано в веб-приложении.</p>
-<h2>2. Главные роли</h2>
-<table>
-<tr><th>Роль</th><th>Что делает</th></tr>
-<tr><td>Менти</td><td>Ищет ментора, отправляет заявки, оплачивает, ходит на встречи, выполняет задачи</td></tr>
-<tr><td>Ментор</td><td>Заполняет профиль, создает услуги и программы, принимает заявки, проводит встречи</td></tr>
-<tr><td>Администратор</td><td>Проверяет документы, разбирает обращения, смотрит выплаты и аудит</td></tr>
-</table>
-<h2>3. Как устроен пользовательский путь</h2>
-<figure><img src="file:///Users/arxungo/projects/mentory/product/diagrams/2026-06-07-cjm-core-loop.png" alt="CJM core loop"><figcaption>CJM core loop</figcaption></figure>
-<h2>4. Архитектура простыми словами</h2>
-<p>Сейчас это <strong>модульный монолит</strong>. Это значит, что backend один, но внутри разделен на понятные модули: профили, поиск, бронирование, сессии, платежи, чат, помощь, подписки.</p>
-<p>Аналогия: это один большой офис, где разные отделы сидят в разных кабинетах. Это проще обслуживать на стадии MVP, чем строить отдельное здание под каждый отдел.</p>
-<p>Почему не микросервисы сейчас:</p>
-<ul>
-<li>проект еще быстро меняется;</li>
-<li>команда маленькая;</li>
-<li>один backend проще деплоить и отлаживать;</li>
-<li>микросервисы добавили бы сетевые ошибки, очереди, трассировку и DevOps-сложность раньше времени.</li>
-</ul>
-<h2>5. C4 Context</h2>
-<figure><img src="file:///Users/arxungo/projects/mentory/product/diagrams/2026-06-07-c4-l1-context.png" alt="C4 context"><figcaption>C4 context</figcaption></figure>
-<h2>6. Основные части системы</h2>
-<table>
-<tr><th>Часть</th><th>Технология</th><th>Зачем</th></tr>
-<tr><td>Web</td><td>SvelteKit</td><td>Рисует сайт и админку</td></tr>
-<tr><td>API</td><td>NestJS</td><td>Бизнес-логика и HTTP endpoints</td></tr>
-<tr><td>Shared</td><td>TypeScript package</td><td>Общие типы между web и API</td></tr>
-<tr><td>Database</td><td>PostgreSQL + Prisma</td><td>Хранит пользователей, сессии, платежи</td></tr>
-<tr><td>Redis</td><td>Redis</td><td>Locks, future queues, realtime support</td></tr>
-<tr><td>Files</td><td>Local uploads now, MinIO/S3 target</td><td>Фото, документы, вложения</td></tr>
-<tr><td>Proxy</td><td>Caddy</td><td>Отдает сайт по IP/домену</td></tr>
-<tr><td>Docker</td><td>Docker Compose</td><td>Запуск локально и на сервере</td></tr>
-</table>
-<h2>7. Важные домены</h2>
-<h3>Профили</h3>
-<p>Ментор хранит фото, карьеру, навыки, хобби, документы, услуги и программы. Это витрина доверия.</p>
-<h3>Каталог</h3>
-<p>Каталог показывает много менторов с фото, темами, рейтингом и ценой от N рублей. Демо-данные лежат в <code>apps/api/prisma/seed.ts</code>.</p>
-<h3>Сессии</h3>
-<p>Разовая консультация проходит состояния: заявка, оплата, согласование, встреча, завершение, отзыв.</p>
-<h3>Подписки</h3>
-<p>Подписка в коде - это подключение к программе. Человеку в интерфейсе говорим "подключение", потому что слово "подписка" часто звучит как автоматическое списание без контекста.</p>
-<h3>Чат</h3>
-<p>Чат связывает ментора и менти. Enter отправляет сообщение, Shift+Enter делает перенос строки.</p>
-<h3>Помощь и безопасность</h3>
-<p>Здесь пользователь отправляет обращение, а ментор загружает документы. Внутри API часть маршрутов все еще называется <code>trust</code>, чтобы не ломать контракты.</p>
-<h2>8. Данные и seed</h2>
-<p>Seed - это сценарий наполнения базы демо-данными.</p>
-<p>В нем сейчас:</p>
-<ul>
-<li>16 менторов, включая демо-профиль Растяпина Данила;</li>
-<li>3 менти;</li>
-<li>1 администратор;</li>
-<li>темы, услуги, программы, документы, слоты;</li>
-<li>демо-сессии разных статусов;</li>
-<li>чаты, отзывы, бонусный баланс.</li>
-</ul>
-<p>Команда локально:</p>
-<pre><code>
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mentory handbook</title>
+    <style>
+      @page {
+        margin: 18mm 16mm;
+      }
+      body {
+        font-family: Inter, Arial, sans-serif;
+        color: #111827;
+        line-height: 1.48;
+        font-size: 13px;
+      }
+      h1 {
+        font-size: 28px;
+        margin: 0 0 18px;
+        color: #0f172a;
+      }
+      h2 {
+        font-size: 20px;
+        margin: 24px 0 8px;
+        color: #0f172a;
+        break-after: avoid;
+      }
+      h3 {
+        font-size: 16px;
+        margin: 18px 0 6px;
+        color: #1f2937;
+      }
+      p {
+        margin: 7px 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0 16px;
+        font-size: 12px;
+      }
+      th,
+      td {
+        border: 1px solid #d1d5db;
+        padding: 7px 8px;
+        vertical-align: top;
+      }
+      th {
+        background: #eff6ff;
+        text-align: left;
+      }
+      code {
+        background: #f3f4f6;
+        padding: 1px 4px;
+        border-radius: 4px;
+      }
+      pre {
+        background: #0f172a;
+        color: #e5e7eb;
+        padding: 12px;
+        border-radius: 8px;
+        white-space: pre-wrap;
+        font-size: 11px;
+        overflow: hidden;
+      }
+      ul,
+      ol {
+        margin: 7px 0 12px 22px;
+        padding: 0;
+      }
+      li {
+        margin: 4px 0;
+      }
+      figure {
+        margin: 12px 0 18px;
+        padding: 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #f8fafc;
+        break-inside: avoid;
+      }
+      figure img {
+        display: block;
+        max-width: 100%;
+        margin: 0 auto;
+      }
+      figcaption {
+        color: #6b7280;
+        font-size: 11px;
+        text-align: center;
+        margin-top: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Mentory: вводный документ для нового лидера проекта</h1>
+    <p>Дата: 2026-06-09</p>
+    <h2>1. Что такое Mentory</h2>
+    <p>
+      Mentory - платформа, где менти находит ментора, выбирает разовую консультацию или программу,
+      отправляет заявку, оплачивает работу и дальше ведет прогресс через сессии, чат, задачи и
+      материалы.
+    </p>
+    <p>
+      Простая аналогия: Mentory похож на учебный центр с ресепшеном, расписанием, переговорными,
+      бухгалтерией и службой поддержки. Только все это собрано в веб-приложении.
+    </p>
+    <h2>2. Главные роли</h2>
+    <table>
+      <tr>
+        <th>Роль</th>
+        <th>Что делает</th>
+      </tr>
+      <tr>
+        <td>Менти</td>
+        <td>Ищет ментора, отправляет заявки, оплачивает, ходит на встречи, выполняет задачи</td>
+      </tr>
+      <tr>
+        <td>Ментор</td>
+        <td>Заполняет профиль, создает услуги и программы, принимает заявки, проводит встречи</td>
+      </tr>
+      <tr>
+        <td>Администратор</td>
+        <td>Проверяет документы, разбирает обращения, смотрит выплаты и аудит</td>
+      </tr>
+    </table>
+    <h2>3. Как устроен пользовательский путь</h2>
+    <figure>
+      <img
+        src="file:///Users/arxungo/projects/mentory/product/diagrams/2026-06-07-cjm-core-loop.png"
+        alt="CJM core loop"
+      />
+      <figcaption>CJM core loop</figcaption>
+    </figure>
+    <h2>4. Архитектура простыми словами</h2>
+    <p>
+      Сейчас это <strong>модульный монолит</strong>. Это значит, что backend один, но внутри
+      разделен на понятные модули: профили, поиск, бронирование, сессии, платежи, чат, помощь,
+      подписки.
+    </p>
+    <p>
+      Аналогия: это один большой офис, где разные отделы сидят в разных кабинетах. Это проще
+      обслуживать на стадии MVP, чем строить отдельное здание под каждый отдел.
+    </p>
+    <p>Почему не микросервисы сейчас:</p>
+    <ul>
+      <li>проект еще быстро меняется;</li>
+      <li>команда маленькая;</li>
+      <li>один backend проще деплоить и отлаживать;</li>
+      <li>
+        микросервисы добавили бы сетевые ошибки, очереди, трассировку и DevOps-сложность раньше
+        времени.
+      </li>
+    </ul>
+    <h2>5. C4 Context</h2>
+    <figure>
+      <img
+        src="file:///Users/arxungo/projects/mentory/product/diagrams/2026-06-07-c4-l1-context.png"
+        alt="C4 context"
+      />
+      <figcaption>C4 context</figcaption>
+    </figure>
+    <h2>6. Основные части системы</h2>
+    <table>
+      <tr>
+        <th>Часть</th>
+        <th>Технология</th>
+        <th>Зачем</th>
+      </tr>
+      <tr>
+        <td>Web</td>
+        <td>SvelteKit</td>
+        <td>Рисует сайт и админку</td>
+      </tr>
+      <tr>
+        <td>API</td>
+        <td>NestJS</td>
+        <td>Бизнес-логика и HTTP endpoints</td>
+      </tr>
+      <tr>
+        <td>Shared</td>
+        <td>TypeScript package</td>
+        <td>Общие типы между web и API</td>
+      </tr>
+      <tr>
+        <td>Database</td>
+        <td>PostgreSQL + Prisma</td>
+        <td>Хранит пользователей, сессии, платежи</td>
+      </tr>
+      <tr>
+        <td>Redis</td>
+        <td>Redis</td>
+        <td>Locks, future queues, realtime support</td>
+      </tr>
+      <tr>
+        <td>Files</td>
+        <td>Local uploads now, MinIO/S3 target</td>
+        <td>Фото, документы, вложения</td>
+      </tr>
+      <tr>
+        <td>Proxy</td>
+        <td>Caddy</td>
+        <td>Отдает сайт по IP/домену</td>
+      </tr>
+      <tr>
+        <td>Docker</td>
+        <td>Docker Compose</td>
+        <td>Запуск локально и на сервере</td>
+      </tr>
+    </table>
+    <h2>7. Важные домены</h2>
+    <h3>Профили</h3>
+    <p>
+      Ментор хранит фото, карьеру, навыки, хобби, документы, услуги и программы. Это витрина
+      доверия.
+    </p>
+    <h3>Каталог</h3>
+    <p>
+      Каталог показывает много менторов с фото, темами, рейтингом и ценой от N рублей. Демо-данные
+      лежат в <code>apps/api/prisma/seed.ts</code>.
+    </p>
+    <h3>Сессии</h3>
+    <p>
+      Разовая консультация проходит состояния: заявка, оплата, согласование, встреча, завершение,
+      отзыв.
+    </p>
+    <h3>Подписки</h3>
+    <p>
+      Подписка в коде - это подключение к программе. Человеку в интерфейсе говорим "подключение",
+      потому что слово "подписка" часто звучит как автоматическое списание без контекста.
+    </p>
+    <h3>Чат</h3>
+    <p>
+      Чат связывает ментора и менти. Enter отправляет сообщение, Shift+Enter делает перенос строки.
+    </p>
+    <h3>Помощь и безопасность</h3>
+    <p>
+      Здесь пользователь отправляет обращение, а ментор загружает документы. Внутри API часть
+      маршрутов все еще называется <code>trust</code>, чтобы не ломать контракты.
+    </p>
+    <h2>8. Данные и seed</h2>
+    <p>Seed - это сценарий наполнения базы демо-данными.</p>
+    <p>В нем сейчас:</p>
+    <ul>
+      <li>16 менторов, включая демо-профиль Растяпина Данила;</li>
+      <li>3 менти;</li>
+      <li>1 администратор;</li>
+      <li>темы, услуги, программы, документы, слоты;</li>
+      <li>демо-сессии разных статусов;</li>
+      <li>чаты, отзывы, бонусный баланс.</li>
+    </ul>
+    <p>Команда локально:</p>
+    <pre><code>
 docker exec -w /app/apps/api mentory-api pnpm seed
 </code></pre>
-<p>Важно: seed пересоздает демо-данные. На production с реальными пользователями его нельзя запускать без осознанного решения.</p>
-<h2>9. Как запустить локально</h2>
-<pre><code>
+    <p>
+      Важно: seed пересоздает демо-данные. На production с реальными пользователями его нельзя
+      запускать без осознанного решения.
+    </p>
+    <h2>9. Как запустить локально</h2>
+    <pre><code>
 pnpm install
 docker compose up -d
 pnpm --filter @mentory/api build
 pnpm --filter @mentory/web check
 </code></pre>
-<p>Обычно сайт доступен на:</p>
-<ul>
-<li>web: <code>http://localhost:3000</code></li>
-<li>api: <code>http://localhost:4000/api</code></li>
-<li>health: <code>http://localhost:4000/api/health/ready</code></li>
-</ul>
-<h2>10. Как деплоится</h2>
-<figure><img src="file:///Users/arxungo/projects/mentory/product/diagrams/2026-06-07-deploy-flow.png" alt="Deploy flow"><figcaption>Deploy flow</figcaption></figure>
-<h2>11. Что проверять после деплоя</h2>
-<p>Мини-smoke:</p>
-<ol>
-<li>Открыть каталог менторов.</li>
-<li>Убедиться, что менторов много и есть фото.</li>
-<li>Зайти тестовым пользователем.</li>
-<li>Открыть <code>/sessions</code>, <code>/chat</code>, <code>/subscriptions</code>, <code>/trust</code>.</li>
-<li>Проверить health endpoint.</li>
-</ol>
-<h2>12. Тестовые аккаунты</h2>
-<table>
-<tr><th>Роль</th><th>Логин</th><th>Пароль</th></tr>
-<tr><td>Админ</td><td><code>admin@mentory.local</code></td><td><code>change-me-admin</code></td></tr>
-<tr><td>Ментор</td><td><code>danil.rastyapin@example.com</code></td><td><code>password123</code></td></tr>
-<tr><td>Ментор</td><td><code>maria.mentor@example.com</code></td><td><code>password123</code></td></tr>
-<tr><td>Ментор</td><td><code>alex.mentor@example.com</code></td><td><code>password123</code></td></tr>
-<tr><td>Менти</td><td><code>ivan.mentee@example.com</code></td><td><code>password123</code></td></tr>
-<tr><td>Менти</td><td><code>anna.mentee@example.com</code></td><td><code>password123</code></td></tr>
-</table>
-<h2>13. Что уже недавно исправлено</h2>
-<ul>
-<li>Расширены demo-data, добавлен видимый профиль Растяпина Данила.</li>
-<li>Фото появились в каталоге и верхнем меню.</li>
-<li>Сессии показывают важные заявки первыми.</li>
-<li>Сохранение ссылки встречи и заметок показывает результат.</li>
-<li>Чат отправляет по Enter.</li>
-<li>Тяжелые термины заменены на простые.</li>
-<li>Темная тема стала читаемой.</li>
-<li>Подписки стали рабочим пространством программ.</li>
-</ul>
-<h2>14. Что еще не хватает до идеального продукта</h2>
-<p>High priority:</p>
-<ul>
-<li>реальные платежи, возвраты и выплаты;</li>
-<li>cancel/reschedule;</li>
-<li>admin queues вместо технических UUID-форм;</li>
-<li>production storage;</li>
-<li>monitoring, backups, load tests.</li>
-</ul>
-<p>Medium priority:</p>
-<ul>
-<li>notification center;</li>
-<li>saved filters;</li>
-<li>profile completeness score;</li>
-<li>mobile visual polish;</li>
-<li>отдельные detail screens заявок.</li>
-</ul>
-<h2>15. Где читать дальше</h2>
-<ul>
-<li><code>product/README.md</code> - карта папки product.</li>
-<li><code>product/reports/mini-report-2026-06-07.md</code> - краткая стадия продукта.</li>
-<li><code>product/reports/framework-map-2026-06-07.md</code> - раскладка по фреймворкам.</li>
-<li><code>product/gaps/figma-product-gap-2026-06-07.md</code> - различия с Figma/product.</li>
-<li><code>apps/api/prisma/schema.prisma</code> - настоящая модель данных.</li>
-<li><code>apps/api/prisma/seed.ts</code> - демо-сценарий.</li>
-</ul></body></html>
+    <p>Обычно сайт доступен на:</p>
+    <ul>
+      <li>web: <code>http://localhost:3000</code></li>
+      <li>api: <code>http://localhost:4000/api</code></li>
+      <li>health: <code>http://localhost:4000/api/health/ready</code></li>
+    </ul>
+    <h2>10. Как деплоится</h2>
+    <figure>
+      <img
+        src="file:///Users/arxungo/projects/mentory/product/diagrams/2026-06-07-deploy-flow.png"
+        alt="Deploy flow"
+      />
+      <figcaption>Deploy flow</figcaption>
+    </figure>
+    <h2>11. Что проверять после деплоя</h2>
+    <p>Мини-smoke:</p>
+    <ol>
+      <li>Открыть каталог менторов.</li>
+      <li>Убедиться, что менторов много и есть фото.</li>
+      <li>Зайти тестовым пользователем.</li>
+      <li>
+        Открыть <code>/sessions</code>, <code>/chat</code>, <code>/subscriptions</code>,
+        <code>/trust</code>.
+      </li>
+      <li>Проверить health endpoint.</li>
+    </ol>
+    <h2>12. Тестовые аккаунты</h2>
+    <table>
+      <tr>
+        <th>Роль</th>
+        <th>Логин</th>
+        <th>Пароль</th>
+      </tr>
+      <tr>
+        <td>Админ</td>
+        <td><code>admin@mentory.local</code></td>
+        <td><code>change-me-admin</code></td>
+      </tr>
+      <tr>
+        <td>Ментор</td>
+        <td><code>danil.rastyapin@example.com</code></td>
+        <td><code>password123</code></td>
+      </tr>
+      <tr>
+        <td>Ментор</td>
+        <td><code>maria.mentor@example.com</code></td>
+        <td><code>password123</code></td>
+      </tr>
+      <tr>
+        <td>Ментор</td>
+        <td><code>alex.mentor@example.com</code></td>
+        <td><code>password123</code></td>
+      </tr>
+      <tr>
+        <td>Менти</td>
+        <td><code>ivan.mentee@example.com</code></td>
+        <td><code>password123</code></td>
+      </tr>
+      <tr>
+        <td>Менти</td>
+        <td><code>anna.mentee@example.com</code></td>
+        <td><code>password123</code></td>
+      </tr>
+    </table>
+    <h2>13. Что уже недавно исправлено</h2>
+    <ul>
+      <li>Расширены demo-data, добавлен видимый профиль Растяпина Данила.</li>
+      <li>Фото появились в каталоге и верхнем меню.</li>
+      <li>Сессии показывают важные заявки первыми.</li>
+      <li>Сохранение ссылки встречи и заметок показывает результат.</li>
+      <li>Чат отправляет по Enter.</li>
+      <li>Тяжелые термины заменены на простые.</li>
+      <li>Темная тема стала читаемой.</li>
+      <li>Подписки стали рабочим пространством программ.</li>
+      <li>Добавлены отдельные страницы деталей заявок на сессию и подписку.</li>
+    </ul>
+    <h2>14. Что еще не хватает до идеального продукта</h2>
+    <p>High priority:</p>
+    <ul>
+      <li>реальные платежи, возвраты и выплаты;</li>
+      <li>cancel/reschedule;</li>
+      <li>admin queues вместо технических UUID-форм;</li>
+      <li>production storage;</li>
+      <li>monitoring, backups, load tests.</li>
+    </ul>
+    <p>Medium priority:</p>
+    <ul>
+      <li>notification center;</li>
+      <li>saved filters;</li>
+      <li>profile completeness score;</li>
+      <li>mobile visual polish;</li>
+      <li>
+        pixel-perfect shortcuts в карточках заявок: профиль участника, чат, плотность карточек по
+        Figma.
+      </li>
+    </ul>
+    <h2>15. Где читать дальше</h2>
+    <ul>
+      <li><code>product/README.md</code> - карта папки product.</li>
+      <li><code>product/reports/mini-report-2026-06-09.md</code> - краткая стадия продукта.</li>
+      <li><code>product/reports/framework-map-2026-06-07.md</code> - раскладка по фреймворкам.</li>
+      <li><code>product/gaps/figma-product-gap-2026-06-07.md</code> - различия с Figma/product.</li>
+      <li><code>apps/api/prisma/schema.prisma</code> - настоящая модель данных.</li>
+      <li><code>apps/api/prisma/seed.ts</code> - демо-сценарий.</li>
+    </ul>
+  </body>
+</html>

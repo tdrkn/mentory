@@ -8,7 +8,7 @@
 
 ---
 
-## Статус после QA 2026-06-06
+## Статус после QA 2026-06-09
 
 Последние приложенные PNG-макеты уточнили часть решений из исходного PDF. Главное уточнение: публичный профиль ментора должен показывать справа **два отдельных блока** `Планы подписки` и `Разовые сессии и услуги`, а не старый переключатель `Сессия/Подписка`.
 
@@ -19,13 +19,16 @@
 - `/schedule/calendar`: weekly calendar без горизонтального overflow на desktop/mobile.
 - `/admin/login`, `/admin`, `/admin/trust#verification|support|database`: вход, dashboard, hash-вкладки, mobile overflow и русские labels финансов.
 - `/requests`: общий центр заявок для mentor/mentee, разделение разовых сессий и подписок, комментарий к решению.
+- `/requests/sessions/:id`: отдельная страница заявки на сессию с contact info, целью, мотивацией, карточкой услуги, оплатой/переходом к встрече и mentor decision actions.
+- `/requests/subscriptions/:id`: отдельная страница заявки на подписку с contact info, целью, мотивацией, карточкой плана, оплатой и mentor/admin approve/reject actions.
 - `/checkout/subscriptions/:id`: approve-first оплата подписки после решения ментора.
 - `/sessions/:id`: участники могут отменить `requested/paid/booked` встречу с причиной; слот освобождается, платеж переводится в refund/fail state.
+- `GET /api/subscriptions/:subscriptionId`: read endpoint одной заявки с проверкой участника и полным планом.
 
 Не закрыто:
 
-- Отдельные pixel-perfect страницы деталей заявок `/requests/:id/session` и `/requests/:id/subscription`.
-- UI обработки ready payouts.
+- Pixel-perfect shortcuts в карточках `/requests`: профиль участника, чат, плотность карточек по Figma.
+- Админские очереди профилей/регалий/поддержки без ручных UUID.
 - Перенос встречи в новый слот с подтверждением второй стороны.
 
 ---
@@ -143,22 +146,25 @@
 
 ---
 
-## Итерация 6 — Экран «Заявка на сессию» / «Заявка на подписку» для ментора (1 PR)
+## Итерация 6 — Экран «Заявка на сессию» / «Заявка на подписку» для ментора (закрыто MVP 2026-06-09)
 
 **Цель:** окно approve/reject с комментарием.
 
-- [ ] `/requests/:id/session`:
-  - Профиль менти с фото + email + ФИО + «Профиль менти» кнопка.
-  - Карточка `Мотивационное письмо`.
+- [x] `/requests/sessions/:id`:
+  - Contact info ментора/менти + email.
+  - Карточка цели и мотивационного письма.
   - Карточка `Сессия`: услуга, стоимость, продолжительность, дата консультации.
-  - Поле `Комментарий для менти (опционально)`.
-  - Кнопки `Принять` (если ожидает) / `Отклонить`.
-- [ ] `/requests/:id/subscription`:
-  - Те же блоки, но Подписка card + `Одобрить` / `Отклонить`.
+  - Поле `Комментарий для менти` и кнопки `Принять` / `Отклонить`, если заявка ожидает решения ментора.
+- [x] `/requests/subscriptions/:id`:
+  - Contact info ментора/менти + email.
+  - Карточка цели и мотивационного письма.
+  - Карточка `Подписка`: стоимость, период, созвоны, длительность, рабочий период.
+  - Поле `Комментарий для менти` и `Одобрить` / `Отклонить`, если заявка `pending`.
+- [x] API: `GET /api/subscriptions/:subscriptionId` возвращает одну подписочную заявку с `plan`, `mentor`, `mentee` и access check.
 - [x] API: `PATCH /sessions/:id/confirm|reject` принимает reason/comment и сохраняет `decisionComment`.
 - [x] API: `PATCH /subscriptions/:id/status` принимает `reason`, использует notes/status.
 
-**Тест:** ментор reject с комментарием → mentee видит комментарий в детали заявки.
+**Тест:** 2026-06-09 Playwright smoke: `/requests/sessions/:id` и `/requests/subscriptions/:id` на desktop/mobile; HTTP 200, console errors = 0, horizontal overflow = 0.
 
 ---
 

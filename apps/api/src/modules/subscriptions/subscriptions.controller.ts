@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators';
 import { JwtAuthGuard } from '../auth/guards';
 import {
@@ -71,24 +81,26 @@ export class SubscriptionsController {
     return this.subscriptionsService.listMySubscriptions(user);
   }
 
+  @Get(':subscriptionId')
+  async getSubscription(
+    @CurrentUser() user: { id: string; role: string },
+    @Param('subscriptionId') subscriptionId: string,
+  ) {
+    return this.subscriptionsService.getSubscription(user, subscriptionId);
+  }
+
   @Get('credits/me')
   async getMyCredits(@CurrentUser('id') userId: string) {
     return this.subscriptionsService.getMyCredits(userId);
   }
 
   @Post('credits/topup')
-  async topupCredits(
-    @CurrentUser('id') userId: string,
-    @Body() dto: TopupCreditDto,
-  ) {
+  async topupCredits(@CurrentUser('id') userId: string, @Body() dto: TopupCreditDto) {
     return this.subscriptionsService.topupCredits(userId, dto);
   }
 
   @Post('credits/redeem')
-  async redeemCredits(
-    @CurrentUser('id') userId: string,
-    @Body() dto: RedeemCreditDto,
-  ) {
+  async redeemCredits(@CurrentUser('id') userId: string, @Body() dto: RedeemCreditDto) {
     return this.subscriptionsService.redeemCredits(userId, dto);
   }
 
@@ -171,5 +183,4 @@ export class SubscriptionsController {
   ) {
     return this.subscriptionsService.deleteBookmark(user, subscriptionId, bookmarkId);
   }
-
 }

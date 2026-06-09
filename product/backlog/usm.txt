@@ -1,6 +1,6 @@
 # User Story Map: Mentory MVP
 
-Дата ревизии: 2026-05-20
+Дата ревизии: 2026-06-09
 
 Источник:
 - Последний DOCX-отчет `1-Отчет_обновленный.docx`.
@@ -19,7 +19,7 @@
 - **Регистрация**: поля `Имя` и `Фамилия` раздельные, не одно `ФИО`.
 - **Вход**: только email + пароль, без username.
 - **Админка**: отдельный экран `/admin/login` с login + паролем (>=16 символов) + 6-значным кодом (2FA).
-- **Профиль ментора (публичный)**: в правой колонке табы `Сессия` / `Подписка`, выбор карточки, единственная кнопка `Забронировать` снизу. Показывается «Ближайший свободный слот» и хинт «Слот удерживается на 10 минут для оплаты».
+- **Профиль ментора (публичный)**: последние PNG закрепили два отдельных правых блока `Планы подписки` и `Разовые сессии и услуги`; старые табы `Сессия` / `Подписка` не возвращать без нового согласования.
 - **State machine заявки**: `mentee submit → mentor approves → mentee pays → session held → completed`. Сейчас код делает `pay → mentor approves`. Прототип меняет порядок.
 - **Заявка**: одно поле `Мотивационное письмо` (без отдельного `goal`), плюс mentor может приложить `Комментарий для менти` при approve/reject.
 - **Mentor «Управление заявками»**: 5 табов — `В ожидании / Одобренные / Оплаченные / Отклонённые / Все`. Сейчас есть только `requested/paid/booked` без отдельного «Одобрено и ждёт оплаты».
@@ -87,8 +87,8 @@ As-is:
 - Ссылка сохраняется в истории и доступна обеим сторонам.
 
 As-is:
-- Реализован `video_rooms` placeholder через `GET /sessions/:id/video` с provider `daily`.
-- Это отличается от report-only модели "внешняя ссылка в чате".
+- Основной UX использует внешнюю ссылку: ментор сохраняет `sessions.videoLink` на `/sessions/:id`, менти видит readonly CTA.
+- `video_rooms` и `GET /sessions/:id/video` оставлены как legacy shim.
 
 ## 2. Актор: Менти
 
@@ -135,7 +135,7 @@ As-is:
 - Отдельной таблицы `applications` нет.
 - Цель и мотивационное письмо сохраняются в `requestGoal` / `requestMotivation`.
 - После оплаты session становится `paid` и ждет решения ментора; после подтверждения ментора становится `booked`.
-- Подписка создается как `pending` request с goal/motivation; workspace открывается после approval.
+- Подписка создается как `pending` request с goal/motivation; после approval появляется `approved_pending_payment`, после оплаты workspace открывается как `active`.
 
 ### US8. Оплата сессий и подписок
 
@@ -151,7 +151,7 @@ As-is:
 As-is:
 - Разовый mock-acquiring flow реализован.
 - Payment provider моковый.
-- Подписки не имеют полноценной оплаты в текущем API.
+- Подписки имеют approve-first mock checkout через `/checkout/subscriptions/:subscriptionId`; real acquiring/refunds остаются production gap.
 
 ### US9. Отзыв о менторе
 
@@ -193,9 +193,9 @@ As-is:
 
 As-is:
 - Есть `requested/paid` session requests, dashboard и автоотмена stale requests.
-- Подписочные заявки реализованы через `pending/rejected` statuses.
+- Подписочные заявки реализованы через `pending/approved_pending_payment/active/rejected` statuses.
 - Mentor approval API: `PATCH /sessions/:id/confirm|reject` и `PATCH /subscriptions/:id/status`.
-- Комментарий к решению остается backlog для UX/audit детализации.
+- Есть `/requests/sessions/:id` и `/requests/subscriptions/:id` с деталями заявки, целью, мотивацией, summary card и комментарием к решению.
 
 ### US12. Календарь и рабочие окна
 

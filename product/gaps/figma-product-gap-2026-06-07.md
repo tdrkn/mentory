@@ -1,10 +1,10 @@
 # Figma/Product Gap Report
 
-Дата: 2026-06-08
+Дата: 2026-06-09
 
 ## Краткий вывод
 
-Mentory стал заметно ближе к последним макетам и пользовательской логике, но Figma все еще шире текущей реализации в деталях заявок, переносе встреч, админских очередях и некоторых состояниях подписок.
+Mentory стал заметно ближе к последним макетам и пользовательской логике: high-gap по отдельным страницам деталей заявок закрыт на MVP-уровне. Figma все еще шире текущей реализации в переносе встреч, админских очередях, real-provider финансовом контуре и pixel-perfect полировке форм.
 
 ## Закрыто в последнем pass
 
@@ -36,25 +36,33 @@ Mentory стал заметно ближе к последним макетам 
 | Finance | `/earnings` был только для ментора и предполагал, что каждый платеж связан с сессией | Раздел `Финансы` доступен менти и ментору; история оплат умеет session/subscription payments; суммы из cents отображаются как рубли |
 | Header  | У менти не было финансового раздела                                                  | Wallet-ссылка ведет в `Финансы` для mentor/mentee; admin остается в своем финансовом контуре `/admin/trust#database`                |
 
+## Product/UI-pass 2026-06-09
+
+| Area            | Было                                                                   | Стало                                                                                                                                   |
+| --------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Request details | `/requests` вел на общую встречу или общий раздел подписок             | Добавлены `/requests/sessions/:id` и `/requests/subscriptions/:id` с contact info, целью, мотивацией, summary card и действиями решения |
+| Subscriptions   | Для одной подписочной заявки не было read endpoint                     | Добавлен `GET /api/subscriptions/:subscriptionId` с проверкой участника, планом, ментором и менти                                       |
+| QA evidence     | Browser evidence был только для списков requests/subscriptions/finance | Добавлены desktop/mobile screenshots деталей session/subscription request, HTTP 200, console errors = 0, horizontal overflow = 0        |
+
 ## Открытые различия с Figma
 
 | Area          | Gap                                                                                                  | Priority |
 | ------------- | ---------------------------------------------------------------------------------------------------- | -------: |
-| Requests      | Нет отдельных 1:1 страниц деталей заявки на сессию/подписку                                          |     High |
 | Booking       | Pay-first/session request screen отличается от target                                                |     High |
-| Subscriptions | Нет отдельной `/subscriptions/new?planId=` страницы из макета                                        |   Medium |
+| Reschedule    | Перенос оплаченной встречи в новый слот отсутствует                                                  |     High |
+| Admin support | Есть формы, но нет объектных очередей и карточек                                                     |     High |
+| Requests      | Detail pages есть MVP; остаются profile/chat shortcuts и pixel-perfect карточки списка               |   Medium |
+| Subscriptions | `/subscriptions/new?planId=` есть, но форма и states требуют полного Figma polish                    |   Medium |
 | Chat polish   | Нужны states для reply/edit/delete, loading attachments, mobile bottom safe-area                     |   Medium |
 | Finance       | Базовый mentor/mentee finance UI есть; real provider, saved payout methods и reconciliation остаются |   Medium |
-| Admin support | Есть формы, но нет объектных очередей и карточек                                                     |     High |
-| Reschedule    | Перенос оплаченной встречи в новый слот отсутствует                                                  |     High |
 | Notifications | Нет полноценного центра уведомлений и настроек                                                       |   Medium |
 | Mobile polish | Основные экраны работают, но нужен полный visual pass                                                |   Medium |
 
 ## Рекомендованный порядок закрытия
 
-1. **Requests detail screens:** самый заметный разрыв в CJM.
-2. **Reschedule:** без переноса сложно считать scheduling продуктовым.
-3. **Admin queues:** убрать ручные UUID и технические формы.
+1. **Reschedule:** без переноса сложно считать scheduling продуктовым.
+2. **Admin queues:** убрать ручные UUID и технические формы.
+3. **Booking request polish:** привести `/booking/new` к Figma pay-first форме.
 4. **Provider readiness:** payments, payouts, storage.
 5. **Finance provider polish:** saved payout methods, reconciliation и edge cases.
 6. **Visual polish:** spacing, typography, empty/loading/error states.
