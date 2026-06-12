@@ -70,7 +70,7 @@
   }
 
   interface PayoutMethod {
-    id: 'card' | 'korona_pay' | 'cbr';
+    id: 'card' | 'sbp';
     label: string;
     description: string;
   }

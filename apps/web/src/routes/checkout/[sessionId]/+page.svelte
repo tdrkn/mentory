@@ -40,6 +40,13 @@
   let paymentMethods: string[] = [];
   let paymentRequested = false;
 
+  const paymentMethodLabel = (method: string) =>
+    ({
+      qr: 'QR',
+      card: 'банковская карта',
+      sbp: 'СБП',
+    })[method] || method;
+
   const loadSession = async () => {
     try {
       session = await api.get<SessionDetail>(`/booking/${$page.params.sessionId}`);
@@ -283,7 +290,7 @@
             <div style="font-weight:600;">Платёжная сессия создана</div>
             {#if paymentMethods.length > 0}
               <div class="muted" style="margin-top:6px;">
-                Доступные способы: {paymentMethods.join(', ')}
+                Доступные способы: {paymentMethods.map(paymentMethodLabel).join(', ')}
               </div>
             {/if}
             {#if checkoutUrl}

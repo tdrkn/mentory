@@ -5,12 +5,11 @@ import { CreatePayoutAccountDto } from './dto/create-payout-account.dto';
 import { RequestPayoutDto } from './dto/request-payout.dto';
 import { MentorshipSubscriptionStatus, PayoutStatus } from '@prisma/client';
 
-const SUPPORTED_ACQUIRING_METHODS = ['qr', 'card', 'cbr'] as const;
+const SUPPORTED_ACQUIRING_METHODS = ['qr', 'card', 'sbp'] as const;
 const DEFAULT_ACQUIRER_CHECKOUT_BASE_URL = 'https://acquirer.example/checkout';
 const SUPPORTED_PAYOUT_METHODS = [
   { id: 'card', label: 'Банковская карта', description: 'Зачисление на карту через эквайринг' },
-  { id: 'korona_pay', label: 'korona.pay', description: 'Зачисление на счёт лицензированного приложения' },
-  { id: 'cbr', label: 'CBR', description: 'Вывод через канал CBR в эквайринге' },
+  { id: 'sbp', label: 'СБП', description: 'Вывод через Систему быстрых платежей' },
 ] as const;
 
 @Injectable()
