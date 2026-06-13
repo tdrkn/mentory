@@ -1,6 +1,6 @@
 # Карта фреймворков Mentory
 
-Дата: 2026-06-09
+Дата: 2026-06-13
 
 Документ раскладывает продукт по фреймворкам: система, домен, UI, CJM, C4, стадия зрелости.
 
@@ -24,7 +24,7 @@
 | Profiles      | Mentor/mentee profile, avatar, career, skills, hobbies, docs                      | Better media handling, profile completeness score |
 | Discovery     | Каталог, фильтры, карточки, профиль                                               | Saved filters, ranking, richer cards              |
 | Booking       | Hold, payment, mentor decision, session lifecycle, participant cancel with reason | Reschedule, refund policy                         |
-| Sessions      | Notes, meeting link, chat, complete, review                                       | Dedicated review screen, reminders                |
+| Sessions      | Notes, meeting link, chat, complete, dedicated review screen                      | Reschedule, reminders                             |
 | Subscriptions | Programs, request detail, approval, checkout, workspace                           | Program marketplace UX, billing automation        |
 | Chat          | REST + Socket.IO, attachments, Enter behavior                                     | Notifications, read receipts polish               |
 | Help/Safety   | Appeals, mentor docs, admin review                                                | SLA queues, object cards without UUID             |
@@ -39,7 +39,7 @@
 | Mentor catalog | 15 rich profiles, photos, RUB                      | Low         |
 | Mentor detail  | Matches latest profile logic                       | Low-medium  |
 | Mentor edit    | Main blocks from PNG                               | Medium      |
-| Sessions       | Better CTA and pending priority                    | Medium      |
+| Sessions       | Better CTA, pending priority, dedicated review page | Low-medium  |
 | Requests       | Dedicated session/subscription detail pages        | Low-medium  |
 | Chat           | Enter/Shift+Enter fixed                            | Low-medium  |
 | Subscriptions  | Simpler workspace, less technical                  | Medium      |

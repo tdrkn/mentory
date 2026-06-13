@@ -8,7 +8,7 @@
 
 ---
 
-## Статус после QA 2026-06-09
+## Статус после QA 2026-06-13
 
 Последние приложенные PNG-макеты уточнили часть решений из исходного PDF. Главное уточнение: публичный профиль ментора должен показывать справа **два отдельных блока** `Планы подписки` и `Разовые сессии и услуги`, а не старый переключатель `Сессия/Подписка`.
 
@@ -23,6 +23,7 @@
 - `/requests/subscriptions/:id`: отдельная страница заявки на подписку с contact info, целью, мотивацией, карточкой плана, оплатой и mentor/admin approve/reject actions.
 - `/checkout/subscriptions/:id`: approve-first оплата подписки после решения ментора.
 - `/sessions/:id`: участники могут отменить `requested/paid/booked` встречу с причиной; слот освобождается, платеж переводится в refund/fail state.
+- `/sessions/:id/review`: отдельный экран отзыва со звездами и textarea; inline review удален из `/sessions/:id`, после отправки есть success banner на `/sessions`.
 - `GET /api/subscriptions/:subscriptionId`: read endpoint одной заявки с проверкой участника и полным планом.
 
 Не закрыто:
@@ -182,17 +183,19 @@
 
 ---
 
-## Итерация 8 — Оценить ментора (отдельный экран) (1 PR)
+## Итерация 8 — Оценить ментора (отдельный экран) (закрыто MVP 2026-06-13)
 
 **Цель:** отдельная страница `/sessions/:id/review` со звёздами.
 
-- [ ] Новая route `/sessions/:id/review`.
-- [ ] Карточка прошедшей сессии (фото ментора + name + «Прошедшая сессия: <название>»).
-- [ ] 5 интерактивных звёзд + textarea + кнопка «Отправить отзыв».
-- [ ] После submit → redirect на `/sessions` с successful banner.
-- [ ] Удалить inline review из `/sessions/:id`.
+- [x] Новая route `/sessions/:id/review`.
+- [x] Карточка прошедшей сессии (mentor identity + name + «Прошедшая сессия: <название>»).
+- [x] 5 интерактивных звёзд + textarea + кнопка «Отправить отзыв».
+- [x] После submit → redirect на `/sessions?tab=past&review=1` с successful banner.
+- [x] Удалить inline review из `/sessions/:id`.
+- [x] `/sessions` и `/sessions/:id` учитывают `review.id` и не предлагают повторный inline submit.
+- [x] Backend createReview обновляет рейтинг ментора через Prisma transaction вместо raw SQL.
 
-**Тест:** mentee оставляет отзыв, mentor видит его в публичном профиле.
+**Тест:** 2026-06-13 Browser QA на Docker dev stack: completed session открывает `/sessions/:id/review`, mobile horizontal overflow = 0, submit редиректит на `/sessions?tab=past&review=1`, список показывает `Отзыв отправлен`.
 
 ---
 

@@ -52,6 +52,7 @@ export class SessionsService {
         mentor: { select: { id: true, fullName: true } },
         mentee: { select: { id: true, fullName: true } },
         service: { select: { id: true, title: true, durationMin: true } },
+        review: { select: { id: true } },
       },
       orderBy: { startAt: 'desc' },
     });
@@ -484,8 +485,8 @@ export class SessionsService {
     }
 
     // Create review and update mentor rating
-    const [review] = await this.prisma.$transaction([
-      this.prisma.review.create({
+    const review = await this.prisma.$transaction(async (tx) => {
+      const createdReview = await tx.review.create({
         data: {
           sessionId,
           menteeId,
@@ -493,19 +494,24 @@ export class SessionsService {
           rating: dto.rating,
           text: dto.text,
         },
-      }),
-      // Update mentor's average rating
-      this.prisma.$executeRaw`
-        UPDATE mentor_profiles
-        SET rating_avg = (
-          SELECT AVG(rating)::numeric(3,2) FROM reviews WHERE mentor_id = ${session.mentorId}
-        ),
-        rating_count = (
-          SELECT COUNT(*) FROM reviews WHERE mentor_id = ${session.mentorId}
-        )
-        WHERE user_id = ${session.mentorId}
-      `,
-    ]);
+      });
+
+      const ratingStats = await tx.review.aggregate({
+        where: { mentorId: session.mentorId },
+        _avg: { rating: true },
+        _count: { rating: true },
+      });
+
+      await tx.mentorProfile.update({
+        where: { userId: session.mentorId },
+        data: {
+          ratingAvg: ratingStats._avg.rating ?? 0,
+          ratingCount: ratingStats._count.rating,
+        },
+      });
+
+      return createdReview;
+    });
 
     return review;
   }

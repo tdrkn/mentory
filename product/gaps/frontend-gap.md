@@ -1,6 +1,6 @@
 # Frontend gap-анализ: DOCX/Figma vs текущий web UI
 
-Дата ревизии: 2026-06-09
+Дата ревизии: 2026-06-13
 
 Источник сравнения:
 
@@ -92,6 +92,7 @@
 | 2026-06-06 RUB/ru localization QA   | Работает: `/mentors`, `/profile/edit`, `/subscriptions`, `/requests`, `/admin/trust#database`; видимого `USD`/`$` нет, новые defaults в API/Prisma переведены на `RUB`, даты форматируются через `ru-RU` |
 | 2026-06-08 mentee finance QA        | Работает: `/earnings` для `ivan.mentee@example.com`; видны `Финансы`, история оплат, активные программы, блок `Ожидают оплаты`; desktop/mobile horizontal overflow = 0                                   |
 | 2026-06-09 request detail QA        | Работает: `/requests/sessions/:id` и `/requests/subscriptions/:id`; desktop/mobile HTTP 200, console/page errors = 0, horizontal overflow = 0                                                            |
+| 2026-06-13 review page QA           | Работает: `/sessions/:id/review` для completed session; форма со звездами/textarea отправляет отзыв, редиректит на `/sessions?tab=past&review=1`; mobile horizontal overflow = 0                         |
 
 ## Найденные и исправленные frontend/runtime дефекты
 
@@ -114,6 +115,7 @@
 | Admin payout processing был backend-only                                                                                                | Исправлено MVP | `AdminPaymentsController` подключен в `PaymentsModule`; `/admin/trust#database` получил кнопку `Обработать готовые выплаты`                                                    |
 | `/earnings` был mentor-only и падал бы на subscription payments без `session`                                                           | Исправлено MVP | `apps/web/src/routes/earnings/+page.svelte`: role-aware `Финансы`, session/subscription history, cents -> RUB display, mentee payments                                         |
 | `/requests` не имел отдельных страниц деталей заявки на сессию и подписку                                                               | Исправлено MVP | Добавлены `apps/web/src/routes/requests/sessions/[id]/+page.svelte`, `apps/web/src/routes/requests/subscriptions/[id]/+page.svelte` и `GET /api/subscriptions/:subscriptionId` |
+| Отзыв был встроен в `/sessions/:id`, а отправка в Docker падала на raw SQL `uuid = text` при пересчете рейтинга                         | Исправлено MVP | Добавлена `/sessions/:id/review`; `/sessions` учитывает `review.id`; `createReview` пересчитывает рейтинг через Prisma transaction без raw SQL cast-проблем                    |
 
 ## Frontend-расхождения с отчетом
 
@@ -123,6 +125,7 @@
 | Отмена/перенос оплаченной сессии | UC10 описывает отмену или перенос оплаченной сессии                              | На `/sessions/:id` участники могут отменить `requested/paid/booked` встречу с причиной; слот освобождается, платеж помечается к возврату/failed. Перенос в отдельный слот пока отсутствует | Частично                                            |
 | Причина отказа ментора           | Ментор подтверждает или отклоняет заявку, ожидается понятная причина/комментарий | В `/requests` и `/sessions/:id` есть поле комментария, причина сохраняется как `decisionComment`/`cancelReason`                                                                            | Закрыто MVP                                         |
 | Детали заявки                    | Figma показывает отдельные страницы `Заявка на сессию` и `Заявка на подписку`    | Есть `/requests/sessions/:id` и `/requests/subscriptions/:id` с contact info, целью, мотивацией, summary card и действиями решения                                                         | Закрыто MVP; pixel-perfect shortcuts остаются       |
+| Оценка ментора                   | Figma показывает отдельный экран `Оценить ментора` со звездами и textarea        | Есть `/sessions/:id/review`; `/sessions/:id` больше не содержит inline-форму, а ведет на отдельную страницу или показывает `Отзыв уже отправлен`                                           | Закрыто MVP                                         |
 | Видеосвязь                       | Отчет ближе к external VKS/link-in-chat сценарию                                 | Ментор прикрепляет внешнюю ссылку на `/sessions/:id`; менти видит readonly CTA. Legacy `/sessions/:id/video` остается shim под старый placeholder                                          | Закрыто MVP                                         |
 | Админская модерация контента     | Модерация профилей/контента как операторский workflow                            | UI имеет техническую форму `targetType/targetId/action`, без контент-очереди по профилям/отзывам/сообщениям                                                                                | Частично                                            |
 | Уведомления                      | Push на телефон + email                                                          | Header не имеет полноценного notification center/settings UI; push delivery не реализован                                                                                                  | Gap                                                 |

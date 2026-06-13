@@ -32,7 +32,8 @@ product/
 ## Ключевые файлы
 
 - `handbook/mentory-leadership-intro.md` и `handbook/mentory-leadership-intro.pdf` - большой вводный документ для нового лидера проекта.
-- `reports/mini-report-2026-06-09.md` - свежий мини-отчет после pass по отдельным страницам деталей заявок и сверке с Drive/Figma-derived материалами.
+- `reports/mini-report-2026-06-13.md` - свежий мини-отчет после pass по отдельному экрану отзыва, backend review transaction и сверке с Drive/Figma-derived материалами.
+- `reports/mini-report-2026-06-09.md` - мини-отчет после pass по отдельным страницам деталей заявок и сверке с Drive/Figma-derived материалами.
 - `reports/mini-report-2026-06-08.md` - мини-отчет после pass по finance UI для mentor/mentee и сверке с Drive/Figma-derived материалами.
 - `reports/mini-report-2026-06-07.md` - мини-отчет после pass по demo-data, фото, сессиям, чату, терминам, темной теме и подпискам.
 - `reports/framework-map-2026-06-07.md` - свежая раскладка продукта по technical/product/UI/C4/stage frameworks, обновлена 2026-06-08.
@@ -61,14 +62,15 @@ product/
 - Booking/payment: `paid` означает "оплачено и ждет решения ментора"; `booked` означает "ментор подтвердил"; `rejected` означает отказ ментора с сохраненной причиной.
 - Подписки: заявка проходит `pending -> approved_pending_payment -> active`; workspace доступен только после оплаты одобренной подписки.
 - Finance UI: `/earnings` является общим разделом `Финансы`; ментор видит KPI/историю/вывод, менти видит историю оплат, возвраты и одобренные подписки к оплате.
+- Reviews UI: отзыв ментора отправляется на отдельном экране `/sessions/:id/review`; `/sessions/:id` и список `/sessions` только ведут на этот route или показывают, что отзыв уже отправлен.
 - Payout: после `completeSession` создается delayed pending payout с `availableAt` через 5 рабочих дней; активные complaints блокируют создание/процессинг выплаты.
 - Uploads: trust/chat/regalia data URL payloads сохраняются через local `FileStorageService`; в БД остается `/uploads/*` URL. MinIO/S3 - будущая production-замена.
 - Figma UI: профиль ментора на просмотре использует отдельные правые блоки `Планы подписки` и `Разовые сессии и услуги`; старые табы `Сессия/Подписка` не возвращать без нового согласования.
 - NFR: 50k users, 99.9%, RTO/RPO, retention, DWH и SLA поддержки пока являются target-only требованиями без нагрузочного/операционного evidence.
 
-## Current Stage 2026-06-09
+## Current Stage 2026-06-13
 
 - Стадия: **demo-ready alpha / functional MVP+**.
-- Готовность: **78-81%** от идеального продукта.
-- Закрыто в последнем pass: отдельные страницы деталей заявок на сессию и подписку, `GET /api/subscriptions/:subscriptionId`, desktop/mobile QA evidence для новых routes.
-- Главные gaps до beta: real acquiring/refunds/payouts, reschedule, admin queues без UUID, production storage, monitoring/backups/load tests, финальный Figma polish.
+- Готовность: **80-82%** от идеального продукта.
+- Закрыто в последнем pass: документация профиля mentee синхронизирована с фактическим `goals[]`; добавлен отдельный экран `/sessions/:id/review`; inline review удален из `/sessions/:id`; список сессий учитывает `review.id`; backend пересчет рейтинга переведен с raw SQL на Prisma transaction.
+- Главные gaps до beta: reschedule, admin queues без UUID, real acquiring/refunds/payouts, production storage, monitoring/backups/load tests, финальный Figma polish.

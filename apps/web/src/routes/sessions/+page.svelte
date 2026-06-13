@@ -16,6 +16,7 @@
     mentor: { id: string; fullName: string };
     mentee: { id: string; fullName: string };
     service: { id: string; title: string; durationMin: number };
+    review?: { id: string } | null;
   }
 
   interface SlotItem {
@@ -37,6 +38,7 @@
   let tab: SessionTab = 'upcoming';
 
   const showSuccess = () => $page.url.searchParams.get('success') === '1';
+  const showReviewSuccess = () => $page.url.searchParams.get('review') === '1';
 
   const parseTab = (value: string | null): SessionTab | null => {
     if (value === 'upcoming' || value === 'past' || value === 'pending' || value === 'all') {
@@ -138,12 +140,21 @@
   const formatSlotFull = (iso: string) =>
     new Date(iso).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 
-  const sessionActionLabel = (status: string) => {
-    if (status === 'requested' || status === 'paid') {
+  const sessionActionLabel = (session: SessionItem) => {
+    if (session.status === 'requested' || session.status === 'paid') {
       return $isMentor ? 'Согласовать встречу' : 'Посмотреть заявку';
     }
-    if (status === 'completed' && !$isMentor) return 'Оценить ментора';
+    if (session.status === 'completed' && session.menteeId === $user?.id) {
+      return session.review ? 'Отзыв отправлен' : 'Оценить ментора';
+    }
     return 'Открыть сессию';
+  };
+
+  const sessionActionHref = (session: SessionItem) => {
+    if (session.status === 'completed' && session.menteeId === $user?.id) {
+      return `/sessions/${session.id}/review`;
+    }
+    return `/sessions/${session.id}`;
   };
 
   const sortSessions = (items: SessionItem[]) => {
@@ -174,6 +185,12 @@
       {#if showSuccess()}
         <div class="alert alert-success">
           🎉 Сессия успешно забронирована!
+        </div>
+      {/if}
+
+      {#if showReviewSuccess()}
+        <div class="alert alert-success">
+          Отзыв отправлен. Спасибо за обратную связь.
         </div>
       {/if}
 
@@ -224,7 +241,7 @@
               </div>
 
               <div class="session-actions">
-                <a class="btn btn-outline" href={`/sessions/${s.id}`}>{sessionActionLabel(s.status)}</a>
+                <a class="btn btn-outline" href={sessionActionHref(s)}>{sessionActionLabel(s)}</a>
                 <a class="btn btn-ghost" href={`/chat?session=${s.id}`}>Чат с {$isMentor ? 'менти' : 'ментором'}</a>
               </div>
             </div>

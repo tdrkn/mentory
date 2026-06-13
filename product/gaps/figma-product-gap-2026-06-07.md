@@ -1,10 +1,10 @@
 # Figma/Product Gap Report
 
-Дата: 2026-06-09
+Дата: 2026-06-13
 
 ## Краткий вывод
 
-Mentory стал заметно ближе к последним макетам и пользовательской логике: high-gap по отдельным страницам деталей заявок закрыт на MVP-уровне. Figma все еще шире текущей реализации в переносе встреч, админских очередях, real-provider финансовом контуре и pixel-perfect полировке форм.
+Mentory стал заметно ближе к последним макетам и пользовательской логике: high-gap по отдельным страницам деталей заявок и отдельному экрану отзыва закрыты на MVP-уровне. Figma все еще шире текущей реализации в переносе встреч, админских очередях, real-provider финансовом контуре и pixel-perfect полировке форм.
 
 ## Закрыто в последнем pass
 
@@ -43,6 +43,15 @@ Mentory стал заметно ближе к последним макетам 
 | Request details | `/requests` вел на общую встречу или общий раздел подписок             | Добавлены `/requests/sessions/:id` и `/requests/subscriptions/:id` с contact info, целью, мотивацией, summary card и действиями решения |
 | Subscriptions   | Для одной подписочной заявки не было read endpoint                     | Добавлен `GET /api/subscriptions/:subscriptionId` с проверкой участника, планом, ментором и менти                                       |
 | QA evidence     | Browser evidence был только для списков requests/subscriptions/finance | Добавлены desktop/mobile screenshots деталей session/subscription request, HTTP 200, console errors = 0, horizontal overflow = 0        |
+
+## Product/UI-pass 2026-06-13
+
+| Area        | Было                                                                                     | Стало                                                                                                                                      |
+| ----------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Review page | Отзыв был inline-формой в `/sessions/:id`, а Figma требует отдельный экран               | Добавлен `/sessions/:id/review` со звездами, textarea, lock-states и redirect на `/sessions?tab=past&review=1`                             |
+| Sessions    | Список не знал, создан ли отзыв, и мог предлагать действие без учета `review`            | `GET /api/sessions` включает `review.id`; `/sessions` показывает `Оценить ментора` или `Отзыв отправлен`                                  |
+| Backend     | Пересчет рейтинга после отзыва был через raw SQL и падал в Postgres на `uuid = text`     | `createReview` создает review и обновляет `mentor_profiles.ratingAvg/ratingCount` через Prisma transaction                                |
+| QA evidence | Gap был только в Figma-derived плане                                                     | Browser QA: completed session открывает review page, mobile overflow = 0, submit успешен, success banner виден на `/sessions?tab=past&review=1` |
 
 ## Открытые различия с Figma
 
