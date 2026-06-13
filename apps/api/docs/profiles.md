@@ -3,10 +3,10 @@
 ## Overview
 
 Модуль профилей управляет:
-- Базовый профиль пользователя
-- Профиль ментора (bio, rate, topics)
-- Профиль менти (goals, interests)
-- Публичные профили менторов
+- Базовый профиль пользователя: ФИО, имя/фамилия, аватар, таймзона
+- Профиль ментора: bio, карьера, навыки, темы, регалии, рейтинг
+- Профиль менти: карьера, background, goals, hobbies, skills, interests
+- Публичные профили менторов и доступный ментору просмотр профиля менти
 
 ## Files Structure
 
@@ -18,7 +18,7 @@ src/modules/profiles/
 ├── mentee-profile.controller.ts  # /profile/mentee
 ├── profiles.service.ts
 └── dto/
-    ├── update-profile.dto.ts
+    ├── update-user.dto.ts
     ├── update-mentor-profile.dto.ts
     ├── update-mentee-profile.dto.ts
     ├── update-topics.dto.ts
@@ -43,7 +43,7 @@ src/modules/profiles/
   "mentorProfile": {
     "headline": "Senior Developer",
     "bio": "10 years of experience...",
-    "hourlyRateCents": 5000,
+    "skills": ["TypeScript", "Architecture"],
     "ratingAvg": 4.8,
     "ratingCount": 25
   }
@@ -57,7 +57,10 @@ src/modules/profiles/
 **Request:**
 ```json
 {
+  "firstName": "John",
+  "lastName": "Smith",
   "fullName": "John Smith",
+  "avatarUrl": "data:image/png;base64,...",
   "timezone": "America/New_York"
 }
 ```
@@ -72,12 +75,14 @@ src/modules/profiles/
   "userId": "uuid",
   "headline": "Senior Developer",
   "bio": "10 years experience in web development",
-  "hourlyRateCents": 5000,
-  "currency": "RUB",
+  "position": "Staff Engineer",
+  "workplace": "Mentory",
+  "activityFields": ["Software Engineering"],
+  "skills": ["TypeScript", "Architecture"],
   "languages": ["en", "ru"],
   "ratingAvg": 4.8,
   "ratingCount": 25,
-  "isVisible": true,
+  "isActive": true,
   "topics": [
     { "id": "uuid", "name": "JavaScript" }
   ]
@@ -93,9 +98,11 @@ src/modules/profiles/
 {
   "headline": "Full-Stack Developer & Mentor",
   "bio": "I help junior developers grow...",
-  "hourlyRateCents": 7500,
-  "languages": ["en", "ru", "es"],
-  "isVisible": true
+  "position": "Staff Engineer",
+  "workplace": "Mentory",
+  "activityFields": ["Software Engineering"],
+  "skills": ["TypeScript", "Architecture"],
+  "languages": ["en", "ru", "es"]
 }
 ```
 
@@ -121,14 +128,21 @@ src/modules/profiles/
 **Request:**
 ```json
 {
-  "goals": "Learn React and Node.js",
+  "education": "HSE",
+  "position": "Junior Developer",
+  "workplace": "Startup",
+  "activityFields": ["Software Engineering"],
+  "background": "I know JavaScript and want to grow into backend.",
+  "goals": ["Learn React", "Master TypeScript"],
+  "hobbies": ["Books"],
+  "skills": ["JavaScript"],
   "interests": ["web-development", "career-growth"]
 }
 ```
 
 ### Загрузка аватара
 
-Пока не реализовано (TODO).
+Аватар загружается через `PATCH /api/profile` как data URL. API сохраняет файл через `FileStorageService` и возвращает `/uploads/*` URL.
 
 ## curl Examples
 
@@ -151,7 +165,7 @@ curl http://localhost:4000/api/profile/mentor \
 curl -X PATCH http://localhost:4000/api/profile/mentor \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"headline":"Expert Mentor","hourlyRateCents":10000}'
+  -d '{"headline":"Expert Mentor","skills":["TypeScript"],"activityFields":["Software Engineering"]}'
 
 # Update mentor topics
 curl -X PUT http://localhost:4000/api/profile/mentor/topics \
@@ -167,21 +181,22 @@ curl http://localhost:4000/api/profile/mentee \
 curl -X PATCH http://localhost:4000/api/profile/mentee \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"goals":"Master TypeScript"}'
+  -d '{"goals":["Master TypeScript"],"skills":["JavaScript"],"background":"Frontend junior"}'
 ```
 
 ## Validation Rules
 
 ### UpdateMentorProfileDto
-- `headline`: string, max 200 chars
-- `bio`: string, max 5000 chars
-- `hourlyRateCents`: number, min 0
-- `currency`: enum (RUB)
-- `languages`: array of strings
-- `isVisible`: boolean
+- `age`: number, 18..120
+- `birthDate`: ISO date
+- `education`, `position`, `workplace`, `headline`, `bio`: string
+- `activityFields`, `goals`, `hobbies`, `certificates`, `skills`, `languages`: array of strings
+- `timezone`: string
 
 ### UpdateMenteeProfileDto
-- `goals`: string, max 2000 chars
+- `age`: number, 18..120
+- `education`, `position`, `workplace`, `background`: string
+- `activityFields`, `goals`, `hobbies`, `certificates`, `skills`: array of strings
 - `interests`: array of strings
 
 ## Access Control
@@ -195,3 +210,4 @@ curl -X PATCH http://localhost:4000/api/profile/mentee \
 | PUT /profile/mentor/topics | Mentor only |
 | GET /profile/mentee | Mentee only |
 | PATCH /profile/mentee | Mentee only |
+| GET /profile/mentor/mentees/:id | Mentor with shared session |
