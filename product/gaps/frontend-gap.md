@@ -1,11 +1,12 @@
 # Frontend gap-анализ: DOCX/Figma vs текущий web UI
 
-Дата ревизии: 2026-06-13
+Дата ревизии: 2026-06-14
 
 Источник сравнения:
 
 - Последний отчет: `1-Отчет_обновленный.docx`.
 - Figma: `Figma basics.pdf` (72 экрана) и приложенные PNG-макеты профиля ментора.
+- Google Drive: `Ментори_Документация_Сайт_12_06.pdf` (создан 2026-06-11), подтверждает текущий фронт/бек/БД/чат/подписки/оплаты и friends-and-family testing, но старше review/notification pass.
 - Текущий frontend: `apps/web/src/routes`, `apps/web/src/lib`.
 
 ## Проверенные браузерные сценарии
@@ -93,6 +94,7 @@
 | 2026-06-08 mentee finance QA        | Работает: `/earnings` для `ivan.mentee@example.com`; видны `Финансы`, история оплат, активные программы, блок `Ожидают оплаты`; desktop/mobile horizontal overflow = 0                                   |
 | 2026-06-09 request detail QA        | Работает: `/requests/sessions/:id` и `/requests/subscriptions/:id`; desktop/mobile HTTP 200, console/page errors = 0, horizontal overflow = 0                                                            |
 | 2026-06-13 review page QA           | Работает: `/sessions/:id/review` для completed session; форма со звездами/textarea отправляет отзыв, редиректит на `/sessions?tab=past&review=1`; mobile horizontal overflow = 0                         |
+| 2026-06-14 notifications UI         | Работает MVP: header bell dropdown на desktop/mobile загружает `/api/notifications`, показывает unread badge, ведет к session/chat/finance/request target и умеет mark read/read-all                     |
 
 ## Найденные и исправленные frontend/runtime дефекты
 
@@ -116,6 +118,8 @@
 | `/earnings` был mentor-only и падал бы на subscription payments без `session`                                                           | Исправлено MVP | `apps/web/src/routes/earnings/+page.svelte`: role-aware `Финансы`, session/subscription history, cents -> RUB display, mentee payments                                         |
 | `/requests` не имел отдельных страниц деталей заявки на сессию и подписку                                                               | Исправлено MVP | Добавлены `apps/web/src/routes/requests/sessions/[id]/+page.svelte`, `apps/web/src/routes/requests/subscriptions/[id]/+page.svelte` и `GET /api/subscriptions/:subscriptionId` |
 | Отзыв был встроен в `/sessions/:id`, а отправка в Docker падала на raw SQL `uuid = text` при пересчете рейтинга                         | Исправлено MVP | Добавлена `/sessions/:id/review`; `/sessions` учитывает `review.id`; `createReview` пересчитывает рейтинг через Prisma transaction без raw SQL cast-проблем                    |
+| Header не показывал существующие in-app notifications, хотя backend API и таблица уже были                                              | Исправлено MVP | `AppHeader` получил bell dropdown, unread badge, список последних уведомлений, переход к целевому экрану и mark read/read-all                                                  |
+| Некоторые notification titles/bodies были англоязычными и с `$`, что противоречило RUB/ru локализации                                   | Исправлено MVP | `NotificationsService` теперь создает русские тексты для session/message/payment/payout notifications и форматирует суммы как RUB                                              |
 
 ## Frontend-расхождения с отчетом
 
@@ -128,7 +132,7 @@
 | Оценка ментора                   | Figma показывает отдельный экран `Оценить ментора` со звездами и textarea        | Есть `/sessions/:id/review`; `/sessions/:id` больше не содержит inline-форму, а ведет на отдельную страницу или показывает `Отзыв уже отправлен`                                           | Закрыто MVP                                         |
 | Видеосвязь                       | Отчет ближе к external VKS/link-in-chat сценарию                                 | Ментор прикрепляет внешнюю ссылку на `/sessions/:id`; менти видит readonly CTA. Legacy `/sessions/:id/video` остается shim под старый placeholder                                          | Закрыто MVP                                         |
 | Админская модерация контента     | Модерация профилей/контента как операторский workflow                            | UI имеет техническую форму `targetType/targetId/action`, без контент-очереди по профилям/отзывам/сообщениям                                                                                | Частично                                            |
-| Уведомления                      | Push на телефон + email                                                          | Header не имеет полноценного notification center/settings UI; push delivery не реализован                                                                                                  | Gap                                                 |
+| Уведомления                      | Push на телефон + email                                                          | Header имеет in-app notification center с unread badge и mark read/read-all; email отправляется через direct SMTP/MailHog. Push delivery и persisted settings пока не реализованы          | Закрыто MVP; push/settings gap                      |
 | Верификация регалий              | Админ проверяет документы, ментор получает статус и причину                      | Upload/review/status есть; deep-link коммуникация по конкретной regalia-заявке ограничена                                                                                                  | Частично                                            |
 | Подбор по критериям              | Стаж, компания, специализация, цели и др.                                        | Каталог фильтрует topic/price/rating/education/workplace/hobby/skill; нет обязательных gender/stage fields из части NFR                                                                    | Частично                                            |
 | Payout admin processing          | Отчет описывает контроль выплат и жалоб                                          | В admin database/finances есть кнопка обработки ready payouts; endpoint возвращает checked/completed/blocked                                                                               | Закрыто MVP                                         |
@@ -144,7 +148,7 @@
 2. Расширить admin moderation UI:
    - очереди профилей, отзывов, сообщений;
    - действия без ручного ввода UUID там, где объект уже известен.
-3. Добавить notification center/settings:
-   - in-app list;
-   - email/push toggles;
-   - честно пометить push как disabled, пока нет delivery.
+3. Довести notification settings:
+   - persisted email/push toggles;
+   - честно пометить push как disabled, пока нет delivery;
+   - добавить отдельный `/settings/notifications`, если нужна настройка не только header-view.

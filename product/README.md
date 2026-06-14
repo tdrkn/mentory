@@ -32,6 +32,7 @@ product/
 ## Ключевые файлы
 
 - `handbook/mentory-leadership-intro.md` и `handbook/mentory-leadership-intro.pdf` - большой вводный документ для нового лидера проекта.
+- `reports/mini-report-2026-06-14.md` - свежий мини-отчет после pass по Drive-документации 12.06, header notification center и синхронизации Figma-plan с фактическими регистрацией/календарем.
 - `reports/mini-report-2026-06-13.md` - свежий мини-отчет после pass по отдельному экрану отзыва, backend review transaction и сверке с Drive/Figma-derived материалами.
 - `reports/mini-report-2026-06-09.md` - мини-отчет после pass по отдельным страницам деталей заявок и сверке с Drive/Figma-derived материалами.
 - `reports/mini-report-2026-06-08.md` - мини-отчет после pass по finance UI для mentor/mentee и сверке с Drive/Figma-derived материалами.
@@ -65,12 +66,13 @@ product/
 - Reviews UI: отзыв ментора отправляется на отдельном экране `/sessions/:id/review`; `/sessions/:id` и список `/sessions` только ведут на этот route или показывают, что отзыв уже отправлен.
 - Payout: после `completeSession` создается delayed pending payout с `availableAt` через 5 рабочих дней; активные complaints блокируют создание/процессинг выплаты.
 - Uploads: trust/chat/regalia data URL payloads сохраняются через local `FileStorageService`; в БД остается `/uploads/*` URL. MinIO/S3 - будущая production-замена.
+- Notifications: in-app уведомления доступны из header bell dropdown на desktop/mobile, email отправляется через direct SMTP/MailHog; push delivery и persisted settings остаются post-MVP/backlog.
 - Figma UI: профиль ментора на просмотре использует отдельные правые блоки `Планы подписки` и `Разовые сессии и услуги`; старые табы `Сессия/Подписка` не возвращать без нового согласования.
 - NFR: 50k users, 99.9%, RTO/RPO, retention, DWH и SLA поддержки пока являются target-only требованиями без нагрузочного/операционного evidence.
 
-## Current Stage 2026-06-13
+## Current Stage 2026-06-14
 
 - Стадия: **demo-ready alpha / functional MVP+**.
-- Готовность: **80-82%** от идеального продукта.
-- Закрыто в последнем pass: документация профиля mentee синхронизирована с фактическим `goals[]`; добавлен отдельный экран `/sessions/:id/review`; inline review удален из `/sessions/:id`; список сессий учитывает `review.id`; backend пересчет рейтинга переведен с raw SQL на Prisma transaction.
-- Главные gaps до beta: reschedule, admin queues без UUID, real acquiring/refunds/payouts, production storage, monitoring/backups/load tests, финальный Figma polish.
+- Готовность: **82-84%** от идеального продукта.
+- Закрыто в последнем pass: найден и учтен Drive PDF `Ментори_Документация_Сайт_12_06.pdf`; добавлен header notification center для in-app уведомлений; backend notification copy локализован и очищен от `$`; product-plan синхронизирован с уже реализованными регистрацией, email-only login и календарем.
+- Главные gaps до beta: reschedule, admin queues без UUID, real acquiring/refunds/payouts, production storage, persisted notification settings/push, monitoring/backups/load tests, финальный Figma polish.

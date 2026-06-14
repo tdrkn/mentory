@@ -1,10 +1,10 @@
 # Figma/Product Gap Report
 
-Дата: 2026-06-13
+Дата: 2026-06-14
 
 ## Краткий вывод
 
-Mentory стал заметно ближе к последним макетам и пользовательской логике: high-gap по отдельным страницам деталей заявок и отдельному экрану отзыва закрыты на MVP-уровне. Figma все еще шире текущей реализации в переносе встреч, админских очередях, real-provider финансовом контуре и pixel-perfect полировке форм.
+Mentory стал заметно ближе к последним макетам и пользовательской логике: high-gap по отдельным страницам деталей заявок и отдельному экрану отзыва закрыты на MVP-уровне, а header теперь показывает in-app notification center. Figma/product все еще шире текущей реализации в переносе встреч, админских очередях, real-provider финансовом контуре и pixel-perfect полировке форм.
 
 ## Закрыто в последнем pass
 
@@ -46,12 +46,21 @@ Mentory стал заметно ближе к последним макетам 
 
 ## Product/UI-pass 2026-06-13
 
-| Area        | Было                                                                                     | Стало                                                                                                                                      |
-| ----------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Review page | Отзыв был inline-формой в `/sessions/:id`, а Figma требует отдельный экран               | Добавлен `/sessions/:id/review` со звездами, textarea, lock-states и redirect на `/sessions?tab=past&review=1`                             |
-| Sessions    | Список не знал, создан ли отзыв, и мог предлагать действие без учета `review`            | `GET /api/sessions` включает `review.id`; `/sessions` показывает `Оценить ментора` или `Отзыв отправлен`                                  |
-| Backend     | Пересчет рейтинга после отзыва был через raw SQL и падал в Postgres на `uuid = text`     | `createReview` создает review и обновляет `mentor_profiles.ratingAvg/ratingCount` через Prisma transaction                                |
-| QA evidence | Gap был только в Figma-derived плане                                                     | Browser QA: completed session открывает review page, mobile overflow = 0, submit успешен, success banner виден на `/sessions?tab=past&review=1` |
+| Area        | Было                                                                                 | Стало                                                                                                                                           |
+| ----------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Review page | Отзыв был inline-формой в `/sessions/:id`, а Figma требует отдельный экран           | Добавлен `/sessions/:id/review` со звездами, textarea, lock-states и redirect на `/sessions?tab=past&review=1`                                  |
+| Sessions    | Список не знал, создан ли отзыв, и мог предлагать действие без учета `review`        | `GET /api/sessions` включает `review.id`; `/sessions` показывает `Оценить ментора` или `Отзыв отправлен`                                        |
+| Backend     | Пересчет рейтинга после отзыва был через raw SQL и падал в Postgres на `uuid = text` | `createReview` создает review и обновляет `mentor_profiles.ratingAvg/ratingCount` через Prisma transaction                                      |
+| QA evidence | Gap был только в Figma-derived плане                                                 | Browser QA: completed session открывает review page, mobile overflow = 0, submit успешен, success banner виден на `/sessions?tab=past&review=1` |
+
+## Product/UI-pass 2026-06-14
+
+| Area          | Было                                                                                          | Стало                                                                                                                                    |
+| ------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Drive source  | Последние mini-reports не учитывали найденный Drive PDF `Ментори_Документация_Сайт_12_06.pdf` | PDF зафиксирован как внешний sanity check: подтверждает front/back/DB/chat/subscriptions/payments и friends-and-family testing           |
+| Notifications | Backend in-app notifications существовали, но header их не показывал                          | `AppHeader` получил bell dropdown на desktop/mobile, unread badge, target links и mark read/read-all                                     |
+| Localization  | Часть notification copy была на английском и с `$`                                            | Session/message/payment/payout notifications создаются на русском, суммы форматируются в RUB                                             |
+| Product docs  | Figma-plan все еще держал регистрацию и календарь как незакрытые                              | План синхронизирован с фактическим кодом: `firstName/lastName`, email-only login, `/schedule` и `/schedule/calendar` закрыты MVP-уровнем |
 
 ## Открытые различия с Figma
 
@@ -64,7 +73,7 @@ Mentory стал заметно ближе к последним макетам 
 | Subscriptions | `/subscriptions/new?planId=` есть, но форма и states требуют полного Figma polish                    |   Medium |
 | Chat polish   | Нужны states для reply/edit/delete, loading attachments, mobile bottom safe-area                     |   Medium |
 | Finance       | Базовый mentor/mentee finance UI есть; real provider, saved payout methods и reconciliation остаются |   Medium |
-| Notifications | Нет полноценного центра уведомлений и настроек                                                       |   Medium |
+| Notifications | Header notification center закрыт MVP; push delivery, persisted settings и production queue остаются |   Medium |
 | Mobile polish | Основные экраны работают, но нужен полный visual pass                                                |   Medium |
 
 ## Рекомендованный порядок закрытия
@@ -74,7 +83,8 @@ Mentory стал заметно ближе к последним макетам 
 3. **Booking request polish:** привести `/booking/new` к Figma pay-first форме.
 4. **Provider readiness:** payments, payouts, storage.
 5. **Finance provider polish:** saved payout methods, reconciliation и edge cases.
-6. **Visual polish:** spacing, typography, empty/loading/error states.
+6. **Notification settings/push:** persisted toggles, disabled push state, production delivery decision.
+7. **Visual polish:** spacing, typography, empty/loading/error states.
 
 ## Как оценивать дальше
 
