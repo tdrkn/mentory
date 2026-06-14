@@ -26,12 +26,7 @@ export class NotificationsService {
     private readonly emailService: EmailService,
   ) {}
 
-  async getNotifications(
-    userId: string,
-    unreadOnly: boolean,
-    limit: number,
-    offset: number,
-  ) {
+  async getNotifications(userId: string, unreadOnly: boolean, limit: number, offset: number) {
     const where: any = { userId };
     if (unreadOnly) where.isRead = false;
 
@@ -105,14 +100,14 @@ export class NotificationsService {
 
     return this.prisma.notification.update({
       where: { id: notificationId },
-      data: { isRead: true },
+      data: { isRead: true, readAt: new Date() },
     });
   }
 
   async markAllAsRead(userId: string) {
     const result = await this.prisma.notification.updateMany({
       where: { userId, isRead: false },
-      data: { isRead: true },
+      data: { isRead: true, readAt: new Date() },
     });
 
     return { markedAsRead: result.count };
@@ -135,8 +130,8 @@ export class NotificationsService {
   async notifySessionBooked(mentorId: string, session: any) {
     const notification = await this.createNotification(mentorId, {
       type: 'session_booked',
-      title: 'New Session Request',
-      body: `${session.mentee.fullName} has requested a session on ${session.startAt}`,
+      title: 'Новая заявка на сессию',
+      body: `${session.mentee.fullName} оплатил(а) заявку и ждет вашего решения`,
       data: { sessionId: session.id },
     });
 
@@ -148,7 +143,10 @@ export class NotificationsService {
         mentorName: session.mentor.fullName,
         menteeName: session.mentee.fullName,
         sessionDate: new Date(session.startAt).toLocaleDateString('ru-RU'),
-        sessionTime: new Date(session.startAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+        sessionTime: new Date(session.startAt).toLocaleTimeString('ru-RU', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
         topic: session.topic?.name || 'Общее менторство',
         sessionLink: `${process.env.WEB_URL || process.env.PUBLIC_APP_URL || 'http://localhost:3000'}/sessions/${session.id}`,
       },
@@ -165,19 +163,24 @@ export class NotificationsService {
       data: { sessionId: session.id },
     });
 
-    this.emailService.sendEmail({
-      to: session.mentee.email,
-      subject: 'Сессия подтверждена — Mentory',
-      template: 'session_booked',
-      context: {
-        mentorName: session.mentee.fullName,
-        menteeName: session.mentor.fullName,
-        sessionDate: new Date(session.startAt).toLocaleDateString('ru-RU'),
-        sessionTime: new Date(session.startAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-        topic: 'Менторская сессия',
-        sessionLink: `${process.env.PUBLIC_APP_URL || 'http://localhost:3000'}/sessions/${session.id}`,
-      },
-    }).catch((e) => this.logger.warn(`Email failed for session_confirmed: ${e.message}`));
+    this.emailService
+      .sendEmail({
+        to: session.mentee.email,
+        subject: 'Сессия подтверждена — Mentory',
+        template: 'session_booked',
+        context: {
+          mentorName: session.mentee.fullName,
+          menteeName: session.mentor.fullName,
+          sessionDate: new Date(session.startAt).toLocaleDateString('ru-RU'),
+          sessionTime: new Date(session.startAt).toLocaleTimeString('ru-RU', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          topic: 'Менторская сессия',
+          sessionLink: `${process.env.PUBLIC_APP_URL || 'http://localhost:3000'}/sessions/${session.id}`,
+        },
+      })
+      .catch((e) => this.logger.warn(`Email failed for session_confirmed: ${e.message}`));
   }
 
   async notifySessionCanceled(userId: string, session: any, canceledBy: string) {
@@ -190,11 +193,13 @@ export class NotificationsService {
 
     const recipient = userId === session.mentorId ? session.mentor : session.mentee;
     if (recipient?.email) {
-      this.emailService.sendEmail({
-        to: recipient.email,
-        subject: 'Сессия отменена — Mentory',
-        html: `<p>Привет, ${recipient.fullName}! Ваша сессия была отменена.</p>`,
-      }).catch((e) => this.logger.warn(`Email failed for session_canceled: ${e.message}`));
+      this.emailService
+        .sendEmail({
+          to: recipient.email,
+          subject: 'Сессия отменена — Mentory',
+          html: `<p>Привет, ${recipient.fullName}! Ваша сессия была отменена.</p>`,
+        })
+        .catch((e) => this.logger.warn(`Email failed for session_canceled: ${e.message}`));
     }
   }
 
@@ -208,26 +213,38 @@ export class NotificationsService {
 
     const recipient = userId === session.mentorId ? session.mentor : session.mentee;
     if (recipient?.email) {
-      this.emailService.sendEmail({
-        to: recipient.email,
-        subject: `Сессия через ${minutesBefore} минут — Mentory`,
-        template: 'session_reminder',
-        context: {
-          recipientName: recipient.fullName,
-          minutesBefore,
-          sessionDate: new Date(session.startAt).toLocaleDateString('ru-RU'),
-          sessionTime: new Date(session.startAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-          sessionLink: `${process.env.PUBLIC_APP_URL || 'http://localhost:3000'}/sessions/${session.id}`,
-        },
-      }).catch((e) => this.logger.warn(`Email failed for session_reminder: ${e.message}`));
+      this.emailService
+        .sendEmail({
+          to: recipient.email,
+          subject: `Сессия через ${minutesBefore} минут — Mentory`,
+          template: 'session_reminder',
+          context: {
+            recipientName: recipient.fullName,
+            minutesBefore,
+            sessionDate: new Date(session.startAt).toLocaleDateString('ru-RU'),
+            sessionTime: new Date(session.startAt).toLocaleTimeString('ru-RU', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+            sessionLink: `${process.env.PUBLIC_APP_URL || 'http://localhost:3000'}/sessions/${session.id}`,
+          },
+        })
+        .catch((e) => this.logger.warn(`Email failed for session_reminder: ${e.message}`));
     }
   }
 
-  async notifyNewMessage(userId: string, sender: any, conversationId: string, recipientEmail: string, recipientName: string, messagePreview: string) {
+  async notifyNewMessage(
+    userId: string,
+    sender: any,
+    conversationId: string,
+    recipientEmail: string,
+    recipientName: string,
+    messagePreview: string,
+  ) {
     const notification = await this.createNotification(userId, {
       type: 'new_message',
-      title: 'New Message',
-      body: `${sender.fullName} sent you a message`,
+      title: 'Новое сообщение',
+      body: `${sender.fullName} отправил(а) вам сообщение`,
       data: { conversationId, senderId: sender.id },
     });
 
@@ -238,7 +255,8 @@ export class NotificationsService {
       context: {
         recipientName,
         senderName: sender.fullName,
-        messagePreview: messagePreview.substring(0, 100) + (messagePreview.length > 100 ? '...' : ''),
+        messagePreview:
+          messagePreview.substring(0, 100) + (messagePreview.length > 100 ? '...' : ''),
         conversationLink: `${process.env.WEB_URL || process.env.PUBLIC_APP_URL || 'http://localhost:3000'}/chat/${conversationId}`,
         unsubscribeLink: `${process.env.WEB_URL || process.env.PUBLIC_APP_URL || 'http://localhost:3000'}/settings/notifications`,
       },
@@ -256,19 +274,26 @@ export class NotificationsService {
     });
 
     if (review.mentor?.email) {
-      this.emailService.sendEmail({
-        to: review.mentor.email,
-        subject: 'Новый отзыв — Mentory',
-        html: `<p>Привет, ${review.mentor.fullName}! Вы получили новый отзыв: ${review.rating} ⭐${review.text ? ` — "${review.text}"` : ''}.</p>`,
-      }).catch((e) => this.logger.warn(`Email failed for new_review: ${e.message}`));
+      this.emailService
+        .sendEmail({
+          to: review.mentor.email,
+          subject: 'Новый отзыв — Mentory',
+          html: `<p>Привет, ${review.mentor.fullName}! Вы получили новый отзыв: ${review.rating} ⭐${review.text ? ` — "${review.text}"` : ''}.</p>`,
+        })
+        .catch((e) => this.logger.warn(`Email failed for new_review: ${e.message}`));
     }
   }
 
-  async notifyPaymentReceived(mentorId: string, payment: any, mentorEmail: string, mentorName: string) {
+  async notifyPaymentReceived(
+    mentorId: string,
+    payment: any,
+    mentorEmail: string,
+    mentorName: string,
+  ) {
     const notification = await this.createNotification(mentorId, {
       type: 'payment_received',
-      title: 'Payment Received',
-      body: `You received a payment of $${(payment.mentorAmount / 100).toFixed(2)}`,
+      title: 'Оплата получена',
+      body: `Вам начислена оплата ${this.formatMoneyFromCents(payment.mentorAmount, payment.currency || 'RUB')}`,
       data: { paymentId: payment.id, sessionId: payment.sessionId },
     });
 
@@ -281,7 +306,9 @@ export class NotificationsService {
         menteeName: payment.session?.mentee?.fullName || 'Mentee',
         amount: (payment.mentorAmount / 100).toFixed(2),
         currency: payment.currency || 'RUB',
-        sessionDate: payment.session?.startAt ? new Date(payment.session.startAt).toLocaleDateString('ru-RU') : 'Не указано',
+        sessionDate: payment.session?.startAt
+          ? new Date(payment.session.startAt).toLocaleDateString('ru-RU')
+          : 'Не указано',
       },
     });
 
@@ -291,8 +318,8 @@ export class NotificationsService {
   async notifyPayoutSent(mentorId: string, payout: any) {
     await this.createNotification(mentorId, {
       type: 'payout_sent',
-      title: 'Payout Sent',
-      body: `Your payout of $${(payout.amount / 100).toFixed(2)} has been sent`,
+      title: 'Выплата отправлена',
+      body: `Выплата ${this.formatMoneyFromCents(payout.amount, payout.currency || 'RUB')} отправлена`,
       data: { payoutId: payout.id },
     });
 
@@ -333,6 +360,15 @@ export class NotificationsService {
       session_reminder: 'Напоминание о сессии — Mentory',
     };
     return subjects[jobType] || 'Уведомление — Mentory';
+  }
+
+  private formatMoneyFromCents(amount: number | string | null | undefined, currency = 'RUB') {
+    const value = Number(amount || 0) / 100;
+    return new Intl.NumberFormat('ru-RU', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 2,
+    }).format(value);
   }
 
   async getQueueStats() {
