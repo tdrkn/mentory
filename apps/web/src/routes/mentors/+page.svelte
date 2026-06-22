@@ -313,7 +313,9 @@
                 <div class="mentor-card-info">
                   <div class="mentor-name-row">
                     <div class="mentor-card-name">{mentor.fullName}</div>
-                    <span class="mentor-role-badge">{mentor.rating?.average >= 4.5 ? 'Эксперт' : 'Ментор'}</span>
+                    <span class="mentor-role-badge">
+                      {mentor.rating?.count > 0 && mentor.rating?.average >= 4.5 ? 'Эксперт' : 'Ментор'}
+                    </span>
                   </div>
                   <div class="mentor-card-title">{mentor.headline || 'Ментор'}</div>
                   {#if mentor.workplace || mentor.education}
@@ -322,10 +324,15 @@
                     </div>
                   {/if}
                   <div class="mentor-card-meta">
-                    <span class="rating">
-                      <Star size={14} fill="currentColor" />
-                      {mentor.rating?.average ? Number(mentor.rating.average).toFixed(1) : '0.0'}
-                    </span>
+                    {#if mentor.rating?.count > 0}
+                      <span class="rating">
+                        <Star size={14} fill="currentColor" />
+                        {Number(mentor.rating.average).toFixed(1)}
+                        <span class="muted">({mentor.rating.count})</span>
+                      </span>
+                    {:else}
+                      <span class="muted">Нет отзывов</span>
+                    {/if}
                     <span class="muted">
                       {mentor.completedSessions} сессий
                     </span>

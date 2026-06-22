@@ -147,7 +147,7 @@
       <a class="nav-link {isActive('/mentors') ? 'active' : ''}" href="/mentors">Найти ментора</a>
       {#if $user}
         <a class="nav-link {isActive('/subscriptions') ? 'active' : ''}" href="/subscriptions">
-          Подписки
+          Мои подписки
         </a>
         <a class="nav-link {isActive('/sessions') ? 'active' : ''}" href="/sessions">
           <Video size={16} /> Сессии
@@ -272,7 +272,7 @@
         </div>
       {:else}
         <a class="btn btn-ghost btn-sm" href="/login">Войти</a>
-        <a class="btn btn-primary btn-sm" href="/register">Начать бесплатно</a>
+        <a class="btn btn-primary btn-sm" href="/register">Зарегистрироваться</a>
       {/if}
 
       <button class="mobile-menu-toggle" on:click={toggleMenu} aria-label="Меню">
@@ -294,7 +294,7 @@
         </a>
         {#if $user}
           <a class="mobile-nav-link {isActive('/subscriptions') ? 'active' : ''}" href="/subscriptions" on:click={closeMenu}>
-            Подписки
+            Мои подписки
           </a>
           <a class="mobile-nav-link {isActive('/sessions') ? 'active' : ''}" href="/sessions" on:click={closeMenu}>
             <Video size={18} /> Сессии
@@ -375,7 +375,7 @@
         {:else}
           <div class="mobile-nav-divider"></div>
           <a class="btn btn-outline" style="width:100%;" href="/login" on:click={closeMenu}>Войти</a>
-          <a class="btn btn-primary" style="width:100%;" href="/register" on:click={closeMenu}>Начать бесплатно</a>
+          <a class="btn btn-primary" style="width:100%;" href="/register" on:click={closeMenu}>Зарегистрироваться</a>
         {/if}
       </nav>
     </div>

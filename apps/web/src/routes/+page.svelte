@@ -45,9 +45,9 @@
           <a class="btn btn-outline" href="/register?role=mentor">Стать ментором</a>
         </div>
         <div class="muted" style="margin-top:16px; display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
-          <span class="tag blue">97% довольных пользователей</span>
-          <span class="tag amber">4.9/5 средний рейтинг</span>
-          <span>Доступно на русском и английском</span>
+          <span class="tag blue">Проверенные профили</span>
+          <span class="tag amber">Персональные сессии</span>
+          <span>Поддержка на русском языке</span>
         </div>
       </div>
 
@@ -66,7 +66,7 @@
               <Star size="24" />
             </div>
             <div>
-              <div class="mentor-card-name">«Нашёл CTO-ментора за 2 дня»</div>
+              <div class="mentor-card-name">Нашёл CTO-ментора за 2 дня</div>
               <div class="muted">Алексей, продуктовый менеджер</div>
             </div>
           </div>
@@ -95,8 +95,8 @@
           <div class="stat-label">проведённых сессий</div>
         </div>
         <div class="stat-card reveal reveal-delay-1">
-          <div class="stat-value">4.9</div>
-          <div class="stat-label">средний рейтинг менторов</div>
+          <div class="stat-value">24 ч</div>
+          <div class="stat-label">среднее время ответа ментора</div>
         </div>
         <div class="stat-card reveal reveal-delay-2">
           <div class="stat-value">48 ч</div>
@@ -218,7 +218,6 @@
         <span>© 2026 Mentory. Все права защищены.</span>
         <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
           <span class="badge">RU</span>
-          <span class="badge">EN</span>
         </div>
       </div>
     </div>

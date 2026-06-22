@@ -333,12 +333,29 @@
     return match ? match[0] : null;
   };
 
-  const getLastHttpLink = (messageList: Message[], fallbackLink?: string | null) => {
+  const isMeetingLink = (link: string) => {
+    try {
+      const host = new URL(link).hostname.replace(/^www\./, '').toLowerCase();
+      return (
+        host.includes('zoom.us') ||
+        host.includes('meet.google.com') ||
+        host.includes('teams.microsoft.com') ||
+        host.includes('whereby.com') ||
+        host.includes('telemost.yandex.ru')
+      );
+    } catch {
+      return false;
+    }
+  };
+
+  const getLastMeetingLink = (messageList: Message[], fallbackLink?: string | null) => {
+    if (fallbackLink && isMeetingLink(fallbackLink)) return fallbackLink;
+
     for (let index = messageList.length - 1; index >= 0; index -= 1) {
       const link = getFirstHttpLink(messageList[index].content);
-      if (link) return link;
+      if (link && isMeetingLink(link)) return link;
     }
-    return fallbackLink || null;
+    return null;
   };
 
   const formatFileSize = (bytes: number) => {
@@ -459,7 +476,7 @@
   };
 
   $: activeConversationData = conversations.find((conv) => conv.id === activeConversation) || null;
-  $: latestMeetingLink = getLastHttpLink(messages, activeConversationData?.session?.videoLink);
+  $: latestMeetingLink = getLastMeetingLink(messages, activeConversationData?.session?.videoLink);
 </script>
 
 <div class="page">

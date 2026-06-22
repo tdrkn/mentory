@@ -93,9 +93,11 @@
 
   $: isOwnProfile = !!mentor && $user?.id === mentor.id;
   $: canBook = !!$user && $user.role !== 'mentor' && !isOwnProfile;
+  $: canBookService = canBook && !!nearestSlot;
   $: isVerified = mentor?.mentorProfile?.verificationStatus === 'verified';
   $: hasPlans = (mentor?.mentorPlans?.length ?? 0) > 0;
   $: hasServices = (mentor?.mentorServices?.length ?? 0) > 0;
+  $: hasRating = (mentor?.mentorProfile?.ratingCount || 0) > 0;
 
   const resolveFileUrl = (value?: string | null) => {
     if (!value) return '';
@@ -246,11 +248,15 @@
               <h2>{mentor.fullName}</h2>
               <p>Ментор</p>
               <div class="hero-stats">
-                <span class="rating">
-                  <Star size={16} fill="currentColor" />
-                  <strong>{normalizeRating(mentor.mentorProfile?.ratingAvg)}</strong>
-                  <span>({mentor.mentorProfile?.ratingCount || 0} отзывов)</span>
-                </span>
+                {#if hasRating}
+                  <span class="rating">
+                    <Star size={16} fill="currentColor" />
+                    <strong>{normalizeRating(mentor.mentorProfile?.ratingAvg)}</strong>
+                    <span>({mentor.mentorProfile?.ratingCount || 0} отзывов)</span>
+                  </span>
+                {:else}
+                  <span class="plain-inline">Нет отзывов</span>
+                {/if}
                 <span>
                   <Users size={16} />
                   {mentor._count?.sessionsAsMentor || 0} сессии
@@ -374,6 +380,7 @@
                   <button
                     class="option-card {selectedPlanId === plan.id ? 'option-selected' : ''}"
                     on:click={() => (selectedPlanId = plan.id)}
+                    disabled={!canBook}
                   >
                     <span class="option-title">{plan.title}</span>
                     <div class="plan-facts">
@@ -405,6 +412,8 @@
                 >
                   Отправить запрос
                 </button>
+              {:else if !$user}
+                <a class="btn btn-primary cta-btn" href="/register">Зарегистрироваться, чтобы подключиться</a>
               {/if}
             {:else}
               <p class="plain-text tab-empty">У ментора пока нет планов подписки.</p>
@@ -423,6 +432,7 @@
                   <button
                     class="option-card {selectedServiceId === service.id ? 'option-selected' : ''}"
                     on:click={() => (selectedServiceId = service.id)}
+                    disabled={!canBook}
                   >
                     <span class="option-title">{service.title}</span>
                     <div class="option-meta">
@@ -443,11 +453,15 @@
                 <button
                   class="btn btn-primary cta-btn"
                   on:click={handleBook}
-                  disabled={!selectedServiceId}
+                  disabled={!selectedServiceId || !canBookService}
                 >
                   Забронировать
                 </button>
-                <p class="hold-notice">Слот удерживается 10 минут для оплаты</p>
+                {#if canBookService}
+                  <p class="hold-notice">Слот удерживается 10 минут для оплаты</p>
+                {/if}
+              {:else if !$user}
+                <a class="btn btn-primary cta-btn" href="/register">Зарегистрироваться, чтобы записаться</a>
               {/if}
             {:else}
               <p class="plain-text tab-empty">У ментора пока нет разовых услуг.</p>
@@ -599,6 +613,10 @@
     align-items: center;
     gap: 6px;
     color: var(--ink-secondary);
+  }
+
+  .plain-inline {
+    color: var(--muted);
   }
 
   .rating :global(svg),
@@ -769,6 +787,11 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+
+  .option-card:disabled {
+    cursor: default;
+    opacity: 0.72;
   }
 
   .option-card:hover {

@@ -174,7 +174,7 @@
     isPageLoading = true;
 
     try {
-      await Promise.all([loadSubscriptions(), loadCredits(), loadMyPlans()]);
+      await Promise.all([loadSubscriptions(), loadMyPlans()]);
     } catch (err) {
       errorMessage = extractError(err);
     } finally {
@@ -592,8 +592,8 @@
     <main class="container section">
       <div class="page-head">
         <div>
-          <h1 class="section-title">Менторские программы</h1>
-          <p class="muted">Подключения к менторам, рабочий план, задачи, материалы и оплата в одном месте.</p>
+          <h1 class="section-title">Мои подписки</h1>
+          <p class="muted">Подписки на менторов и их текущие статусы. Новую подписку оформляйте из профиля ментора.</p>
         </div>
         <button class="btn btn-outline" on:click={loadPage} disabled={isBusy}>Обновить</button>
       </div>
@@ -606,9 +606,9 @@
         <div class="alert status-success">{infoMessage}</div>
       {/if}
 
-      <div class="grid cols-4 stats-row">
+      <div class="grid cols-3 stats-row">
         <div class="card">
-          <div class="muted">Подключений всего</div>
+          <div class="muted">Подписок всего</div>
           <div class="kpi">{subscriptions.length}</div>
         </div>
         <div class="card">
@@ -619,18 +619,14 @@
           <div class="muted">Ждут решения</div>
           <div class="kpi kpi-warn">{subscriptions.filter((item) => item.status === 'pending').length}</div>
         </div>
-        <div class="card">
-          <div class="muted">Бонусный баланс</div>
-          <div class="kpi">{credits ? formatMoney((credits.balance.amountCents || 0) / 100, credits.balance.currency) : '—'}</div>
-        </div>
       </div>
 
       <section class="card info-card">
         <h2 class="section-title">Как это работает</h2>
         <div class="grid cols-3 compact-grid">
           <div class="surface info-step">
-            <strong>1. Выберите программу</strong>
-            <p class="muted">Откройте профиль ментора, сравните условия и отправьте заявку.</p>
+            <strong>1. Выберите ментора</strong>
+            <p class="muted">Откройте профиль ментора в каталоге и выберите подходящую подписку.</p>
           </div>
           <div class="surface info-step">
             <strong>2. Дождитесь решения</strong>
@@ -638,20 +634,22 @@
           </div>
           <div class="surface info-step">
             <strong>3. Работайте по плану</strong>
-            <p class="muted">После оплаты появляются задачи, дедлайны, материалы и общий прогресс.</p>
+            <p class="muted">После оплаты подписка появится здесь отдельной карточкой.</p>
           </div>
         </div>
       </section>
 
       <section class="card">
-        <h2 class="section-title">{canManagePlans ? 'Подключения учеников' : 'Мои подключения'}</h2>
+        <h2 class="section-title">{canManagePlans ? 'Подписки учеников' : 'Мои подписки'}</h2>
         <p class="muted">
-          Подключение — это активная работа с ментором по выбранной программе.
-          Нажмите на карточку, чтобы открыть рабочий план ниже.
+          Каждая карточка показывает выбранного ментора, программу, стоимость и текущий статус.
         </p>
 
         {#if subscriptions.length === 0}
-          <p class="muted">Подключений пока нет.</p>
+          <p class="muted">Подписок пока нет.</p>
+          {#if canCreateSubscription}
+            <a class="btn btn-outline" href="/mentors">Открыть каталог менторов</a>
+          {/if}
         {:else}
           <div class="stack">
             {#each sortedSubscriptions as item}
@@ -683,118 +681,10 @@
                     <button class="btn btn-sm btn-outline" on:click={() => changeSubscriptionStatus(item.id, 'rejected')} disabled={isBusy}>Отклонить</button>
                   {:else if item.status === 'approved_pending_payment' && item.menteeId === $user?.id}
                     <a class="btn btn-sm btn-primary" href={`/checkout/subscriptions/${item.id}`}>Оплатить</a>
-                  {:else if item.status === 'active'}
-                    <button class="btn btn-sm btn-ghost" on:click={() => changeSubscriptionStatus(item.id, 'paused')} disabled={isBusy}>Пауза</button>
-                    <button class="btn btn-sm btn-outline" on:click={() => changeSubscriptionStatus(item.id, 'ended')} disabled={isBusy}>Завершить</button>
-                  {:else if item.status === 'paused'}
-                    <button class="btn btn-sm btn-primary" on:click={() => changeSubscriptionStatus(item.id, 'active')} disabled={isBusy}>Активировать</button>
-                    <button class="btn btn-sm btn-outline" on:click={() => changeSubscriptionStatus(item.id, 'ended')} disabled={isBusy}>Завершить</button>
                   {/if}
                 </div>
               </div>
             {/each}
-          </div>
-        {/if}
-      </section>
-
-      <section class="card bottom-card">
-        <h2 class="section-title">Рабочий план</h2>
-        <p class="muted workspace-description">
-          Рабочий план появляется после подключения к программе.
-          Это общая область ментора и менти: задачи, дедлайны и полезные материалы.
-        </p>
-
-        {#if !selectedSubscription || !workspace}
-          <p class="muted">
-            {selectedSubscription && !canOpenWorkspace(selectedSubscription.status)
-              ? selectedSubscription.status === 'approved_pending_payment'
-                ? 'Рабочий план откроется после оплаты одобренной заявки.'
-                : 'Рабочий план откроется после одобрения заявки ментором.'
-              : 'Когда у вас будет подключение, здесь появится ваш рабочий план.'}
-          </p>
-        {:else}
-          <div class="workspace-meta">
-            <div class="muted">Программа: <strong>{selectedSubscription.plan?.title || selectedSubscription.planId}</strong></div>
-            <div class="muted">Менти: {selectedSubscription.mentee?.fullName || selectedSubscription.menteeId}</div>
-            <div class="muted">Ментор: {selectedSubscription.mentor?.fullName || selectedSubscription.mentorId}</div>
-          </div>
-
-          <div class="divider"></div>
-
-          <h3 class="section-subtitle">Задачи</h3>
-          <form class="stack-sm" on:submit|preventDefault={createTask}>
-            <input class="input" placeholder="Название задачи" bind:value={taskForm.title} />
-            <textarea class="textarea" placeholder="Описание (опционально)" bind:value={taskForm.description}></textarea>
-            <div class="grid cols-2 compact-grid">
-              <select class="select" bind:value={taskForm.assigneeId}>
-                <option value="">Кому назначить</option>
-                <option value={workspace.subscription.mentorId}>Ментор</option>
-                <option value={workspace.subscription.menteeId}>Менти</option>
-              </select>
-              <div class="grid cols-2 compact-grid">
-                <input class="input" type="date" bind:value={taskForm.startDate} />
-                <input class="input" type="date" bind:value={taskForm.dueDate} />
-              </div>
-            </div>
-            <button class="btn btn-primary" type="submit" disabled={isBusy}>Добавить задачу</button>
-          </form>
-
-          <div class="stack task-list">
-            {#if workspace.tasks.length === 0}
-              <p class="muted">Задач пока нет.</p>
-            {:else}
-              {#each workspace.tasks as task}
-                <div class="surface task-row">
-                  <div>
-                    <strong>{task.title}</strong>
-                    {#if task.description}
-                      <div class="muted">{task.description}</div>
-                    {/if}
-                    <div class="muted">Срок: {formatDate(task.dueDate)} · Исполнитель: {formatAssigneeLabel(task.assigneeId)}</div>
-                  </div>
-                  <div class="task-actions">
-                    <span class="badge {task.status === 'done' ? 'success' : task.status === 'in_progress' ? 'info' : ''}">{formatTaskStatus(task.status)}</span>
-                    {#if task.status !== 'todo'}
-                      <button class="btn btn-sm btn-outline" on:click={() => setTaskStatus(task, 'todo')} disabled={isBusy}>К выполнению</button>
-                    {/if}
-                    {#if task.status !== 'in_progress'}
-                      <button class="btn btn-sm btn-outline" on:click={() => setTaskStatus(task, 'in_progress')} disabled={isBusy}>В работу</button>
-                    {/if}
-                    {#if task.status !== 'done'}
-                      <button class="btn btn-sm btn-primary" on:click={() => setTaskStatus(task, 'done')} disabled={isBusy}>Готово</button>
-                    {/if}
-                  </div>
-                </div>
-              {/each}
-            {/if}
-          </div>
-
-          <div class="divider"></div>
-
-          <h3 class="section-subtitle">Материалы и ссылки</h3>
-          <form class="stack-sm" on:submit|preventDefault={createBookmark}>
-            <input class="input" placeholder="Название" bind:value={bookmarkForm.title} />
-            <input class="input" placeholder="https://..." bind:value={bookmarkForm.url} />
-            <textarea class="textarea" placeholder="Описание (опционально)" bind:value={bookmarkForm.description}></textarea>
-            <button class="btn btn-primary" type="submit" disabled={isBusy}>Добавить закладку</button>
-          </form>
-
-          <div class="stack bookmark-list">
-            {#if workspace.bookmarks.length === 0}
-              <p class="muted">Закладок пока нет.</p>
-            {:else}
-              {#each workspace.bookmarks as bookmark}
-                <div class="surface bookmark-row">
-                  <div>
-                    <a href={bookmark.url} target="_blank" rel="noreferrer" class="bookmark-link">{bookmark.title}</a>
-                    {#if bookmark.description}
-                      <div class="muted">{bookmark.description}</div>
-                    {/if}
-                  </div>
-                  <button class="btn btn-sm btn-ghost" on:click={() => deleteBookmark(bookmark.id)} disabled={isBusy}>Удалить</button>
-                </div>
-              {/each}
-            {/if}
           </div>
         {/if}
       </section>
@@ -871,147 +761,6 @@
         </section>
       {/if}
 
-      {#if canCreateSubscription}
-        <section class="card bottom-card">
-          <h2 class="section-title">Подключиться к программе</h2>
-          <p class="muted">Сначала найдите ментора, выберите программу и расскажите, с чем нужна помощь.</p>
-
-          <div class="grid cols-2 compact-grid">
-            <div class="stack-sm">
-              <h3 class="section-subtitle">1. Найдите программы ментора</h3>
-              <p class="muted">Лучший путь — открыть профиль ментора в каталоге. Если ментор прислал код, используйте блок ниже.</p>
-              <a class="btn btn-outline" href="/mentors">Открыть каталог менторов</a>
-
-              <details class="surface manual-connect">
-                <summary>Подключиться по коду ментора</summary>
-                <div class="manual-connect-body">
-                  <p class="muted">Этот способ нужен для демо и прямых приглашений. Вставьте ID ментора, если он уже у вас есть.</p>
-                  <div class="flex gap-sm">
-                    <input class="input" placeholder="ID ментора" bind:value={mentorLookupId} />
-                    <button class="btn btn-outline" on:click={searchMentorPlans} disabled={isBusy}>Показать программы</button>
-                  </div>
-                </div>
-              </details>
-
-              {#if mentorPlans.length > 0}
-                <div class="stack-sm">
-                  {#each mentorPlans as plan}
-                    <div class="surface plan-option">
-                      <strong>{plan.title}</strong>
-                      <div class="muted">Стоимость: {formatMoney(plan.priceAmount, plan.currency)} / {plan.billingIntervalMonths} мес.</div>
-                      <div class="muted">Звонков в период: {plan.callsPerMonth ?? '—'} · Ответ: до {plan.responseTimeHours ?? '—'} ч.</div>
-                      <button class="btn btn-sm btn-primary" on:click={() => selectPlanForSubscription(plan.id)} disabled={isBusy}>
-                        Выбрать программу
-                      </button>
-                      <details class="muted plan-code">
-                        <summary>Код программы</summary>
-                        <div>{plan.id}</div>
-                      </details>
-                    </div>
-                  {/each}
-                </div>
-              {:else if mentorLookupId.trim()}
-                <p class="muted">Программы не найдены. Проверьте ID ментора.</p>
-              {/if}
-            </div>
-
-            <form class="stack-sm" on:submit|preventDefault={() => subscribeToPlan()}>
-              <h3 class="section-subtitle">2. Отправьте заявку</h3>
-              {#if selectedPlanForSubscription}
-                <div class="surface selected-plan">
-                  <div class="muted">Выбрана программа</div>
-                  <strong>{selectedPlanForSubscription.title}</strong>
-                  <div class="muted">
-                    {formatMoney(selectedPlanForSubscription.priceAmount, selectedPlanForSubscription.currency)}
-                    / {selectedPlanForSubscription.billingIntervalMonths} мес.
-                  </div>
-                </div>
-              {:else}
-                <p class="muted">Выберите программу слева. Ручной код нужен только для прямого приглашения.</p>
-              {/if}
-              <details class="surface manual-connect">
-                <summary>У меня есть код программы</summary>
-                <div class="manual-connect-body">
-                  <input class="input" placeholder="Код программы" bind:value={subscribeForm.planId} />
-                </div>
-              </details>
-              <input class="input" placeholder="Цель менторства" bind:value={subscribeForm.requestGoal} maxlength="500" />
-              <textarea class="textarea" placeholder="Мотивационное письмо для ментора" bind:value={subscribeForm.requestMotivation} maxlength="2000"></textarea>
-              <textarea class="textarea" placeholder="Комментарий для ментора (необязательно)" bind:value={subscribeForm.notes}></textarea>
-              <button class="btn btn-primary" type="submit" disabled={isBusy || !subscribeForm.planId.trim()}>Отправить заявку</button>
-            </form>
-          </div>
-        </section>
-      {/if}
-
-      {#if canUseCredits}
-        <section class="card bottom-card">
-          <h2 class="section-title">Оплата и бонусный баланс</h2>
-          <p class="muted">Здесь видны бонусные деньги для оплаты программ и последние операции по балансу.</p>
-
-          <div class="grid cols-2 compact-grid">
-            <div class="stack-sm">
-              <div class="surface">
-                <div class="muted">Доступно</div>
-                <div class="kpi">{credits ? formatMoney((credits.balance.amountCents || 0) / 100, credits.balance.currency) : '—'}</div>
-                <div class="muted">Срок действия: {credits ? formatDate(credits.balance.expiresAt) : '—'}</div>
-              </div>
-
-              <form class="stack-sm" on:submit|preventDefault={topupCredits}>
-                <label class="label" for="topup-amount-rub">Сумма пополнения, руб.</label>
-                <input
-                  id="topup-amount-rub"
-                  class="input"
-                  type="number"
-                  min="1"
-                  step="1"
-                  bind:value={creditsForm.topupAmountRub}
-                />
-                <label class="label" for="topup-expires-days">Срок (дней)</label>
-                <input
-                  id="topup-expires-days"
-                  class="input"
-                  type="number"
-                  min="1"
-                  max="3650"
-                  bind:value={creditsForm.expiresInDays}
-                />
-                <button class="btn btn-primary" type="submit" disabled={isBusy}>Пополнить</button>
-              </form>
-            </div>
-
-            <div class="stack-sm">
-              <form class="stack-sm" on:submit|preventDefault={redeemCode}>
-                <label class="label" for="redeem-code">Код активации</label>
-                <input
-                  id="redeem-code"
-                  class="input"
-                  placeholder="MENTORY-START-10"
-                  bind:value={creditsForm.redeemCode}
-                />
-                <button class="btn btn-outline" type="submit" disabled={isBusy}>Активировать код</button>
-              </form>
-
-              <div class="surface">
-                <div class="muted">Последние операции</div>
-                {#if !credits || credits.transactions.length === 0}
-                  <p class="muted">Операций пока нет.</p>
-                {:else}
-                  <div class="stack-sm transactions">
-                    {#each credits.transactions.slice(0, 8) as tx}
-                      <div class="tx-row">
-                        <span class="badge {tx.status === 'succeeded' ? 'success' : 'error'}">{formatTransactionType(tx.type)}</span>
-                        <span>{formatMoney(tx.amountCents / 100, credits.balance.currency)}</span>
-                        <span class="muted">{new Date(tx.createdAt).toLocaleString('ru-RU')}</span>
-                      </div>
-                    {/each}
-                  </div>
-                {/if}
-              </div>
-            </div>
-          </div>
-        </section>
-      {/if}
     </main>
   {/if}
 </div>
@@ -1159,7 +908,6 @@
     gap: 10px;
   }
 
-  .manual-connect summary,
   .plan-code summary {
     cursor: pointer;
     font-weight: 600;
