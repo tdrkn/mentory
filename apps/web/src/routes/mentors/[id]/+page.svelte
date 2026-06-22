@@ -101,8 +101,8 @@
 
   const resolveFileUrl = (value?: string | null) => {
     if (!value) return '';
-    if (value.startsWith('http') || value.startsWith('data:')) return value;
-    return `${getApiUrl()}${value}`;
+    if (value.startsWith('http') || value.startsWith('data:') || value.startsWith('blob:')) return value;
+    return `${getApiUrl()}${value.startsWith('/') ? value : `/${value}`}`;
   };
 
   const formatMoney = (amount: string | number, currency: string) => {
