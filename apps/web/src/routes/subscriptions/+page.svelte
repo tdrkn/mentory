@@ -52,54 +52,6 @@
     mentee?: UserRef;
   }
 
-  interface MentorshipTask {
-    id: string;
-    subscriptionId: string;
-    createdById: string;
-    assigneeId: string;
-    title: string;
-    description?: string | null;
-    status: 'todo' | 'in_progress' | 'done';
-    startDate?: string | null;
-    dueDate?: string | null;
-    completedAt?: string | null;
-    createdAt: string;
-  }
-
-  interface MentorshipBookmark {
-    id: string;
-    subscriptionId: string;
-    createdById: string;
-    title: string;
-    description?: string | null;
-    url: string;
-    createdAt: string;
-  }
-
-  interface WorkspacePayload {
-    subscription: MentorshipSubscription;
-    tasks: MentorshipTask[];
-    bookmarks: MentorshipBookmark[];
-  }
-
-  interface CreditsPayload {
-    balance: {
-      menteeId: string;
-      amountCents: number;
-      currency: string;
-      expiresAt?: string | null;
-    };
-    transactions: Array<{
-      id: string;
-      type: string;
-      status: string;
-      amountCents: number;
-      description?: string;
-      createdAt: string;
-      externalRef?: string | null;
-    }>;
-  }
-
   let isPageLoading = true;
   let isBusy = false;
   let errorMessage = '';
@@ -107,27 +59,8 @@
 
   let subscriptions: MentorshipSubscription[] = [];
   let selectedSubscriptionId = '';
-  let workspace: WorkspacePayload | null = null;
 
   let myPlans: MentorshipPlan[] = [];
-  let mentorLookupId = '';
-  let mentorPlans: MentorshipPlan[] = [];
-
-  let credits: CreditsPayload | null = null;
-
-  const taskForm = {
-    title: '',
-    description: '',
-    assigneeId: '',
-    startDate: '',
-    dueDate: '',
-  };
-
-  const bookmarkForm = {
-    title: '',
-    description: '',
-    url: '',
-  };
 
   const planForm = {
     title: '',
@@ -139,25 +72,9 @@
     billingIntervalMonths: 1,
   };
 
-  const subscribeForm = {
-    planId: '',
-    requestGoal: '',
-    requestMotivation: '',
-    notes: '',
-  };
-
-  const creditsForm = {
-    topupAmountRub: 500,
-    expiresInDays: 365,
-    redeemCode: '',
-  };
-
-  $: selectedSubscription = subscriptions.find((item) => item.id === selectedSubscriptionId) || null;
-  $: selectedPlanForSubscription = mentorPlans.find((plan) => plan.id === subscribeForm.planId) || null;
   $: sortedSubscriptions = sortSubscriptions(subscriptions);
   $: canManagePlans = $isMentor || $user?.role === 'admin';
   $: canCreateSubscription = $user?.role === 'mentee' || $user?.role === 'both' || $user?.role === 'admin';
-  $: canUseCredits = $user?.role === 'mentee' || $user?.role === 'both' || $user?.role === 'admin';
 
   onMount(async () => {
     if (!$isAuthenticated && !$authLoading) {
@@ -184,45 +101,9 @@
 
   async function loadSubscriptions() {
     subscriptions = await api.get<MentorshipSubscription[]>('/subscriptions/mine');
-
-    if (subscriptions.length === 0) {
-      selectedSubscriptionId = '';
-      workspace = null;
-      return;
-    }
-
-    const workspaceCandidate =
-      subscriptions.find((item) => item.id === selectedSubscriptionId && canOpenWorkspace(item.status)) ||
-      subscriptions.find((item) => canOpenWorkspace(item.status));
-
-    if (!workspaceCandidate) {
-      selectedSubscriptionId = subscriptions[0].id;
-      workspace = null;
-      return;
-    }
-
-    if (!selectedSubscriptionId || selectedSubscriptionId !== workspaceCandidate.id) {
-      selectedSubscriptionId = workspaceCandidate.id;
-    }
-
-    await loadWorkspace(selectedSubscriptionId);
-  }
-
-  async function loadWorkspace(subscriptionId: string) {
-    workspace = await api.get<WorkspacePayload>(`/subscriptions/${subscriptionId}/workspace`);
-
-    if (!taskForm.assigneeId) {
-      taskForm.assigneeId = workspace.subscription.menteeId;
-    }
-  }
-
-  async function loadCredits() {
-    if (!canUseCredits) {
-      credits = null;
-      return;
-    }
-
-    credits = await api.get<CreditsPayload>('/subscriptions/credits/me');
+    selectedSubscriptionId = subscriptions.some((item) => item.id === selectedSubscriptionId)
+      ? selectedSubscriptionId
+      : subscriptions[0]?.id || '';
   }
 
   async function loadMyPlans() {
@@ -278,172 +159,20 @@
     });
   }
 
-  async function searchMentorPlans() {
-    await withBusy(async () => {
-      mentorPlans = [];
-
-      if (!mentorLookupId.trim()) {
-        throw new Error('Введите ID ментора');
-      }
-
-      mentorPlans = await api.get<MentorshipPlan[]>(`/subscriptions/plans/mentor/${mentorLookupId.trim()}`);
-      infoMessage = `Найдено планов: ${mentorPlans.length}`;
-    });
-  }
-
-  async function subscribeToPlan(planId?: string) {
-    await withBusy(async () => {
-      const targetPlanId = planId || subscribeForm.planId.trim();
-
-      if (!targetPlanId) {
-        throw new Error('Выберите программу или вставьте код программы');
-      }
-
-      await api.post('/subscriptions', {
-        planId: targetPlanId,
-        requestGoal: subscribeForm.requestGoal.trim() || undefined,
-        requestMotivation: subscribeForm.requestMotivation.trim() || undefined,
-        notes: subscribeForm.notes || undefined,
-      });
-
-      subscribeForm.planId = '';
-      subscribeForm.requestGoal = '';
-      subscribeForm.requestMotivation = '';
-      subscribeForm.notes = '';
-      infoMessage = 'Заявка на подключение отправлена ментору';
-      await loadSubscriptions();
-    });
-  }
-
-  function selectPlanForSubscription(planId: string) {
-    subscribeForm.planId = planId;
-    infoMessage = 'Программа выбрана. Расскажите ментору, с чем нужна помощь, и отправьте заявку.';
-  }
-
   async function changeSubscriptionStatus(subscriptionId: string, status: MentorshipSubscription['status']) {
     await withBusy(async () => {
       await api.patch(`/subscriptions/${subscriptionId}/status`, { status });
-      infoMessage = 'Статус подключения обновлён';
+      infoMessage = 'Статус подписки обновлён';
       await loadSubscriptions();
     });
   }
 
-  async function selectSubscription(subscriptionId: string) {
+  function selectSubscription(subscriptionId: string) {
     if (!subscriptionId || subscriptionId === selectedSubscriptionId) {
       return;
     }
 
-    await withBusy(async () => {
-      selectedSubscriptionId = subscriptionId;
-      const selected = subscriptions.find((item) => item.id === subscriptionId);
-      if (!selected || !canOpenWorkspace(selected.status)) {
-        workspace = null;
-        return;
-      }
-      await loadWorkspace(subscriptionId);
-    });
-  }
-
-  async function createTask() {
-    if (!selectedSubscriptionId) {
-      return;
-    }
-
-    await withBusy(async () => {
-      if (!taskForm.title.trim() || !taskForm.assigneeId) {
-        throw new Error('Укажите название задачи и исполнителя');
-      }
-
-      await api.post(`/subscriptions/${selectedSubscriptionId}/tasks`, {
-        title: taskForm.title.trim(),
-        description: taskForm.description || undefined,
-        assigneeId: taskForm.assigneeId,
-        startDate: taskForm.startDate || undefined,
-        dueDate: taskForm.dueDate || undefined,
-      });
-
-      taskForm.title = '';
-      taskForm.description = '';
-      taskForm.startDate = '';
-      taskForm.dueDate = '';
-
-      infoMessage = 'Задача создана';
-      await loadWorkspace(selectedSubscriptionId);
-    });
-  }
-
-  async function setTaskStatus(task: MentorshipTask, status: 'todo' | 'in_progress' | 'done') {
-    if (!selectedSubscriptionId) {
-      return;
-    }
-
-    await withBusy(async () => {
-      await api.patch(`/subscriptions/${selectedSubscriptionId}/tasks/${task.id}`, { status });
-      await loadWorkspace(selectedSubscriptionId);
-    });
-  }
-
-  async function createBookmark() {
-    if (!selectedSubscriptionId) {
-      return;
-    }
-
-    await withBusy(async () => {
-      if (!bookmarkForm.title.trim() || !bookmarkForm.url.trim()) {
-        throw new Error('Укажите название и ссылку');
-      }
-
-      await api.post(`/subscriptions/${selectedSubscriptionId}/bookmarks`, {
-        title: bookmarkForm.title.trim(),
-        description: bookmarkForm.description || undefined,
-        url: bookmarkForm.url.trim(),
-      });
-
-      bookmarkForm.title = '';
-      bookmarkForm.description = '';
-      bookmarkForm.url = '';
-      infoMessage = 'Закладка создана';
-      await loadWorkspace(selectedSubscriptionId);
-    });
-  }
-
-  async function deleteBookmark(bookmarkId: string) {
-    if (!selectedSubscriptionId) {
-      return;
-    }
-
-    await withBusy(async () => {
-      await api.delete(`/subscriptions/${selectedSubscriptionId}/bookmarks/${bookmarkId}`);
-      await loadWorkspace(selectedSubscriptionId);
-    });
-  }
-
-  async function topupCredits() {
-    await withBusy(async () => {
-      await api.post('/subscriptions/credits/topup', {
-        amountCents: Math.round(Number(creditsForm.topupAmountRub) * 100),
-        expiresInDays: Number(creditsForm.expiresInDays),
-      });
-
-      infoMessage = 'Баланс пополнен';
-      await loadCredits();
-    });
-  }
-
-  async function redeemCode() {
-    await withBusy(async () => {
-      if (!creditsForm.redeemCode.trim()) {
-        throw new Error('Введите код');
-      }
-
-      await api.post('/subscriptions/credits/redeem', {
-        code: creditsForm.redeemCode.trim(),
-      });
-
-      creditsForm.redeemCode = '';
-      infoMessage = 'Код активирован';
-      await loadCredits();
-    });
+    selectedSubscriptionId = subscriptionId;
   }
 
   function formatMoney(value: number | string | null | undefined, currency = 'RUB') {
@@ -492,10 +221,6 @@
     return 'error';
   }
 
-  function canOpenWorkspace(status: MentorshipSubscription['status']) {
-    return status === 'active' || status === 'paused';
-  }
-
   function canReviewSubscription(item: MentorshipSubscription) {
     return item.status === 'pending' && ($user?.role === 'admin' || item.mentorId === $user?.id);
   }
@@ -515,52 +240,6 @@
       if (statusDiff !== 0) return statusDiff;
       return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
     });
-  }
-
-  function formatTaskStatus(status: MentorshipTask['status']) {
-    if (status === 'todo') {
-      return 'К выполнению';
-    }
-
-    if (status === 'in_progress') {
-      return 'В работе';
-    }
-
-    return 'Готово';
-  }
-
-  function formatAssigneeLabel(assigneeId: string) {
-    if (!workspace) {
-      return assigneeId;
-    }
-
-    if (workspace.subscription.mentorId === assigneeId) {
-      return `Ментор: ${workspace.subscription.mentor?.fullName || '—'}`;
-    }
-
-    if (workspace.subscription.menteeId === assigneeId) {
-      return `Менти: ${workspace.subscription.mentee?.fullName || '—'}`;
-    }
-
-    return assigneeId;
-  }
-
-  function formatTransactionType(type: string) {
-    const normalizedType = type.toLowerCase();
-
-    if (normalizedType.includes('topup') || normalizedType.includes('deposit')) {
-      return 'Пополнение';
-    }
-
-    if (normalizedType.includes('redeem')) {
-      return 'Активация кода';
-    }
-
-    if (normalizedType.includes('debit') || normalizedType.includes('charge')) {
-      return 'Списание';
-    }
-
-    return type;
   }
 
   function extractError(err: unknown) {
@@ -630,7 +309,7 @@
           </div>
           <div class="surface info-step">
             <strong>2. Дождитесь решения</strong>
-            <p class="muted">Ментор видит цель, принимает заявку, а вы оплачиваете подключение.</p>
+            <p class="muted">Ментор видит цель, принимает заявку, а вы оплачиваете подписку.</p>
           </div>
           <div class="surface info-step">
             <strong>3. Работайте по плану</strong>
@@ -710,7 +389,7 @@
               </div>
 
               <div class="surface plan-form-group">
-                <h3 class="section-subtitle">Условия подключения</h3>
+                <h3 class="section-subtitle">Условия подписки</h3>
                 <div class="grid cols-2 compact-grid">
                   <div class="stack-sm">
                     <label class="label" for="plan-price">Стоимость за период, руб.</label>
@@ -809,15 +488,6 @@
   .section-subtitle {
     font-size: 1rem;
     margin-bottom: 10px;
-  }
-
-  .workspace-meta {
-    display: grid;
-    gap: 4px;
-  }
-
-  .workspace-description {
-    margin: 4px 0 12px;
   }
 
   .subscription-row {

@@ -371,7 +371,7 @@
           <section class="profile-card booking-card">
             <h2 class="sidebar-title">
               <Calendar size={18} />
-              Планы подписки
+              Программы сопровождения
             </h2>
 
             {#if hasPlans}
@@ -413,17 +413,17 @@
                   Отправить запрос
                 </button>
               {:else if !$user}
-                <a class="btn btn-primary cta-btn" href="/register">Зарегистрироваться, чтобы подключиться</a>
+                <a class="btn btn-primary cta-btn" href="/register">Зарегистрироваться, чтобы выбрать программу</a>
               {/if}
             {:else}
-              <p class="plain-text tab-empty">У ментора пока нет планов подписки.</p>
+              <p class="plain-text tab-empty">У ментора пока нет программ сопровождения.</p>
             {/if}
           </section>
 
           <section class="profile-card booking-card">
             <h2 class="sidebar-title">
               <BriefcaseBusiness size={18} />
-              Разовые сессии и услуги
+              Разовые консультации
             </h2>
 
             {#if hasServices}
@@ -464,7 +464,7 @@
                 <a class="btn btn-primary cta-btn" href="/register">Зарегистрироваться, чтобы записаться</a>
               {/if}
             {:else}
-              <p class="plain-text tab-empty">У ментора пока нет разовых услуг.</p>
+              <p class="plain-text tab-empty">У ментора пока нет разовых консультаций.</p>
             {/if}
           </section>
         </aside>
