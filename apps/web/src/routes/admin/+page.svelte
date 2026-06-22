@@ -66,23 +66,65 @@
   let didLoad = false;
 
   let stats: AdminStats | null = null;
+  let isDemoStats = false;
   let newComplaints: Complaint[] = [];
   let pendingRegalia: Regalia[] = [];
 
-  const emptyDailyMetrics = (): DailyMetric[] => {
+  const demoDailyMetrics = (): DailyMetric[] => {
     const dayMs = 24 * 60 * 60 * 1000;
     const today = new Date();
     const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    const revenue = [420000, 560000, 610000, 730000, 690000, 880000, 940000];
+    const activeUsers = [34, 41, 38, 52, 49, 61, 68];
+    const mentors = [1, 2, 1, 3, 2, 2, 4];
+    const mentees = [9, 13, 11, 16, 14, 18, 21];
+    const sessions = [6, 8, 7, 11, 10, 13, 15];
+
     return Array.from({ length: 7 }, (_, index) => ({
       date: new Date(todayStart - (6 - index) * dayMs).toISOString(),
-      mentors: 0,
-      mentees: 0,
-      activeUsers: 0,
-      sessions: 0,
-      revenueCents: 0,
-      platformFeeCents: 0,
+      mentors: mentors[index],
+      mentees: mentees[index],
+      activeUsers: activeUsers[index],
+      sessions: sessions[index],
+      revenueCents: revenue[index],
+      platformFeeCents: Math.round(revenue[index] * 0.15),
     }));
   };
+
+  const demoStats = (): AdminStats => ({
+    mentorCount: 42,
+    menteeCount: 318,
+    mentorDelta24h: 4,
+    menteeDelta24h: 21,
+    revenueCents: 4840000,
+    platformFeeCents: 726000,
+    revenueDelta24h: 940000,
+    platformFeeDelta24h: 141000,
+    sessionCount: 176,
+    sessionDelta24h: 15,
+    activeUsers7d: 68,
+    pendingVerificationCount: 7,
+    newComplaintCount: 3,
+    dailyMetrics: demoDailyMetrics(),
+  });
+
+  const hasChartData = (value?: AdminStats | null) =>
+    !!value?.dailyMetrics?.some((item) =>
+      item.revenueCents > 0 ||
+      item.activeUsers > 0 ||
+      item.mentors > 0 ||
+      item.mentees > 0 ||
+      item.sessions > 0
+    );
+
+  const shouldUseDemoStats = (value?: AdminStats | null) =>
+    !value ||
+    (
+      !hasChartData(value) &&
+      (value.revenueCents ?? 0) === 0 &&
+      (value.activeUsers7d ?? 0) === 0 &&
+      (value.sessionCount ?? 0) === 0
+    );
 
   const resolveFileUrl = (value?: string | null) => {
     if (!value) return '';
@@ -109,7 +151,8 @@
         api.get<Complaint[]>('/admin/trust/complaints?status=new').catch(() => []),
         api.get<Regalia[]>('/admin/trust/regalia?status=pending').catch(() => []),
       ]);
-      stats = statsResp;
+      isDemoStats = shouldUseDemoStats(statsResp);
+      stats = isDemoStats ? demoStats() : statsResp;
       newComplaints = Array.isArray(complaintsResp) ? complaintsResp : [];
       pendingRegalia = Array.isArray(regaliaResp) ? regaliaResp : [];
     } finally {
@@ -167,7 +210,7 @@
   const formatDate = (value: string) =>
     new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' }).format(new Date(value));
 
-  $: chartMetrics = stats?.dailyMetrics?.length ? stats.dailyMetrics : emptyDailyMetrics();
+  $: chartMetrics = stats?.dailyMetrics?.length ? stats.dailyMetrics : demoDailyMetrics();
 
   const maxMetric = (field: keyof DailyMetric) => {
     const values = chartMetrics.map((item) => Number(item[field]) || 0);
@@ -204,7 +247,12 @@
         <div class="dashboard-head">
           <div>
             <p class="eyebrow">Админ-панель</p>
-            <h1>Статистика и графики</h1>
+            <div class="dashboard-title-row">
+              <h1>Статистика и графики</h1>
+              {#if isDemoStats}
+                <span class="demo-badge">демо-данные</span>
+              {/if}
+            </div>
             <p>Выручка, активность, пользователи и текущие задачи платформы.</p>
           </div>
           <a class="topbar-btn dashboard-link" href="/admin/trust">Модерация и база</a>
@@ -529,9 +577,31 @@
   }
 
   .dashboard-head h1 {
-    margin: 4px 0 6px;
+    margin: 0;
     font-size: 1.8rem;
     line-height: 1.15;
+  }
+
+  .dashboard-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 4px 0 6px;
+  }
+
+  .demo-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(245, 158, 11, 0.18);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.34);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
   }
 
   .dashboard-head p {
