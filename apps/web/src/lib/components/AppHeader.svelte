@@ -26,6 +26,8 @@
   let notifications: NotificationItem[] = [];
   let unreadCount = 0;
   let lastLoadedUserId = '';
+  let avatarImageFailed = false;
+  let lastAvatarUrl = '';
 
   const isActive = (path: string) => $page.url.pathname.startsWith(path);
 
@@ -40,6 +42,12 @@
     if (value.startsWith('http') || value.startsWith('data:') || value.startsWith('blob:')) return value;
     return `${getApiUrl()}${value.startsWith('/') ? value : `/${value}`}`;
   };
+
+  $: currentAvatarUrl = $user?.avatarUrl || '';
+  $: if (currentAvatarUrl !== lastAvatarUrl) {
+    lastAvatarUrl = currentAvatarUrl;
+    avatarImageFailed = false;
+  }
 
   const notificationTarget = (item: NotificationItem) => {
     const payload = item.payloadJson ?? {};
@@ -241,10 +249,14 @@
 
         <div class="user-menu">
           <button class="user-avatar" aria-label="Меню пользователя">
-            {#if $user.avatarUrl}
-              <img src={resolveAvatarUrl($user.avatarUrl)} alt={$user.fullName || 'Пользователь'} />
+            {#if currentAvatarUrl && !avatarImageFailed}
+              <img
+                src={resolveAvatarUrl(currentAvatarUrl)}
+                alt={$user.fullName || 'Пользователь'}
+                on:error={() => (avatarImageFailed = true)}
+              />
             {:else}
-              <User size={18} />
+              <span class="avatar-fallback">{$user.fullName?.slice(0, 1) || 'П'}</span>
             {/if}
           </button>
           <div class="user-dropdown">
@@ -260,7 +272,7 @@
               <ShieldCheck size={16} /> Помощь и безопасность
             </a>
             {#if $isAdmin}
-              <a class="user-dropdown-item" href="/admin/trust">
+              <a class="user-dropdown-item" href="/admin">
                 <LayoutDashboard size={16} /> Админ-панель
               </a>
             {/if}
@@ -365,7 +377,7 @@
             <ShieldCheck size={18} /> Помощь и безопасность
           </a>
           {#if $isAdmin}
-            <a class="mobile-nav-link" href="/admin/trust" on:click={closeMenu}>
+            <a class="mobile-nav-link" href="/admin" on:click={closeMenu}>
               Админ-панель
             </a>
           {/if}
@@ -649,6 +661,13 @@
     height: 100%;
     object-fit: cover;
     display: block;
+  }
+
+  .avatar-fallback {
+    font-size: 0.9rem;
+    font-weight: 800;
+    line-height: 1;
+    text-transform: uppercase;
   }
 
   .user-dropdown {

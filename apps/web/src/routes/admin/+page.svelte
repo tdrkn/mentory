@@ -20,6 +20,16 @@
     mentor?: { id: string; fullName: string; email: string } | null;
   }
 
+  interface DailyMetric {
+    date: string;
+    mentors: number;
+    mentees: number;
+    activeUsers: number;
+    sessions: number;
+    revenueCents: number;
+    platformFeeCents: number;
+  }
+
   interface AdminStats {
     mentorCount: number;
     menteeCount: number;
@@ -34,15 +44,7 @@
     activeUsers7d: number;
     pendingVerificationCount: number;
     newComplaintCount: number;
-    dailyMetrics: Array<{
-      date: string;
-      mentors: number;
-      mentees: number;
-      activeUsers: number;
-      sessions: number;
-      revenueCents: number;
-      platformFeeCents: number;
-    }>;
+    dailyMetrics: DailyMetric[];
   }
 
   type RequiredActionKind = 'verification' | 'support';
@@ -66,6 +68,21 @@
   let stats: AdminStats | null = null;
   let newComplaints: Complaint[] = [];
   let pendingRegalia: Regalia[] = [];
+
+  const emptyDailyMetrics = (): DailyMetric[] => {
+    const dayMs = 24 * 60 * 60 * 1000;
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    return Array.from({ length: 7 }, (_, index) => ({
+      date: new Date(todayStart - (6 - index) * dayMs).toISOString(),
+      mentors: 0,
+      mentees: 0,
+      activeUsers: 0,
+      sessions: 0,
+      revenueCents: 0,
+      platformFeeCents: 0,
+    }));
+  };
 
   const resolveFileUrl = (value?: string | null) => {
     if (!value) return '';
@@ -150,8 +167,10 @@
   const formatDate = (value: string) =>
     new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' }).format(new Date(value));
 
-  const maxMetric = (field: keyof NonNullable<AdminStats['dailyMetrics']>[number]) => {
-    const values = stats?.dailyMetrics?.map((item) => Number(item[field]) || 0) ?? [];
+  $: chartMetrics = stats?.dailyMetrics?.length ? stats.dailyMetrics : emptyDailyMetrics();
+
+  const maxMetric = (field: keyof DailyMetric) => {
+    const values = chartMetrics.map((item) => Number(item[field]) || 0);
     return Math.max(1, ...values);
   };
 
@@ -182,8 +201,20 @@
   {:else}
     <div class="shell">
       <div class="dashboard-card">
+        <div class="dashboard-head">
+          <div>
+            <p class="eyebrow">Админ-панель</p>
+            <h1>Статистика и графики</h1>
+            <p>Выручка, активность, пользователи и текущие задачи платформы.</p>
+          </div>
+          <a class="topbar-btn dashboard-link" href="/admin/trust">Модерация и база</a>
+        </div>
+
         <!-- Navigation cards -->
         <div class="nav-cards">
+          <a class="nav-card nav-card-active" href="/admin">
+            <span class="nav-label">Дашборд</span>
+          </a>
           <a class="nav-card" href="/admin/trust#verification">
             {#if pendingRegalia.length > 0}
               <span class="nav-dot" aria-label="Новые задачи"></span>
@@ -255,7 +286,7 @@
               </div>
             </div>
             <div class="bar-chart">
-              {#each stats?.dailyMetrics ?? [] as item}
+              {#each chartMetrics as item}
                 <div class="bar-column">
                   <div class="bar-track">
                     <div class="bar-fill revenue-bar" style={`height: ${barHeight(item.revenueCents, maxMetric('revenueCents'))}`}></div>
@@ -274,7 +305,7 @@
               </div>
             </div>
             <div class="bar-chart">
-              {#each stats?.dailyMetrics ?? [] as item}
+              {#each chartMetrics as item}
                 <div class="bar-column">
                   <div class="bar-track">
                     <div class="bar-fill activity-bar" style={`height: ${barHeight(item.activeUsers, maxMetric('activeUsers'))}`}></div>
@@ -290,7 +321,7 @@
           <section class="chart-panel" aria-label="Новые пользователи за 7 дней">
             <div class="chart-title">Новые пользователи</div>
             <div class="user-bars">
-              {#each stats?.dailyMetrics ?? [] as item}
+              {#each chartMetrics as item}
                 <div class="user-bar-row">
                   <span class="user-date">{formatDate(item.date)}</span>
                   <div class="stack-track">
@@ -481,7 +512,7 @@
   /* Dashboard panel */
   .dashboard-card {
     width: 100%;
-    max-width: 880px;
+    max-width: 1040px;
     background: #36363c;
     border-radius: 14px;
     padding: 32px 36px 40px;
@@ -490,10 +521,42 @@
     gap: 36px;
   }
 
+  .dashboard-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+  }
+
+  .dashboard-head h1 {
+    margin: 4px 0 6px;
+    font-size: 1.8rem;
+    line-height: 1.15;
+  }
+
+  .dashboard-head p {
+    margin: 0;
+    color: #cbd5e1;
+    font-size: 0.92rem;
+  }
+
+  .eyebrow {
+    color: #93c5fd !important;
+    font-size: 0.75rem !important;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .dashboard-link {
+    flex: 0 0 auto;
+    background: #e5e7eb;
+  }
+
   /* Navigation cards */
   .nav-cards {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 18px;
   }
 
@@ -514,6 +577,14 @@
     transition: background 0.15s ease, transform 0.15s ease;
   }
   .nav-card:hover { background: #444a72; transform: translateY(-1px); }
+
+  .nav-card-active {
+    background: #2563eb;
+  }
+
+  .nav-card-active:hover {
+    background: #1d4ed8;
+  }
 
   .nav-dot {
     position: absolute;
@@ -908,6 +979,13 @@
 
   /* Responsive */
   @media (max-width: 760px) {
+    .dashboard-head {
+      flex-direction: column;
+    }
+    .dashboard-link {
+      width: 100%;
+      text-align: center;
+    }
     .nav-cards {
       grid-template-columns: 1fr;
     }

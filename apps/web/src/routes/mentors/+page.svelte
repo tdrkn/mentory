@@ -135,6 +135,10 @@
     return `${getApiUrl()}${value.startsWith('/') ? value : `/${value}`}`;
   };
 
+  const hideBrokenImage = (event: Event) => {
+    (event.currentTarget as HTMLImageElement).style.display = 'none';
+  };
+
   // Active filter pills
   $: activeFilterPills = [
     ...(minPrice ? [{ label: `Цена от: ${minPrice} руб`, clear: () => { minPrice = ''; } }] : []),
@@ -304,10 +308,13 @@
             <a class="mentor-card reveal" href={`/mentors/${mentor.id}`} style={`animation-delay:${i * 0.05}s`}>
               <div class="mentor-card-header">
                 <div class="avatar avatar-lg">
+                  <span>{mentor.fullName?.charAt(0) || 'M'}</span>
                   {#if mentor.avatarUrl}
-                    <img src={resolveAvatarUrl(mentor.avatarUrl)} alt={mentor.fullName} />
-                  {:else}
-                    {mentor.fullName?.charAt(0) || 'M'}
+                    <img
+                      src={resolveAvatarUrl(mentor.avatarUrl)}
+                      alt={mentor.fullName}
+                      on:error={hideBrokenImage}
+                    />
                   {/if}
                 </div>
                 <div class="mentor-card-info">
@@ -543,6 +550,21 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 24px;
+  }
+
+  .avatar {
+    position: relative;
+  }
+
+  .avatar span {
+    position: relative;
+    z-index: 0;
+  }
+
+  .avatar img {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
   }
 
   .empty-state {

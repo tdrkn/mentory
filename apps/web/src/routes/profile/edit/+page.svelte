@@ -48,6 +48,7 @@
   let profileEmail = '';
   let profileRole = '';
   let avatarUrl: string | null = null;
+  let avatarImageFailed = false;
   let avatarInput: HTMLInputElement;
   let achievementInput: HTMLInputElement;
   let mentorVerificationStatus: string | null = null;
@@ -204,8 +205,8 @@
 
   const resolveFileUrl = (value?: string | null) => {
     if (!value) return '';
-    if (value.startsWith('http') || value.startsWith('data:')) return value;
-    return `${getApiUrl()}${value}`;
+    if (value.startsWith('http') || value.startsWith('data:') || value.startsWith('blob:')) return value;
+    return `${getApiUrl()}${value.startsWith('/') ? value : `/${value}`}`;
   };
 
   const formatBirthDate = (value?: string | null) => {
@@ -241,6 +242,7 @@
     profileEmail = profile.email || '';
     profileRole = profile.role || '';
     avatarUrl = profile.avatarUrl || null;
+    avatarImageFailed = false;
 
     const fn = profile.firstName || (profile.fullName || '').split(' ')[0] || '';
     const ln = profile.lastName || (profile.fullName || '').split(' ').slice(1).join(' ') || '';
@@ -403,6 +405,7 @@
         avatarSize: file.size,
       });
       avatarUrl = updated.avatarUrl;
+      avatarImageFailed = false;
       message = 'Фото профиля обновлено.';
     } finally {
       isUploadingAvatar = false;
@@ -686,8 +689,12 @@
             <section class="profile-card">
               <h2>Фото профиля</h2>
               <div class="avatar-preview">
-                {#if avatarUrl}
-                  <img src={resolveFileUrl(avatarUrl)} alt="Фото профиля" />
+                {#if avatarUrl && !avatarImageFailed}
+                  <img
+                    src={resolveFileUrl(avatarUrl)}
+                    alt="Фото профиля"
+                    on:error={() => (avatarImageFailed = true)}
+                  />
                 {:else}
                   <span>{$formData.fullName?.slice(0, 1) || 'M'}</span>
                 {/if}
@@ -802,8 +809,12 @@
             <section class="profile-card">
               <h2>Фото профиля</h2>
               <div class="avatar-preview">
-                {#if avatarUrl}
-                  <img src={resolveFileUrl(avatarUrl)} alt="Фото профиля" />
+                {#if avatarUrl && !avatarImageFailed}
+                  <img
+                    src={resolveFileUrl(avatarUrl)}
+                    alt="Фото профиля"
+                    on:error={() => (avatarImageFailed = true)}
+                  />
                 {:else}
                   <span>{$formData.fullName?.slice(0, 1) || '?'}</span>
                 {/if}

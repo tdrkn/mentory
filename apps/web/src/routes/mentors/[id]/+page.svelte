@@ -105,6 +105,10 @@
     return `${getApiUrl()}${value.startsWith('/') ? value : `/${value}`}`;
   };
 
+  const hideBrokenImage = (event: Event) => {
+    (event.currentTarget as HTMLImageElement).style.display = 'none';
+  };
+
   const formatMoney = (amount: string | number, currency: string) => {
     const value = Number(amount);
     if (!Number.isFinite(value)) return `${amount} ${currency}`;
@@ -238,10 +242,13 @@
         <div class="mentor-main">
           <section class="profile-card hero-card">
             <div class="avatar">
+              <span>{mentor.fullName.slice(0, 1)}</span>
               {#if mentor.avatarUrl}
-                <img src={resolveFileUrl(mentor.avatarUrl)} alt="Фото ментора" />
-              {:else}
-                <span>{mentor.fullName.slice(0, 1)}</span>
+                <img
+                  src={resolveFileUrl(mentor.avatarUrl)}
+                  alt="Фото ментора"
+                  on:error={hideBrokenImage}
+                />
               {/if}
             </div>
             <div class="hero-info">
@@ -563,6 +570,7 @@
   }
 
   .avatar {
+    position: relative;
     width: 82px;
     height: 82px;
     flex: 0 0 82px;
@@ -579,9 +587,16 @@
   }
 
   .avatar img {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+
+  .avatar span {
+    position: relative;
+    z-index: 0;
   }
 
   .hero-info {
