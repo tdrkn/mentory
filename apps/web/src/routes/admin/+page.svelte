@@ -25,6 +25,24 @@
     menteeCount: number;
     mentorDelta24h: number;
     menteeDelta24h: number;
+    revenueCents: number;
+    platformFeeCents: number;
+    revenueDelta24h: number;
+    platformFeeDelta24h: number;
+    sessionCount: number;
+    sessionDelta24h: number;
+    activeUsers7d: number;
+    pendingVerificationCount: number;
+    newComplaintCount: number;
+    dailyMetrics: Array<{
+      date: string;
+      mentors: number;
+      mentees: number;
+      activeUsers: number;
+      sessions: number;
+      revenueCents: number;
+      platformFeeCents: number;
+    }>;
   }
 
   type RequiredActionKind = 'verification' | 'support';
@@ -121,6 +139,26 @@
     logout(false);
     goto('/admin/login');
   };
+
+  const formatMoney = (cents = 0) =>
+    new Intl.NumberFormat('ru-RU', {
+      style: 'currency',
+      currency: 'RUB',
+      maximumFractionDigits: 0,
+    }).format(cents / 100);
+
+  const formatDate = (value: string) =>
+    new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' }).format(new Date(value));
+
+  const maxMetric = (field: keyof NonNullable<AdminStats['dailyMetrics']>[number]) => {
+    const values = stats?.dailyMetrics?.map((item) => Number(item[field]) || 0) ?? [];
+    return Math.max(1, ...values);
+  };
+
+  const barHeight = (value: number, max: number) => {
+    if (value <= 0) return '2%';
+    return `${Math.max(8, Math.round((value / max) * 100))}%`;
+  };
 </script>
 
 <svelte:head>
@@ -183,6 +221,127 @@
             <div class="counter-value">{stats?.menteeCount ?? 0}</div>
             <div class="counter-label">менти</div>
           </div>
+        </div>
+
+        <div class="summary-grid">
+          <div class="summary-item">
+            <div class="summary-label">Выручка</div>
+            <div class="summary-value">{formatMoney(stats?.revenueCents ?? 0)}</div>
+            <div class="summary-note">+{formatMoney(stats?.revenueDelta24h ?? 0)} за сутки</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Комиссия платформы</div>
+            <div class="summary-value">{formatMoney(stats?.platformFeeCents ?? 0)}</div>
+            <div class="summary-note">+{formatMoney(stats?.platformFeeDelta24h ?? 0)} за сутки</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Активные входы</div>
+            <div class="summary-value">{stats?.activeUsers7d ?? 0}</div>
+            <div class="summary-note">за последние 7 дней</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Сессии</div>
+            <div class="summary-value">{stats?.sessionCount ?? 0}</div>
+            <div class="summary-note">+{stats?.sessionDelta24h ?? 0} за сутки</div>
+          </div>
+        </div>
+
+        <div class="charts-grid">
+          <section class="chart-panel" aria-label="Выручка за 7 дней">
+            <div class="chart-head">
+              <div>
+                <div class="chart-title">Выручка</div>
+                <div class="chart-caption">успешные платежи за 7 дней</div>
+              </div>
+            </div>
+            <div class="bar-chart">
+              {#each stats?.dailyMetrics ?? [] as item}
+                <div class="bar-column">
+                  <div class="bar-track">
+                    <div class="bar-fill revenue-bar" style={`height: ${barHeight(item.revenueCents, maxMetric('revenueCents'))}`}></div>
+                  </div>
+                  <div class="bar-label">{formatDate(item.date)}</div>
+                </div>
+              {/each}
+            </div>
+          </section>
+
+          <section class="chart-panel" aria-label="Активность за 7 дней">
+            <div class="chart-head">
+              <div>
+                <div class="chart-title">Посещения</div>
+                <div class="chart-caption">активные входы пользователей</div>
+              </div>
+            </div>
+            <div class="bar-chart">
+              {#each stats?.dailyMetrics ?? [] as item}
+                <div class="bar-column">
+                  <div class="bar-track">
+                    <div class="bar-fill activity-bar" style={`height: ${barHeight(item.activeUsers, maxMetric('activeUsers'))}`}></div>
+                  </div>
+                  <div class="bar-label">{formatDate(item.date)}</div>
+                </div>
+              {/each}
+            </div>
+          </section>
+        </div>
+
+        <div class="charts-grid charts-grid-secondary">
+          <section class="chart-panel" aria-label="Новые пользователи за 7 дней">
+            <div class="chart-title">Новые пользователи</div>
+            <div class="user-bars">
+              {#each stats?.dailyMetrics ?? [] as item}
+                <div class="user-bar-row">
+                  <span class="user-date">{formatDate(item.date)}</span>
+                  <div class="stack-track">
+                    <span
+                      class="stack-segment mentors-segment"
+                      style={`width: ${Math.round((item.mentors / maxMetric('mentors')) * 100)}%`}
+                    ></span>
+                    <span
+                      class="stack-segment mentees-segment"
+                      style={`width: ${Math.round((item.mentees / maxMetric('mentees')) * 100)}%`}
+                    ></span>
+                  </div>
+                  <span class="user-count">{item.mentors + item.mentees}</span>
+                </div>
+              {/each}
+            </div>
+            <div class="legend">
+              <span><i class="legend-dot mentors-dot"></i>менторы</span>
+              <span><i class="legend-dot mentees-dot"></i>менти</span>
+            </div>
+          </section>
+
+          <section class="chart-panel" aria-label="Операционная очередь">
+            <div class="chart-title">Очередь задач</div>
+            <div class="task-meters">
+              <div class="task-meter">
+                <div class="task-meter-head">
+                  <span>Верификация</span>
+                  <strong>{stats?.pendingVerificationCount ?? pendingRegalia.length}</strong>
+                </div>
+                <div class="meter-track">
+                  <span
+                    class="meter-fill verification-fill"
+                    style={`width: ${Math.min(100, ((stats?.pendingVerificationCount ?? pendingRegalia.length) / Math.max(1, requiredActions.length)) * 100)}%`}
+                  ></span>
+                </div>
+              </div>
+              <div class="task-meter">
+                <div class="task-meter-head">
+                  <span>Поддержка</span>
+                  <strong>{stats?.newComplaintCount ?? newComplaints.length}</strong>
+                </div>
+                <div class="meter-track">
+                  <span
+                    class="meter-fill support-fill"
+                    style={`width: ${Math.min(100, ((stats?.newComplaintCount ?? newComplaints.length) / Math.max(1, requiredActions.length)) * 100)}%`}
+                  ></span>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
 
         <!-- Required actions -->
@@ -415,6 +574,214 @@
     color: #d4d4d8;
   }
 
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .summary-item {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 14px;
+    min-width: 0;
+  }
+
+  .summary-label {
+    color: #a1a1aa;
+    font-size: 0.78rem;
+    line-height: 1.25;
+  }
+
+  .summary-value {
+    color: #fff;
+    font-size: 1.35rem;
+    font-weight: 750;
+    line-height: 1.15;
+    margin-top: 8px;
+    overflow-wrap: anywhere;
+  }
+
+  .summary-note {
+    color: #cbd5e1;
+    font-size: 0.78rem;
+    margin-top: 4px;
+  }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .charts-grid-secondary {
+    margin-top: -20px;
+  }
+
+  .chart-panel {
+    background: rgba(20, 20, 24, 0.34);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 0;
+  }
+
+  .chart-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .chart-title {
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
+  .chart-caption {
+    color: #a1a1aa;
+    font-size: 0.78rem;
+    margin-top: 2px;
+  }
+
+  .bar-chart {
+    height: 148px;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    align-items: end;
+    gap: 9px;
+  }
+
+  .bar-column {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .bar-track {
+    flex: 1;
+    display: flex;
+    align-items: end;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 7px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    width: 100%;
+    border-radius: 7px 7px 0 0;
+    transition: height 0.2s ease;
+  }
+
+  .revenue-bar {
+    background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+  }
+
+  .activity-bar {
+    background: linear-gradient(180deg, #34d399 0%, #059669 100%);
+  }
+
+  .bar-label,
+  .user-date,
+  .user-count {
+    color: #a1a1aa;
+    font-size: 0.68rem;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .user-bars,
+  .task-meters {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .user-bar-row {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) 24px;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .stack-track,
+  .meter-track {
+    height: 9px;
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 999px;
+    overflow: hidden;
+    display: flex;
+  }
+
+  .stack-segment,
+  .meter-fill {
+    min-width: 0;
+    height: 100%;
+    display: block;
+  }
+
+  .mentors-segment {
+    background: #60a5fa;
+  }
+
+  .mentees-segment {
+    background: #34d399;
+  }
+
+  .legend {
+    display: flex;
+    gap: 14px;
+    color: #cbd5e1;
+    font-size: 0.76rem;
+    margin-top: 14px;
+  }
+
+  .legend-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    margin-right: 5px;
+  }
+
+  .mentors-dot {
+    background: #60a5fa;
+  }
+
+  .mentees-dot {
+    background: #34d399;
+  }
+
+  .task-meter-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: #e5e7eb;
+    font-size: 0.84rem;
+    margin-bottom: 7px;
+  }
+
+  .task-meter-head strong {
+    color: #fff;
+    font-size: 1rem;
+  }
+
+  .verification-fill {
+    background: #60a5fa;
+  }
+
+  .support-fill {
+    background: #f59e0b;
+  }
+
   /* Required actions */
   .actions-block {
     display: flex;
@@ -547,6 +914,13 @@
     .counter-row {
       grid-template-columns: 1fr;
       padding: 0;
+    }
+    .summary-grid,
+    .charts-grid {
+      grid-template-columns: 1fr;
+    }
+    .charts-grid-secondary {
+      margin-top: -20px;
     }
     .counter-value {
       font-size: 3rem;

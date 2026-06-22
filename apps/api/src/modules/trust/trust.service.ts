@@ -411,7 +411,34 @@ export class TrustService {
 
   async getAdminStats() {
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [mentorTotal, menteeTotal, mentorRecent, menteeRecent] = await Promise.all([
+    const dayMs = 24 * 60 * 60 * 1000;
+    const startOfUtcDay = (date: Date) =>
+      new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const todayStart = startOfUtcDay(new Date());
+    const ranges = Array.from({ length: 7 }, (_, index) => {
+      const start = new Date(todayStart.getTime() - (6 - index) * dayMs);
+      const end = new Date(start.getTime() + dayMs);
+      return {
+        start,
+        end,
+        date: start.toISOString().slice(0, 10),
+      };
+    });
+
+    const [
+      mentorTotal,
+      menteeTotal,
+      mentorRecent,
+      menteeRecent,
+      revenueTotal,
+      revenueRecent,
+      sessionTotal,
+      sessionRecent,
+      activeUsers7d,
+      pendingVerificationCount,
+      newComplaintCount,
+      dailyMetrics,
+    ] = await Promise.all([
       this.prisma.user.count({ where: { role: { in: ['mentor', 'both'] } } }),
       this.prisma.user.count({ where: { role: { in: ['mentee', 'both'] } } }),
       this.prisma.user.count({
@@ -420,12 +447,64 @@ export class TrustService {
       this.prisma.user.count({
         where: { role: { in: ['mentee', 'both'] }, createdAt: { gte: dayAgo } },
       }),
+      this.prisma.payment.aggregate({
+        where: { status: { in: ['succeeded', 'paid'] } },
+        _sum: { amount: true, platformFee: true },
+      }),
+      this.prisma.payment.aggregate({
+        where: { status: { in: ['succeeded', 'paid'] }, createdAt: { gte: dayAgo } },
+        _sum: { amount: true, platformFee: true },
+      }),
+      this.prisma.session.count(),
+      this.prisma.session.count({ where: { createdAt: { gte: dayAgo } } }),
+      this.prisma.user.count({ where: { lastLoginAt: { gte: ranges[0].start } } }),
+      this.prisma.mentorRegalia.count({ where: { status: 'pending' } }),
+      this.prisma.complaint.count({ where: { status: 'new' } }),
+      Promise.all(
+        ranges.map(async ({ date, start, end }) => {
+          const [mentors, mentees, activeUsers, sessions, revenue] = await Promise.all([
+            this.prisma.user.count({
+              where: { role: { in: ['mentor', 'both'] }, createdAt: { gte: start, lt: end } },
+            }),
+            this.prisma.user.count({
+              where: { role: { in: ['mentee', 'both'] }, createdAt: { gte: start, lt: end } },
+            }),
+            this.prisma.user.count({ where: { lastLoginAt: { gte: start, lt: end } } }),
+            this.prisma.session.count({ where: { createdAt: { gte: start, lt: end } } }),
+            this.prisma.payment.aggregate({
+              where: { status: { in: ['succeeded', 'paid'] }, createdAt: { gte: start, lt: end } },
+              _sum: { amount: true, platformFee: true },
+            }),
+          ]);
+
+          return {
+            date,
+            mentors,
+            mentees,
+            activeUsers,
+            sessions,
+            revenueCents: revenue._sum.amount ?? 0,
+            platformFeeCents: revenue._sum.platformFee ?? 0,
+          };
+        }),
+      ),
     ]);
+
     return {
       mentorCount: mentorTotal,
       menteeCount: menteeTotal,
       mentorDelta24h: mentorRecent,
       menteeDelta24h: menteeRecent,
+      revenueCents: revenueTotal._sum.amount ?? 0,
+      platformFeeCents: revenueTotal._sum.platformFee ?? 0,
+      revenueDelta24h: revenueRecent._sum.amount ?? 0,
+      platformFeeDelta24h: revenueRecent._sum.platformFee ?? 0,
+      sessionCount: sessionTotal,
+      sessionDelta24h: sessionRecent,
+      activeUsers7d,
+      pendingVerificationCount,
+      newComplaintCount,
+      dailyMetrics,
     };
   }
 
