@@ -80,34 +80,34 @@
   {#if $authLoading || isLoading}
     <Loading />
   {:else}
-    <main class="container section">
-      <h1 class="section-title">Добро пожаловать, {$user?.fullName}</h1>
-      <p class="muted">Ваш центр управления менторством</p>
+    <main class="container section mentor-dashboard">
+      <h1 class="section-title dashboard-title">Добро пожаловать, {$user?.fullName}</h1>
+      <p class="muted dashboard-subtitle">Ваш центр управления менторством</p>
 
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin:18px 0;gap:12px;">
-        <div class="card">
+      <div class="dashboard-stats">
+        <div class="card stat-card">
           <div class="muted">Всего сессий</div>
-          <div style="font-size:1.8rem;font-weight:700;">{sessions.length}</div>
+          <div class="stat-value">{sessions.length}</div>
         </div>
-        <div class="card">
+        <div class="card stat-card">
           <div class="muted">Предстоящие</div>
-          <div style="font-size:1.8rem;font-weight:700;color:var(--accent);">{upcoming().length}</div>
+          <div class="stat-value stat-accent">{upcoming().length}</div>
         </div>
-        <div class="card">
+        <div class="card stat-card">
           <div class="muted">Ожидают подтверждения</div>
-          <div style="font-size:1.8rem;font-weight:700;color:var(--amber);">{pending().length}</div>
+          <div class="stat-value stat-warning">{pending().length}</div>
         </div>
-        <div class="card">
+        <div class="card stat-card">
           <div class="muted">Баланс</div>
-          <div style="font-size:1.4rem;font-weight:700;">
+          <div class="stat-value stat-balance">
             {balance ? `${balance.available} ${balance.currency}` : '—'}
           </div>
         </div>
       </div>
 
-      <div class="card" style="margin-bottom:20px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
-          <h2 class="section-title" style="margin:0;">Заявки на встречи со мной</h2>
+      <div class="card requests-card">
+        <div class="card-head">
+          <h2 class="section-title card-title">Заявки на встречи со мной</h2>
           <a class="btn btn-outline btn-sm" href="/requests">Все заявки</a>
         </div>
         {#if pending().length === 0}
@@ -115,24 +115,24 @@
         {:else}
           <div class="stack">
             {#each pending() as request}
-              <div class="surface" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-                <div>
+              <div class="surface request-row">
+                <div class="request-copy">
                   <strong>{request.mentee.fullName}</strong>
                   <div class="muted">{request.service.title}</div>
                   {#if request.status === 'paid'}
-                    <div class="muted" style="font-size:0.86rem;color:var(--accent);">Оплачено, ожидает вашего подтверждения</div>
+                    <div class="muted request-note request-paid">Оплачено, ожидает вашего подтверждения</div>
                   {/if}
                   {#if request.requestGoal}
-                    <div class="muted" style="font-size:0.86rem;">Цель: {request.requestGoal}</div>
+                    <div class="muted request-note">Цель: {request.requestGoal}</div>
                   {/if}
                   {#if request.requestMotivation}
-                    <div class="muted" style="font-size:0.86rem;max-width:520px;">{request.requestMotivation}</div>
+                    <div class="muted request-note request-motivation">{request.requestMotivation}</div>
                   {/if}
-                  <div class="muted" style="font-size:0.86rem;">
+                  <div class="muted request-note">
                     {new Date(request.startAt).toLocaleDateString('ru-RU')} · {new Date(request.startAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <div class="request-actions">
                   <button
                     class="btn btn-primary"
                     on:click={() => approveRequest(request.id)}
@@ -156,15 +156,15 @@
         {/if}
       </div>
 
-      <div class="grid" style="grid-template-columns:2fr 1fr;gap:20px;">
+      <div class="dashboard-main-grid">
         <div class="card">
-          <h2 class="section-title">Предстоящие сессии</h2>
+          <h2 class="section-title card-title">Предстоящие сессии</h2>
           {#if upcoming().length === 0}
             <p class="muted">Пока нет предстоящих сессий.</p>
           {:else}
             <div class="stack">
               {#each upcoming().slice(0, 4) as session}
-                <div class="surface" style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="surface session-row">
                   <div>
                     <strong>{session.mentee.fullName}</strong>
                     <div class="muted">{session.service.title}</div>
@@ -179,8 +179,8 @@
         </div>
 
         <div class="card">
-          <h2 class="section-title">Быстрые действия</h2>
-          <div class="stack">
+          <h2 class="section-title card-title">Быстрые действия</h2>
+          <div class="stack quick-actions">
             <a class="btn btn-primary" href="/schedule">Управлять расписанием</a>
             <a class="btn btn-ghost" href="/profile/edit">Редактировать профиль</a>
             <a class="btn btn-ghost" href="/earnings">Вывод средств</a>
@@ -190,3 +190,172 @@
     </main>
   {/if}
 </div>
+
+<style>
+  .mentor-dashboard {
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .dashboard-title {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    line-height: 1.18;
+  }
+
+  .dashboard-subtitle {
+    margin-top: 6px;
+  }
+
+  .dashboard-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin: 18px 0;
+  }
+
+  .stat-card {
+    min-height: 110px;
+    display: grid;
+    align-content: start;
+    gap: 8px;
+  }
+
+  .stat-value {
+    font-size: 1.8rem;
+    line-height: 1.1;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+
+  .stat-accent {
+    color: var(--accent);
+  }
+
+  .stat-warning {
+    color: var(--amber);
+  }
+
+  .stat-balance {
+    font-size: 1.35rem;
+  }
+
+  .requests-card {
+    margin-bottom: 20px;
+  }
+
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  .card-title {
+    margin: 0;
+    line-height: 1.18;
+    overflow-wrap: anywhere;
+  }
+
+  .request-row,
+  .session-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .request-copy {
+    min-width: min(100%, 260px);
+    flex: 1 1 320px;
+  }
+
+  .request-note {
+    font-size: 0.86rem;
+  }
+
+  .request-paid {
+    color: var(--accent);
+  }
+
+  .request-motivation {
+    max-width: 520px;
+  }
+
+  .request-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+
+  .dashboard-main-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+    gap: 20px;
+  }
+
+  .quick-actions .btn {
+    width: 100%;
+    justify-content: center;
+    white-space: normal;
+    text-align: center;
+  }
+
+  @media (max-width: 1100px) {
+    .dashboard-stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 980px) {
+    .dashboard-main-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .dashboard-stats,
+    .quick-actions {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .card-head,
+    .request-row,
+    .session-row {
+      align-items: stretch;
+    }
+
+    .card-head .btn,
+    .request-actions,
+    .request-actions .btn {
+      width: 100%;
+    }
+
+    .request-actions {
+      justify-content: stretch;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .mentor-dashboard {
+      padding-inline: 14px;
+    }
+
+    .stat-card,
+    .mentor-dashboard :global(.card) {
+      padding: 18px;
+    }
+  }
+</style>
