@@ -815,7 +815,7 @@
     color: var(--muted);
   }
 
-  @media (max-width: 900px) {
+  @media (max-width: 1180px) {
     .nav-desktop {
       display: none;
     }
@@ -845,7 +845,8 @@
     }
 
     .header-inner {
-      padding: 12px 16px;
+      padding: 10px 12px;
+      gap: 12px;
     }
   }
 </style>
